@@ -75,6 +75,130 @@ sqlite.exec(`
     processed_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_processed_channel_ts ON processed_messages(channel_id, message_ts);
+
+  CREATE TABLE IF NOT EXISTS people (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    company_id TEXT,
+    role TEXT,
+    slack_user_id TEXT,
+    source TEXT NOT NULL DEFAULT 'manual',
+    metadata TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_people_email ON people(email);
+  CREATE INDEX IF NOT EXISTS idx_people_slack_user_id ON people(slack_user_id);
+  CREATE INDEX IF NOT EXISTS idx_people_company_id ON people(company_id);
+
+  CREATE TABLE IF NOT EXISTS companies (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    industry TEXT,
+    status TEXT NOT NULL DEFAULT 'prospect',
+    revenue INTEGER,
+    employee_count INTEGER,
+    website TEXT,
+    metadata TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
+  CREATE INDEX IF NOT EXISTS idx_companies_status ON companies(status);
+
+  CREATE TABLE IF NOT EXISTS deals (
+    id TEXT PRIMARY KEY,
+    company_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    stage TEXT NOT NULL DEFAULT 'lead',
+    value INTEGER,
+    close_date INTEGER,
+    owner_id TEXT,
+    owner_slack_id TEXT,
+    source TEXT,
+    metadata TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_deals_company_id ON deals(company_id);
+  CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
+  CREATE INDEX IF NOT EXISTS idx_deals_owner_slack_id ON deals(owner_slack_id);
+
+  CREATE TABLE IF NOT EXISTS meetings (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    date INTEGER,
+    duration INTEGER,
+    source TEXT NOT NULL DEFAULT 'zoom',
+    zoom_meeting_id TEXT,
+    calendar_event_id TEXT,
+    transcript_text TEXT,
+    summary TEXT,
+    meeting_type TEXT,
+    metadata TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_meetings_zoom_meeting_id ON meetings(zoom_meeting_id);
+  CREATE INDEX IF NOT EXISTS idx_meetings_date ON meetings(date);
+
+  CREATE TABLE IF NOT EXISTS documents (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    type TEXT,
+    content TEXT,
+    version INTEGER NOT NULL DEFAULT 1,
+    auto_generated INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'draft',
+    created_by TEXT,
+    metadata TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(type);
+  CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
+
+  CREATE TABLE IF NOT EXISTS decisions (
+    id TEXT PRIMARY KEY,
+    what TEXT NOT NULL,
+    context TEXT,
+    decided_by TEXT,
+    meeting_id TEXT,
+    source_type TEXT NOT NULL DEFAULT 'meeting',
+    source_ref TEXT,
+    metadata TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_decisions_meeting_id ON decisions(meeting_id);
+  CREATE INDEX IF NOT EXISTS idx_decisions_decided_by ON decisions(decided_by);
+
+  CREATE TABLE IF NOT EXISTS relationships (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    relationship_type TEXT NOT NULL,
+    metadata TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_relationships_source ON relationships(source_type, source_id);
+  CREATE INDEX IF NOT EXISTS idx_relationships_target ON relationships(target_type, target_id);
+  CREATE INDEX IF NOT EXISTS idx_relationships_type ON relationships(relationship_type);
+
+  CREATE TABLE IF NOT EXISTS knowledge_entries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type TEXT NOT NULL,
+    source_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    embedding BLOB,
+    embedding_model TEXT,
+    metadata TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_knowledge_entries_source ON knowledge_entries(source_type, source_id);
 `);
 
 console.log('Database initialized.');
