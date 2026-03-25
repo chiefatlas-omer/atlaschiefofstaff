@@ -1,5 +1,7 @@
 import type { App } from '@slack/bolt';
 import { completeTask, dismissTask, confirmTask, getTaskById, createTask } from '../tasks/task-service';
+import { publishSOP, archiveSOP } from '../services/sop-service';
+import { markCorrect, recordCorrection } from '../services/feedback-service';
 
 export function registerInteractionHandlers(app: App) {
   // Mark Complete button
@@ -235,6 +237,116 @@ export function registerInteractionHandlers(app: App) {
   // View thread noop (just acknowledges)
   app.action('view_thread_noop', async ({ ack }) => {
     await ack();
+  });
+
+  // --- SOP button handlers ---
+
+  // Publish SOP draft
+  app.action('sop_publish', async ({ action, ack, client, body }) => {
+    await ack();
+    if (action.type !== 'button') return;
+
+    const docId = action.value!;
+    publishSOP(docId);
+
+    if ('channel' in body && body.channel && 'message' in body && body.message) {
+      await client.chat.update({
+        channel: (body as any).channel.id,
+        ts: (body as any).message.ts,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `:white_check_mark: SOP *published* and now active. Doc ID: \`${docId}\``,
+            },
+          },
+        ],
+        text: 'SOP published: ' + docId,
+      });
+    }
+  });
+
+  // Dismiss SOP draft
+  app.action('sop_dismiss', async ({ action, ack, client, body }) => {
+    await ack();
+    if (action.type !== 'button') return;
+
+    const docId = action.value!;
+    archiveSOP(docId);
+
+    if ('channel' in body && body.channel && 'message' in body && body.message) {
+      await client.chat.update({
+        channel: (body as any).channel.id,
+        ts: (body as any).message.ts,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `_SOP draft dismissed and archived. Doc ID: \`${docId}\`_`,
+            },
+          },
+        ],
+        text: 'SOP dismissed: ' + docId,
+      });
+    }
+  });
+
+  // --- Q&A feedback button handlers ---
+
+  // Mark answer as correct
+  app.action('qa_correct', async ({ action, ack, client, body }) => {
+    await ack();
+    if (action.type !== 'button') return;
+
+    const qaId = parseInt(action.value!, 10);
+    markCorrect(qaId);
+
+    if ('channel' in body && body.channel && 'message' in body && body.message) {
+      const existingBlocks = ((body as any).message.blocks ?? []).filter(
+        (b: any) => b.type !== 'actions',
+      );
+      await client.chat.update({
+        channel: (body as any).channel.id,
+        ts: (body as any).message.ts,
+        blocks: [
+          ...existingBlocks,
+          {
+            type: 'context',
+            elements: [{ type: 'mrkdwn', text: ':thumbsup: Marked as correct — thanks for the feedback!' }],
+          },
+        ],
+        text: 'Answer marked correct',
+      });
+    }
+  });
+
+  // Mark answer as incorrect
+  app.action('qa_incorrect', async ({ action, ack, client, body }) => {
+    await ack();
+    if (action.type !== 'button') return;
+
+    const qaId = parseInt(action.value!, 10);
+    await recordCorrection(qaId, 'User indicated answer was incorrect');
+
+    if ('channel' in body && body.channel && 'message' in body && body.message) {
+      const existingBlocks = ((body as any).message.blocks ?? []).filter(
+        (b: any) => b.type !== 'actions',
+      );
+      await client.chat.update({
+        channel: (body as any).channel.id,
+        ts: (body as any).message.ts,
+        blocks: [
+          ...existingBlocks,
+          {
+            type: 'context',
+            elements: [{ type: 'mrkdwn', text: ':thumbsdown: Noted — logged as incorrect to improve future answers.' }],
+          },
+        ],
+        text: 'Answer marked incorrect',
+      });
+    }
   });
 
   // --- Zoom meeting assignment handlers ---

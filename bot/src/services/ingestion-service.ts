@@ -9,6 +9,7 @@ import {
 } from './graph-service';
 import { ingestText } from './embedding-service';
 import { extractEntities, ExtractedEntities } from '../ai/entity-extractor';
+import { recordTopics } from './topic-tracker';
 
 // --- Zoom Transcript Ingestion ---
 
@@ -136,6 +137,12 @@ export async function ingestZoomTranscript(
     console.error('[ingestion] Error embedding transcript:', err);
   }
 
+  // Record topics for SOP pattern detection
+  const sopCandidates = await recordTopics(entities.topics, 'zoom_transcript', meeting.id);
+  if (sopCandidates.length > 0) {
+    console.log(`[ingestion] SOP candidates detected from Zoom: ${sopCandidates.map(c => c.topic).join(', ')}`);
+  }
+
   return { meetingId: meeting.id, entities, chunkCount };
 }
 
@@ -217,6 +224,13 @@ export async function ingestSlackMessage(
         console.error('[ingestion] Error creating decision from Slack message:', err);
       }
     }
+
+    if (entities.topics.length > 0) {
+      const sopCandidates = await recordTopics(entities.topics, 'slack_message', input.messageTs);
+      if (sopCandidates.length > 0) {
+        console.log(`[ingestion] SOP candidates from Slack: ${sopCandidates.map(c => c.topic).join(', ')}`);
+      }
+    }
   }
 
   // Embed the message
@@ -278,6 +292,10 @@ export async function ingestDocument(
     console.log(`[ingestion] Extracted entities from document`);
   } catch (err) {
     console.error('[ingestion] Error extracting entities from document:', err);
+  }
+
+  if (entities.topics.length > 0) {
+    void recordTopics(entities.topics, 'document', doc.id);
   }
 
   // Link companies as 'applies_to'
