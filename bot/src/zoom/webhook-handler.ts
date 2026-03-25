@@ -6,6 +6,7 @@ import { db } from '../db/connection';
 import { zoomUserMappings } from '../db/schema';
 import { extractParticipantsFromVtt } from './transcript-fetcher';
 import { ingestZoomTranscript } from '../services/ingestion-service';
+import { analyzeCall } from '../services/call-analyzer';
 
 type MeetingType = 'private' | 'external' | 'team';
 
@@ -602,6 +603,27 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
       });
     } catch (err) {
       console.error('[zoom] Knowledge graph ingestion failed (non-fatal):', err);
+    }
+
+    // ─── Sales Call Analysis ───────────────────────────────────
+    try {
+      const analysisResult = await analyzeCall({
+        transcript: transcriptText,
+        zoomMeetingId: meetingUuid,
+        meetingId: recording.id?.toString(),
+        title: meetingTopic,
+        date: recording.start_time ? Math.floor(new Date(recording.start_time).getTime() / 1000) : undefined,
+        duration: recording.duration,
+        repSlackId: host?.slackId,
+        repName: host?.name,
+      });
+      console.log(
+        '[zoom] Call analysis complete: id=' + analysisResult.analysisId +
+        ', outcome=' + analysisResult.outcome +
+        ', signals=' + analysisResult.productSignalCount,
+      );
+    } catch (err) {
+      console.error('[zoom] Call analysis failed (non-fatal):', err);
     }
 
     console.log(

@@ -5,6 +5,11 @@ import { getSOPCandidates } from '../services/topic-tracker';
 import { createSOPForTopic } from '../services/sop-service';
 import { config } from '../config';
 import { generateProactiveAlerts, formatAlertsForSlack } from '../services/proactive-alerts';
+import { generateWeeklyDigest, formatDigestForSlack } from '../services/sales-digest';
+import { generateCoachingSnapshot, formatCoachingForSlack } from '../services/coaching-engine';
+import { db } from '../db/connection';
+import { callAnalyses } from '../db/schema';
+import { gt, gte } from 'drizzle-orm';
 
 export function startCronJobs(client: any) {
   // Reminders: 8:00 AM and 4:00 PM CT, Mon-Fri (DM'd to each person)
@@ -151,10 +156,114 @@ export function startCronJobs(client: any) {
     }
   }, { timezone: 'America/Chicago' });
 
+  // Friday 10 AM CT: Sales Intelligence Digest — sent to leadership channel + DMs to Omer/Mark/Ehsan
+  cron.schedule('0 10 * * 5', async () => {
+    console.log('Generating weekly sales intelligence digest (Friday 10 AM CT)...');
+    try {
+      const digest = await generateWeeklyDigest();
+      const message = formatDigestForSlack(digest);
+
+      const leadershipIds = [
+        config.escalation.omerSlackUserId,
+        config.escalation.markSlackUserId,
+        config.escalation.ehsanSlackUserId,
+      ].filter(Boolean);
+
+      // Post to leadership channel
+      const leadershipChannel = config.channels.founderHubHQ;
+      if (leadershipChannel) {
+        try {
+          await client.chat.postMessage({
+            channel: leadershipChannel,
+            text: message,
+          });
+        } catch (err) {
+          console.error('[sales-digest] Failed to post to leadership channel:', err);
+        }
+      }
+
+      // DM each leader
+      for (const userId of leadershipIds) {
+        try {
+          await client.chat.postMessage({
+            channel: userId,
+            text: message,
+          });
+        } catch (err) {
+          console.error(`[sales-digest] Failed to DM ${userId}:`, err);
+        }
+      }
+
+      console.log(`[sales-digest] Sent digest (${digest.totalCalls} calls) to ${leadershipIds.length} leader(s).`);
+    } catch (error) {
+      console.error('Sales digest cron error:', error);
+    }
+  }, { timezone: 'America/Chicago' });
+
+  // Monday 9 AM CT: Coaching snapshots — per-rep coaching flags DM'd to leadership
+  cron.schedule('0 9 * * 1', async () => {
+    console.log('Generating weekly coaching snapshots (Monday 9 AM CT)...');
+    try {
+      const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
+
+      // Find reps who had calls last week
+      const recentCalls = db
+        .select({ repSlackId: callAnalyses.repSlackId })
+        .from(callAnalyses)
+        .where(gt(callAnalyses.createdAt, weekAgo))
+        .all();
+
+      const repIds = [...new Set(
+        recentCalls
+          .map((c) => c.repSlackId)
+          .filter((id): id is string => !!id),
+      )];
+
+      if (repIds.length === 0) {
+        console.log('[coaching] No reps with calls last week, skipping snapshots.');
+        return;
+      }
+
+      const leadershipIds = [
+        config.escalation.omerSlackUserId,
+        config.escalation.markSlackUserId,
+        config.escalation.ehsanSlackUserId,
+      ].filter(Boolean);
+
+      for (const repId of repIds) {
+        try {
+          const snapshot = await generateCoachingSnapshot(repId);
+          if (snapshot.coachingFlags.length > 0) {
+            const message = formatCoachingForSlack(snapshot.repName ?? repId, snapshot.coachingFlags);
+
+            for (const leaderId of leadershipIds) {
+              try {
+                await client.chat.postMessage({
+                  channel: leaderId,
+                  text: message,
+                });
+              } catch (err) {
+                console.error(`[coaching] Failed to DM ${leaderId}:`, err);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[coaching] Failed to generate snapshot for rep ${repId}:`, err);
+        }
+      }
+
+      console.log(`[coaching] Processed snapshots for ${repIds.length} rep(s).`);
+    } catch (error) {
+      console.error('Coaching cron error:', error);
+    }
+  }, { timezone: 'America/Chicago' });
+
   console.log('Cron jobs started (timezone: America/Chicago)');
   console.log('  - Reminders: 8:00 AM + 4:00 PM CT, Mon-Fri (DM to each person)');
   console.log('  - Escalation: 9:00 AM + 5:00 PM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
   console.log('  - Friday digest: Fridays at 9:00 AM CT');
   console.log('  - SOP review: Wednesdays at 10:00 AM CT');
   console.log('  - Proactive alerts: 8:30 AM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
+  console.log('  - Sales digest: Fridays at 10:00 AM CT (leadership channel + DMs)');
+  console.log('  - Coaching snapshots: Mondays at 9:00 AM CT (DM to leadership)');
 }
