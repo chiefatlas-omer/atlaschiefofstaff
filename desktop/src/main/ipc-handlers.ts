@@ -4,6 +4,7 @@ import { transcribeAudio } from './voice/whisper-client';
 import { getMyTasks } from './db/task-bridge';
 import { classifyIntent } from './ai/intent-classifier';
 import { logVoiceInteraction } from './db/voice-logger';
+import { sqlite } from './db/connection';
 
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
   let voiceMode: 'command' | 'dictation' = 'command';
@@ -124,12 +125,38 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
           mainWindow.webContents.send(IPC.ERROR, 'Meeting prep failed: ' + err.message);
         }
         mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
+      } else if (intent === 'KNOWLEDGE_QUERY') {
+        mainWindow.webContents.send(IPC.TRANSCRIPT, 'Searching knowledge base...');
+        try {
+          const rows = sqlite.prepare(
+            'SELECT content, source_type FROM knowledge_entries WHERE embedding IS NOT NULL ORDER BY created_at DESC LIMIT 20'
+          ).all() as Array<{ content: string; source_type: string }>;
+
+          if (rows.length === 0) {
+            mainWindow.webContents.send(IPC.TRANSCRIPT, "I don't have enough information to answer that yet.");
+          } else {
+            const context = rows.map((r, i) => `[${i + 1}] (${r.source_type}) ${r.content}`).join('\n\n');
+            const Anthropic = require('@anthropic-ai/sdk');
+            const ai = new Anthropic.default();
+            const aiResponse = await ai.messages.create({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 512,
+              system: 'Answer based ONLY on context. Be concise — voice response. Cite as [N].',
+              messages: [{ role: 'user', content: `Context:\n${context}\n\nQuestion: ${transcript}` }],
+            });
+            const answer = (aiResponse.content[0] as any).text?.trim() || 'No answer found.';
+            mainWindow.webContents.send(IPC.KNOWLEDGE_RESPONSE, answer);
+          }
+        } catch (err: any) {
+          mainWindow.webContents.send(IPC.ERROR, 'Knowledge query failed: ' + err.message);
+        }
+        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
       }
 
       // Log voice interaction to knowledge graph (non-blocking)
       logVoiceInteraction({
         transcript,
-        response: intent === 'TASK_QUERY' ? 'Showed task panel' : intent === 'MEETING_PREP' ? 'Showed meeting briefing' : transcript,
+        response: intent === 'TASK_QUERY' ? 'Showed task panel' : intent === 'MEETING_PREP' ? 'Showed meeting briefing' : intent === 'KNOWLEDGE_QUERY' ? 'Showed knowledge response' : transcript,
         intent,
         userId: process.env.SLACK_USER_ID,
       });

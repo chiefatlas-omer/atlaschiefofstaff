@@ -26,6 +26,8 @@ export const IPC = {
   TASKS_UPDATE: 'tasks:update',
   TASKS_GET: 'tasks:get',
   ERROR: 'app:error',
+  // Knowledge Query
+  KNOWLEDGE_RESPONSE: 'knowledge:response',
   // Meeting Briefing
   BRIEFING_SHOW: 'briefing:show',
   BRIEFING_DISMISS: 'briefing:dismiss',

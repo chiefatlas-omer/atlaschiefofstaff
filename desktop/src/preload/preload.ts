@@ -10,6 +10,8 @@ const IPC = {
   ERROR: 'app:error',
   VOICE_MODE: 'voice:mode',
   DICTATION_DATA: 'voice:dictation-data',
+  // Knowledge Query
+  KNOWLEDGE_RESPONSE: 'knowledge:response',
   // Meeting Briefing
   BRIEFING_SHOW: 'briefing:show',
   BRIEFING_DISMISS: 'briefing:dismiss',
@@ -51,6 +53,10 @@ contextBridge.exposeInMainWorld('chiefOfStaff', {
   },
   getTasks: () => ipcRenderer.invoke(IPC.TASKS_GET),
 
+  // Knowledge Response
+  onKnowledgeResponse: (cb: (answer: string) => void) => {
+    ipcRenderer.on(IPC.KNOWLEDGE_RESPONSE, (_event, answer) => cb(answer));
+  },
   // Briefing
   onBriefingShow: (cb: (brief: any) => void) => {
     ipcRenderer.on(IPC.BRIEFING_SHOW, (_event, brief) => cb(brief));

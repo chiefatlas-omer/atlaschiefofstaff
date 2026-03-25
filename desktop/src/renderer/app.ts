@@ -9,6 +9,8 @@ declare global {
       onError: (cb: (message: string) => void) => void;
       sendAudioData: (buffer: ArrayBuffer) => void;
       getTasks: () => Promise<any[]>;
+      // Knowledge
+      onKnowledgeResponse: (cb: (answer: string) => void) => void;
       // Briefing
       onBriefingShow: (cb: (brief: any) => void) => void;
       dismissBriefing: () => void;
@@ -39,6 +41,10 @@ const briefingAttendees = document.getElementById('briefing-attendees')!;
 const briefingTasks = document.getElementById('briefing-tasks')!;
 const briefingTalkingPoints = document.getElementById('briefing-talking-points')!;
 const briefingDismiss = document.getElementById('briefing-dismiss')!;
+
+// ── Knowledge Panel ──
+const knowledgePanel = document.getElementById('knowledge-panel')!;
+const knowledgeText = document.getElementById('knowledge-text')!;
 
 // ── Follow-up Panel ──
 const followupPanel = document.getElementById('followup-panel')!;
@@ -308,6 +314,19 @@ const dismissFollowUp = () => {
 
 followupDismissBtn.addEventListener('click', dismissFollowUp);
 followupDismissAction.addEventListener('click', dismissFollowUp);
+
+// ── Knowledge Response ──
+let knowledgeAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+window.chiefOfStaff.onKnowledgeResponse((answer: string) => {
+  knowledgeText.textContent = answer;
+  knowledgePanel.classList.remove('hidden');
+
+  if (knowledgeAutoHideTimer) clearTimeout(knowledgeAutoHideTimer);
+  knowledgeAutoHideTimer = setTimeout(() => {
+    knowledgePanel.classList.add('hidden');
+  }, 15000);
+});
 
 // Initial state
 setState('idle');
