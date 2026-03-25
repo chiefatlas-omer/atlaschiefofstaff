@@ -1,0 +1,196 @@
+import { App, LogLevel } from '@slack/bolt';
+import { config } from './config';
+import { registerAllListeners } from './slack/listeners';
+import { startCronJobs } from './scheduler/cron-jobs';
+import { handleZoomWebhook } from './zoom/webhook-handler';
+import http from 'http';
+
+// Run database migrations on startup
+import './db/connection';
+import { sqlite } from './db/connection';
+
+// Create tables if they don't exist
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    slack_user_id TEXT NOT NULL,
+    slack_user_name TEXT,
+    description TEXT NOT NULL,
+    raw_message_text TEXT,
+    source_channel_id TEXT,
+    source_message_ts TEXT,
+    source_thread_ts TEXT,
+    bot_reply_ts TEXT,
+    status TEXT NOT NULL DEFAULT 'DETECTED',
+    confidence TEXT,
+    team TEXT,
+    deadline_text TEXT,
+    deadline INTEGER,
+    completed_at INTEGER,
+    last_reminder_at INTEGER,
+    escalated_at INTEGER,
+    source TEXT NOT NULL DEFAULT 'slack',
+    zoom_meeting_id TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_tasks_status_deadline ON tasks(status, deadline);
+  CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(slack_user_id, status);
+
+  CREATE TABLE IF NOT EXISTS team_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slack_user_id TEXT NOT NULL,
+    team TEXT NOT NULL,
+    display_name TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS escalation_targets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slack_user_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    display_name TEXT,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS zoom_user_mappings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zoom_display_name TEXT NOT NULL UNIQUE,
+    slack_user_id TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS digest_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sent_at INTEGER NOT NULL,
+    recipient_slack_id TEXT NOT NULL,
+    task_count INTEGER NOT NULL,
+    overdue_count INTEGER NOT NULL,
+    completed_count INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS processed_messages (
+    message_ts TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL,
+    processed_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_processed_channel_ts ON processed_messages(channel_id, message_ts);
+`);
+
+console.log('Database initialized.');
+
+// Initialize the Slack Bolt app
+const app = new App({
+  token: config.slack.botToken,
+  appToken: config.slack.appToken,
+  socketMode: true,
+  logLevel: LogLevel.INFO,
+});
+
+// Register all Slack event handlers
+registerAllListeners(app);
+
+// Start cron jobs for reminders, escalation, and weekly digest
+startCronJobs(app.client);
+
+// Start a simple HTTP server for Zoom webhooks
+const httpServer = http.createServer(async (req, res) => {
+  if (req.method === 'POST' && req.url === '/zoom/webhook') {
+    let body = '';
+    req.on('data', (chunk) => { body += chunk; });
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+
+        // Verify Zoom webhook signature
+        const signature = req.headers['x-zm-signature'] as string;
+        const timestamp = req.headers['x-zm-request-timestamp'] as string;
+        const webhookSecret = config.zoom.webhookSecretToken || config.zoom.clientSecret;
+
+        if (webhookSecret && signature && timestamp) {
+          const crypto = require('crypto');
+          const message = `v0:${timestamp}:${body}`;
+          const expectedSig = 'v0=' + crypto.createHmac('sha256', webhookSecret).update(message).digest('hex');
+          if (signature !== expectedSig) {
+            console.warn('Zoom webhook signature mismatch — rejecting.');
+            res.writeHead(403);
+            res.end('Invalid signature');
+            return;
+          }
+        } else if (webhookSecret && payload.event !== 'endpoint.url_validation') {
+          console.warn('Zoom webhook missing signature headers — rejecting.');
+          res.writeHead(403);
+          res.end('Missing signature');
+          return;
+        }
+
+        // Log every incoming webhook event for debugging
+        console.log('Zoom webhook received:', payload.event, JSON.stringify(payload).substring(0, 200));
+
+        // Zoom webhook signature verification (warn-only, does not block)
+        const zoomSignature = req.headers['x-zm-signature'] as string | undefined;
+        const zoomTimestamp = req.headers['x-zm-request-timestamp'] as string | undefined;
+        if (zoomSignature && zoomTimestamp && config.zoom.webhookSecretToken) {
+          const crypto = require('crypto');
+          const message = `v0:${zoomTimestamp}:${body}`;
+          const expectedSig = 'v0=' + crypto.createHmac('sha256', config.zoom.webhookSecretToken).update(message).digest('hex');
+          if (zoomSignature !== expectedSig) {
+            console.warn('Zoom webhook signature mismatch! Expected:', expectedSig.substring(0, 20) + '...', 'Got:', zoomSignature.substring(0, 20) + '...');
+          }
+        }
+
+        // Zoom webhook validation challenge
+        if (payload.event === 'endpoint.url_validation') {
+          const crypto = require('crypto');
+          const hashForValidation = crypto
+            .createHmac('sha256', config.zoom.webhookSecretToken || config.zoom.clientSecret || '')
+            .update(payload.payload.plainToken)
+            .digest('hex');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            plainToken: payload.payload.plainToken,
+            encryptedToken: hashForValidation,
+          }));
+          return;
+        }
+
+        // Handle the webhook
+        await handleZoomWebhook(payload, app.client);
+        res.writeHead(200);
+        res.end('OK');
+      } catch (error) {
+        console.error('Zoom webhook error:', error);
+        res.writeHead(500);
+        res.end('Error');
+      }
+    });
+  } else if (req.method === 'GET' && req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', bot: 'atlaschief' }));
+  } else {
+    res.writeHead(404);
+    res.end('Not Found');
+  }
+});
+
+// Start everything
+async function start() {
+  await app.start();
+  console.log('Atlas Chief of Staff bot is running! (Socket Mode)');
+
+  httpServer.listen(config.port, () => {
+    console.log('HTTP server listening on port ' + config.port + ' (for Zoom webhooks + health check)');
+  });
+
+  console.log('');
+  console.log('=== Atlas Chief of Staff (@atlaschief) ===');
+  console.log('Monitoring Slack channels for commitments...');
+  console.log('Zoom webhook endpoint: http://localhost:' + config.port + '/zoom/webhook');
+  console.log('Health check: http://localhost:' + config.port + '/health');
+  console.log('');
+}
+
+start().catch((error) => {
+  console.error('Failed to start bot:', error);
+  process.exit(1);
+});

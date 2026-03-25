@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atlas Chief of Staff</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="status-dot" class="status-dot idle"></div>
+
+  <div id="waveform-container" class="waveform-container hidden">
+    <canvas id="waveform-canvas" width="400" height="120"></canvas>
+    <div class="waveform-label">Listening...</div>
+  </div>
+
+  <div id="transcript-bubble" class="transcript-bubble hidden">
+    <span id="transcript-text"></span>
+  </div>
+
+  <div id="error-message" class="error-message hidden">
+    <span id="error-text"></span>
+  </div>
+
+  <div id="task-panel" class="task-panel hidden">
+    <div class="task-panel-header">My Tasks</div>
+    <div id="task-list"></div>
+  </div>
+
+  <div id="computer-use-panel" class="computer-use-panel hidden">
+    <div class="computer-use-indicator"></div>
+    <span id="computer-use-status"></span>
+  </div>
+
+  <div id="briefing-panel" class="briefing-panel hidden">
+    <div class="briefing-header">
+      <div>
+        <div class="briefing-title" id="briefing-title"></div>
+        <div class="briefing-time" id="briefing-time"></div>
+      </div>
+      <button id="briefing-dismiss" class="panel-dismiss-btn">×</button>
+    </div>
+    <div class="briefing-section">
+      <div class="briefing-section-label">Attendees</div>
+      <div id="briefing-attendees"></div>
+    </div>
+    <div class="briefing-section">
+      <div class="briefing-section-label">Open Tasks</div>
+      <div id="briefing-tasks"></div>
+    </div>
+    <div class="briefing-section">
+      <div class="briefing-section-label">Talking Points</div>
+      <div id="briefing-talking-points"></div>
+    </div>
+  </div>
+
+  <div id="followup-panel" class="followup-panel hidden">
+    <div class="followup-header">
+      <span>Follow-up Email</span>
+      <button id="followup-dismiss-btn" class="panel-dismiss-btn">×</button>
+    </div>
+    <div class="followup-recipients" id="followup-recipients"></div>
+    <input type="text" id="followup-subject" class="followup-subject" />
+    <div id="followup-body" class="followup-body" contenteditable="true"></div>
+    <div class="followup-actions">
+      <button id="followup-send-btn" class="followup-btn-send">Send</button>
+      <button id="followup-copy-btn" class="followup-btn-copy">Copy</button>
+      <button id="followup-dismiss-action" class="followup-btn-dismiss">Dismiss</button>
+    </div>
+  </div>
+
+  <script>var exports = {}; var module = { exports: exports };</script>
+  <script src="components/waveform.js"></script>
+  <script>window.WaveformVisualizer = exports.WaveformVisualizer || module.exports.WaveformVisualizer;</script>
+  <script>var exports = {}; var module = { exports: exports };</script>
+  <script src="app.js"></script>
+</body>
+</html>

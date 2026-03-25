@@ -1,0 +1,22 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Node
+**/node_modules/
+**/dist/
+
+# Runtime data
+bot/data/*
+!bot/data/.gitkeep
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

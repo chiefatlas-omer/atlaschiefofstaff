@@ -1,0 +1,337 @@
+export {};
+
+declare global {
+  interface Window {
+    chiefOfStaff: {
+      onStatusChange: (cb: (state: string) => void) => void;
+      onTranscript: (cb: (text: string) => void) => void;
+      onTasksUpdate: (cb: (tasks: any[]) => void) => void;
+      onError: (cb: (message: string) => void) => void;
+      onComputerUseStatus: (cb: (status: string) => void) => void;
+      onComputerUseResult: (cb: (result: string) => void) => void;
+      sendAudioData: (buffer: ArrayBuffer) => void;
+      getTasks: () => Promise<any[]>;
+      // Briefing
+      onBriefingShow: (cb: (brief: any) => void) => void;
+      dismissBriefing: () => void;
+      // Follow-up
+      onFollowUpShow: (cb: (draft: any) => void) => void;
+      sendFollowUp: (draft: any) => void;
+      copyFollowUp: (text: string) => void;
+      dismissFollowUp: () => void;
+      setIgnoreMouseEvents: (ignore: boolean) => void;
+    };
+  }
+}
+
+const statusDot = document.getElementById('status-dot')!;
+const waveformContainer = document.getElementById('waveform-container')!;
+const transcriptBubble = document.getElementById('transcript-bubble')!;
+const transcriptText = document.getElementById('transcript-text')!;
+const errorMessage = document.getElementById('error-message')!;
+const errorText = document.getElementById('error-text')!;
+const taskPanel = document.getElementById('task-panel')!;
+const taskList = document.getElementById('task-list')!;
+const computerUsePanel = document.getElementById('computer-use-panel')!;
+const computerUseStatus = document.getElementById('computer-use-status')!;
+
+// ── Briefing Panel ──
+const briefingPanel = document.getElementById('briefing-panel')!;
+const briefingTitle = document.getElementById('briefing-title')!;
+const briefingTime = document.getElementById('briefing-time')!;
+const briefingAttendees = document.getElementById('briefing-attendees')!;
+const briefingTasks = document.getElementById('briefing-tasks')!;
+const briefingTalkingPoints = document.getElementById('briefing-talking-points')!;
+const briefingDismiss = document.getElementById('briefing-dismiss')!;
+
+// ── Follow-up Panel ──
+const followupPanel = document.getElementById('followup-panel')!;
+const followupRecipients = document.getElementById('followup-recipients')!;
+const followupSubject = document.getElementById('followup-subject') as HTMLInputElement;
+const followupBody = document.getElementById('followup-body')!;
+const followupSendBtn = document.getElementById('followup-send-btn')!;
+const followupCopyBtn = document.getElementById('followup-copy-btn')!;
+const followupDismissBtn = document.getElementById('followup-dismiss-btn')!;
+const followupDismissAction = document.getElementById('followup-dismiss-action')!;
+
+// Click-through toggle: disable click-through when interactive panels are showing
+function updateClickThrough() {
+  const anyPanelVisible = !briefingPanel.classList.contains('hidden') ||
+    !followupPanel.classList.contains('hidden') ||
+    !taskPanel.classList.contains('hidden');
+  window.chiefOfStaff.setIgnoreMouseEvents(!anyPanelVisible);
+}
+
+// State management
+function setState(state: string) {
+  statusDot.className = `status-dot ${state}`;
+
+  if (state === 'listening') {
+    waveformContainer.classList.remove('hidden');
+    transcriptBubble.classList.add('hidden');
+    errorMessage.classList.add('hidden');
+  } else {
+    waveformContainer.classList.add('hidden');
+  }
+
+  if (state === 'computer-use') {
+    computerUsePanel.classList.remove('hidden');
+    waveformContainer.classList.add('hidden');
+    transcriptBubble.classList.add('hidden');
+  }
+
+  if (state === 'idle') {
+    transcriptBubble.classList.add('hidden');
+    errorMessage.classList.add('hidden');
+  }
+}
+
+// Waveform visualizer — loaded via script tag in index.html, accessed via window global
+const waveformCanvas = document.getElementById('waveform-canvas') as HTMLCanvasElement;
+const waveform = new (window as any).WaveformVisualizer(waveformCanvas);
+let mediaRecorder: MediaRecorder | null = null;
+let audioChunks: Blob[] = [];
+let currentVoiceMode: string = 'command';
+
+// Track voice mode from hotkey (command vs dictation)
+(window as any).chiefOfStaff.onVoiceMode((mode: string) => {
+  currentVoiceMode = mode;
+  console.log('[MODE] Voice mode:', mode);
+});
+
+// Main status change handler — manages UI state, waveform, and recording
+window.chiefOfStaff.onStatusChange(async (state: string) => {
+  setState(state);
+
+  if (state === 'listening') {
+    try {
+      const stream = await waveform.start();
+
+      // Set up MediaRecorder to capture audio for Whisper
+      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      audioChunks = [];
+
+      mediaRecorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        console.log('[RECORDER] Stopped. Chunks:', audioChunks.length, 'Mode:', currentVoiceMode);
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        console.log('[RECORDER] Blob size:', audioBlob.size, 'bytes');
+        const buffer = await audioBlob.arrayBuffer();
+
+        // Route to correct handler based on mode
+        if (currentVoiceMode === 'dictation') {
+          console.log('[RECORDER] Sending to DICTATION handler');
+          (window as any).chiefOfStaff.sendDictationData(buffer);
+        } else {
+          console.log('[RECORDER] Sending to COMMAND handler');
+          window.chiefOfStaff.sendAudioData(buffer);
+        }
+      };
+
+      mediaRecorder.start();
+      console.log('[RECORDER] Started recording (mode:', currentVoiceMode, ')');
+    } catch (err) {
+      console.error('[RECORDER] Failed to start audio capture:', err);
+    }
+  } else if (state === 'processing') {
+    console.log('[RECORDER] Processing state — stopping recorder');
+    // Stop recording, send audio to main for Whisper transcription
+    waveform.stop();
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  }
+});
+
+// Listen for transcripts
+window.chiefOfStaff.onTranscript((text) => {
+  transcriptText.textContent = text;
+  transcriptBubble.classList.remove('hidden');
+  waveformContainer.classList.add('hidden');
+
+  setTimeout(() => {
+    transcriptBubble.classList.add('hidden');
+  }, 5000);
+});
+
+// Listen for errors
+window.chiefOfStaff.onError((message) => {
+  errorText.textContent = message;
+  errorMessage.classList.remove('hidden');
+  setState('error');
+
+  setTimeout(() => {
+    errorMessage.classList.add('hidden');
+    setState('idle');
+  }, 5000);
+});
+
+// Listen for task updates
+window.chiefOfStaff.onTasksUpdate((tasks: any[]) => {
+  taskPanel.classList.remove('hidden');
+  updateClickThrough();
+  taskList.innerHTML = '';
+
+  if (tasks.length === 0) {
+    const emptyItem = document.createElement('div');
+    emptyItem.className = 'task-item';
+    const emptyDesc = document.createElement('div');
+    emptyDesc.className = 'task-description';
+    emptyDesc.style.color = 'rgba(255,255,255,0.5)';
+    emptyDesc.textContent = 'No open tasks';
+    emptyItem.appendChild(emptyDesc);
+    taskList.appendChild(emptyItem);
+  } else {
+    tasks.forEach((task: any) => {
+      const isOverdue = task.status === 'OVERDUE' || task.status === 'ESCALATED';
+      const div = document.createElement('div');
+      div.className = `task-item ${isOverdue ? 'task-status-overdue' : 'task-status-confirmed'}`;
+      const descDiv = document.createElement('div');
+      descDiv.className = 'task-description';
+      descDiv.textContent = task.description;
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'task-meta';
+      metaDiv.textContent = `${task.status} · ${task.deadlineText || 'No deadline'}`;
+      div.appendChild(descDiv);
+      div.appendChild(metaDiv);
+      taskList.appendChild(div);
+    });
+  }
+
+  // Auto-hide after 10 seconds
+  setTimeout(() => {
+    taskPanel.classList.add('hidden');
+    updateClickThrough();
+  }, 10000);
+});
+
+// Listen for computer use status updates
+window.chiefOfStaff.onComputerUseStatus((status: string) => {
+  computerUsePanel.classList.remove('hidden');
+  computerUseStatus.textContent = status;
+});
+
+window.chiefOfStaff.onComputerUseResult((result: string) => {
+  computerUseStatus.textContent = '\u2713 ' + result.substring(0, 100);
+  setTimeout(() => {
+    computerUsePanel.classList.add('hidden');
+  }, 5000);
+});
+
+// ── Briefing Panel Events ──
+let briefingAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+window.chiefOfStaff.onBriefingShow((brief: any) => {
+  briefingTitle.textContent = brief.meetingTitle;
+  briefingTime.textContent = new Date(brief.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Attendees
+  briefingAttendees.innerHTML = '';
+  (brief.attendees || []).forEach((a: any) => {
+    const div = document.createElement('div');
+    div.className = 'briefing-attendee';
+    const nameNode = document.createTextNode(a.name);
+    const emailSpan = document.createElement('span');
+    emailSpan.className = 'briefing-attendee-email';
+    emailSpan.textContent = a.email;
+    div.appendChild(nameNode);
+    div.appendChild(emailSpan);
+    briefingAttendees.appendChild(div);
+  });
+
+  // Tasks
+  briefingTasks.innerHTML = '';
+  if (brief.openTasks && brief.openTasks.length > 0) {
+    brief.openTasks.forEach((task: any) => {
+      const div = document.createElement('div');
+      div.className = 'briefing-task-item';
+      div.textContent = task.description;
+      briefingTasks.appendChild(div);
+    });
+  } else {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.style.color = 'rgba(255,255,255,0.4)';
+    emptyDiv.style.fontSize = '13px';
+    emptyDiv.textContent = 'No related tasks';
+    briefingTasks.appendChild(emptyDiv);
+  }
+
+  // Talking points
+  briefingTalkingPoints.innerHTML = '';
+  (brief.suggestedTalkingPoints || []).forEach((point: string) => {
+    const div = document.createElement('div');
+    div.className = 'briefing-talking-point';
+    div.textContent = point;
+    briefingTalkingPoints.appendChild(div);
+  });
+
+  briefingPanel.classList.remove('hidden');
+  updateClickThrough();
+
+  // Auto-hide after 60s
+  if (briefingAutoHideTimer) clearTimeout(briefingAutoHideTimer);
+  briefingAutoHideTimer = setTimeout(() => {
+    briefingPanel.classList.add('hidden');
+    updateClickThrough();
+  }, 60000);
+});
+
+briefingDismiss.addEventListener('click', () => {
+  briefingPanel.classList.add('hidden');
+  updateClickThrough();
+  if (briefingAutoHideTimer) clearTimeout(briefingAutoHideTimer);
+  window.chiefOfStaff.dismissBriefing();
+});
+
+// ── Follow-up Panel Events ──
+let currentFollowUpDraft: any = null;
+
+window.chiefOfStaff.onFollowUpShow((draft: any) => {
+  currentFollowUpDraft = draft;
+  followupRecipients.textContent = 'To: ' + (draft.to || []).join(', ');
+  followupSubject.value = draft.subject || '';
+  // Sanitize follow-up body HTML (strip script tags — accepted risk for internal tool)
+  const sanitized = (draft.body || '').replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  followupBody.innerHTML = sanitized;
+  followupPanel.classList.remove('hidden');
+  updateClickThrough();
+});
+
+followupSendBtn.addEventListener('click', () => {
+  if (currentFollowUpDraft) {
+    const updatedDraft = {
+      ...currentFollowUpDraft,
+      subject: followupSubject.value,
+      body: followupBody.innerHTML,
+    };
+    window.chiefOfStaff.sendFollowUp(updatedDraft);
+    followupPanel.classList.add('hidden');
+    updateClickThrough();
+  }
+});
+
+followupCopyBtn.addEventListener('click', () => {
+  const text = followupBody.innerText || followupBody.textContent || '';
+  window.chiefOfStaff.copyFollowUp(text);
+  followupCopyBtn.textContent = 'Copied!';
+  setTimeout(() => { followupCopyBtn.textContent = 'Copy'; }, 2000);
+});
+
+const dismissFollowUp = () => {
+  followupPanel.classList.add('hidden');
+  updateClickThrough();
+  currentFollowUpDraft = null;
+  window.chiefOfStaff.dismissFollowUp();
+};
+
+followupDismissBtn.addEventListener('click', dismissFollowUp);
+followupDismissAction.addEventListener('click', dismissFollowUp);
+
+// Initial state
+setState('idle');
+console.log('Atlas Chief of Staff renderer loaded.');

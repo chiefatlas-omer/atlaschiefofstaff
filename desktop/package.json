@@ -1,0 +1,31 @@
+{
+  "name": "atlas-chief-of-staff-desktop",
+  "version": "0.1.0",
+  "description": "AI Chief of Staff desktop app — voice-controlled computer automation",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "copy-static": "node -e \"const fs=require('fs');const path=require('path');['index.html','styles.css'].forEach(f=>{const src=path.join('src','renderer',f);const dest=path.join('dist','renderer',f);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(src,dest)})\"",
+    "dev": "tsc && npm run copy-static && electron .",
+    "build": "tsc && npm run copy-static",
+    "start": "electron .",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "better-sqlite3": "^12.8.0",
+    "dotenv": "^17.3.1",
+    "drizzle-orm": "^0.45.1",
+    "electron-store": "^8.2.0",
+    "googleapis": "^171.4.0",
+    "openai": "^4.85.0",
+    "uiohook-napi": "^1.5.4"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "electron": "^33.3.1",
+    "typescript": "^5.9.3"
+  }
+}
