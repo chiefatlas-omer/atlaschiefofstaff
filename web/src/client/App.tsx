@@ -1,12 +1,22 @@
 import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Layout from './components/Layout';
+import Dashboard from './pages/Dashboard';
+import Metrics from './pages/Metrics';
+import Knowledge from './pages/Knowledge';
+import SOPs from './pages/SOPs';
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Atlas Command Center</h1>
-        <p className="text-gray-400 text-lg">Web dashboard coming soon.</p>
-      </div>
-    </div>
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/metrics" element={<Metrics />} />
+          <Route path="/knowledge" element={<Knowledge />} />
+          <Route path="/sops" element={<SOPs />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
   );
 }
