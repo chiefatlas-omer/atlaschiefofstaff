@@ -4,6 +4,7 @@ import { generateDigest } from '../tasks/digest-service';
 import { getSOPCandidates } from '../services/topic-tracker';
 import { createSOPForTopic } from '../services/sop-service';
 import { config } from '../config';
+import { generateProactiveAlerts, formatAlertsForSlack } from '../services/proactive-alerts';
 
 export function startCronJobs(client: any) {
   // Reminders: 8:00 AM and 4:00 PM CT, Mon-Fri (DM'd to each person)
@@ -120,9 +121,40 @@ export function startCronJobs(client: any) {
     }
   }, { timezone: 'America/Chicago' });
 
+  // Daily proactive alerts: 8:30 AM CT, Mon-Fri (DM to Omer, Mark, Ehsan)
+  cron.schedule('30 8 * * 1-5', async () => {
+    console.log('Running daily proactive alerts (8:30 AM CT)...');
+    try {
+      const alerts = generateProactiveAlerts();
+      const message = formatAlertsForSlack(alerts);
+
+      const leadershipIds = [
+        config.escalation.omerSlackUserId,
+        config.escalation.markSlackUserId,
+        config.escalation.ehsanSlackUserId,
+      ].filter(Boolean);
+
+      for (const userId of leadershipIds) {
+        try {
+          await client.chat.postMessage({
+            channel: userId,
+            text: message,
+          });
+        } catch (err) {
+          console.error(`[proactive-alerts] Failed to DM ${userId}:`, err);
+        }
+      }
+
+      console.log(`[proactive-alerts] Sent ${alerts.length} alert(s) to ${leadershipIds.length} leader(s).`);
+    } catch (error) {
+      console.error('Proactive alerts cron error:', error);
+    }
+  }, { timezone: 'America/Chicago' });
+
   console.log('Cron jobs started (timezone: America/Chicago)');
   console.log('  - Reminders: 8:00 AM + 4:00 PM CT, Mon-Fri (DM to each person)');
   console.log('  - Escalation: 9:00 AM + 5:00 PM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
   console.log('  - Friday digest: Fridays at 9:00 AM CT');
   console.log('  - SOP review: Wednesdays at 10:00 AM CT');
+  console.log('  - Proactive alerts: 8:30 AM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
 }
