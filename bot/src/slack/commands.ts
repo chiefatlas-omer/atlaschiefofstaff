@@ -7,9 +7,7 @@ import { deduplicateTasks } from '../tasks/task-service';
 import { ingestDocument } from '../services/ingestion-service';
 import { createSOPForTopic, getSOPs } from '../services/sop-service';
 import { getSOPCandidates, getTopTopics } from '../services/topic-tracker';
-import { semanticSearch } from '../services/embedding-service';
-import { recordQA } from '../services/feedback-service';
-import { anthropic } from '../ai/client';
+import { queryKnowledgeBot } from '../services/knowledge-bot';
 
 export function registerCommands(app: App) {
   // /tasks - show your open tasks
@@ -423,7 +421,7 @@ export function registerCommands(app: App) {
     }
   });
 
-  // /ask <question> — semantic search + Claude synthesis
+  // /ask <question> — knowledge bot: semantic search + SOP-aware + Claude synthesis
   app.command('/ask', async ({ command, ack, client }) => {
     await ack();
     const question = command.text.trim();
@@ -443,83 +441,32 @@ export function registerCommands(app: App) {
       text: ':mag: Searching knowledge base...',
     });
 
-    let results;
+    let result;
     try {
-      results = await semanticSearch(question, 8);
+      result = await queryKnowledgeBot({
+        question,
+        askedBy: command.user_id,
+        askedVia: 'slack_command',
+      });
     } catch (err) {
-      console.error('[/ask] Semantic search error:', err);
+      console.error('[/ask] Knowledge bot error:', err);
       await client.chat.postEphemeral({
         channel: command.channel_id,
         user: command.user_id,
-        text: ':x: Search failed. Please try again.',
+        text: ':x: Failed to answer question. Please try again.',
       });
       return;
     }
-
-    if (results.length === 0) {
-      await client.chat.postEphemeral({
-        channel: command.channel_id,
-        user: command.user_id,
-        text: ":shrug: I don't have any relevant information on that topic yet.",
-      });
-      return;
-    }
-
-    // Build context from search results
-    const contextBlocks = results.map((r, i) => `[Source ${i + 1}] (${r.sourceType}): ${r.content}`).join('\n\n');
-
-    let answer: string;
-    let confidence: string;
-
-    try {
-      const response = await anthropic.messages.create({
-        model: 'claude-opus-4-5',
-        max_tokens: 1024,
-        messages: [
-          {
-            role: 'user',
-            content: `Context:\n${contextBlocks}\n\nQuestion: ${question}`,
-          },
-        ],
-        system:
-          'Answer based ONLY on provided context. Cite sources as [Source N]. If the context does not contain enough information to answer, say so clearly. Be concise.',
-      });
-
-      const textBlock = response.content.find((b) => b.type === 'text');
-      answer = textBlock?.type === 'text' ? textBlock.text : 'Unable to generate answer.';
-
-      // Rough confidence based on top similarity score
-      const topSim = results[0].similarity ?? 0;
-      confidence = topSim >= 0.8 ? 'high' : topSim >= 0.6 ? 'medium' : 'low';
-    } catch (err) {
-      console.error('[/ask] Claude synthesis error:', err);
-      await client.chat.postEphemeral({
-        channel: command.channel_id,
-        user: command.user_id,
-        text: ':x: Failed to synthesize answer. Please try again.',
-      });
-      return;
-    }
-
-    // Record the Q&A for feedback tracking
-    const qaId = recordQA({
-      question,
-      answer,
-      confidence,
-      sourceEntryIds: results.map((r) => r.id),
-      askedBy: command.user_id,
-      askedVia: 'slack_command',
-    });
 
     await client.chat.postMessage({
       channel: command.channel_id,
-      text: answer,
+      text: result.answer,
       blocks: [
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*Q: ${question}*\n\n${answer}`,
+            text: `*Q: ${question}*\n\n${result.answer}`,
           },
         },
         {
@@ -527,7 +474,7 @@ export function registerCommands(app: App) {
           elements: [
             {
               type: 'mrkdwn',
-              text: `Confidence: *${confidence}* | Sources: ${results.length} | Asked by <@${command.user_id}>`,
+              text: `Confidence: *${result.confidence}* | Sources: ${result.sourceCount} | Asked by <@${command.user_id}>`,
             },
           ],
         },
@@ -539,14 +486,14 @@ export function registerCommands(app: App) {
               text: { type: 'plain_text', text: '👍 Correct' },
               style: 'primary',
               action_id: 'qa_correct',
-              value: String(qaId),
+              value: String(result.qaId),
             },
             {
               type: 'button',
               text: { type: 'plain_text', text: '👎 Wrong' },
               style: 'danger',
               action_id: 'qa_incorrect',
-              value: String(qaId),
+              value: String(result.qaId),
             },
           ],
         },

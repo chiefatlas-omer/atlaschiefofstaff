@@ -4,6 +4,7 @@ import { generatePersonalDigest } from '../tasks/digest-service';
 import { extractCommitments } from '../ai/commitment-extractor';
 import { taskListBlocks, taskConfirmationBlocks } from './blocks';
 import { config } from '../config';
+import { queryKnowledgeBot } from '../services/knowledge-bot';
 
 // Leadership users who can see all tasks
 const LEADERSHIP_IDS = new Set(
@@ -477,6 +478,63 @@ export async function handleDirectMessage(
   if (/^digest\b/.test(text)) {
     await client.chat.postMessage({ channel, text: ':hourglass_flowing_sand: Generating your digest...' });
     await generatePersonalDigest(client, userId);
+    return true;
+  }
+
+  // --- Question detection: route to knowledge bot before trying task extraction ---
+  const QUESTION_STARTERS = /^(what|who|where|when|why|how|which|is|are|do|does|did|can|could|should|would|will|has|have|tell me)/i;
+  const looksLikeQuestion = originalText.includes('?') || QUESTION_STARTERS.test(originalText.trim());
+
+  if (looksLikeQuestion && originalText.length > 10) {
+    await client.chat.postMessage({ channel, text: ':mag: Let me check the knowledge base...' });
+    try {
+      const result = await queryKnowledgeBot({
+        question: originalText,
+        askedBy: userId,
+        askedVia: 'slack_dm',
+      });
+      await client.chat.postMessage({
+        channel,
+        text: result.answer,
+        blocks: [
+          {
+            type: 'section',
+            text: { type: 'mrkdwn', text: result.answer },
+          },
+          {
+            type: 'context',
+            elements: [
+              {
+                type: 'mrkdwn',
+                text: `Confidence: *${result.confidence}* | Sources: ${result.sourceCount}`,
+              },
+            ],
+          },
+          {
+            type: 'actions',
+            elements: [
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: '👍 Correct' },
+                style: 'primary',
+                action_id: 'qa_correct',
+                value: String(result.qaId),
+              },
+              {
+                type: 'button',
+                text: { type: 'plain_text', text: '👎 Wrong' },
+                style: 'danger',
+                action_id: 'qa_incorrect',
+                value: String(result.qaId),
+              },
+            ],
+          },
+        ],
+      });
+    } catch (err) {
+      console.error('[dm-handler] Knowledge bot error:', err);
+      await client.chat.postMessage({ channel, text: ':x: Failed to search the knowledge base. Please try again.' });
+    }
     return true;
   }
 

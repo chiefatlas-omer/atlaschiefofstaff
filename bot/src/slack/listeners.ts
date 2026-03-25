@@ -2,6 +2,7 @@ import type { App } from '@slack/bolt';
 import { registerMessageHandler } from './messages';
 import { registerInteractionHandlers } from './interactions';
 import { registerCommands } from './commands';
+import { queryKnowledgeBot } from '../services/knowledge-bot';
 
 export function registerAllListeners(app: App) {
   registerMessageHandler(app);
@@ -206,6 +207,70 @@ export function registerAllListeners(app: App) {
         }
       }
     } else {
+      // Strip @mention from text to get clean question/statement
+      const strippedText = (event.text || '').replace(/<@[A-Z0-9]+>/gi, '').trim();
+
+      // Check if this looks like a question — route to knowledge bot first
+      const QUESTION_STARTERS = /^(what|who|where|when|why|how|which|is|are|do|does|did|can|could|should|would|will|has|have|tell me)/i;
+      const looksLikeQuestion = strippedText.includes('?') || QUESTION_STARTERS.test(strippedText);
+
+      if (looksLikeQuestion && strippedText.length > 5) {
+        try {
+          const result = await queryKnowledgeBot({
+            question: strippedText,
+            askedBy: event.user,
+            askedVia: 'slack_mention',
+          });
+          await client.chat.postMessage({
+            channel: event.channel,
+            thread_ts: event.ts,
+            text: result.answer,
+            blocks: [
+              {
+                type: 'section',
+                text: { type: 'mrkdwn', text: result.answer },
+              },
+              {
+                type: 'context',
+                elements: [
+                  {
+                    type: 'mrkdwn',
+                    text: `Confidence: *${result.confidence}* | Sources: ${result.sourceCount}`,
+                  },
+                ],
+              },
+              {
+                type: 'actions',
+                elements: [
+                  {
+                    type: 'button',
+                    text: { type: 'plain_text', text: '👍 Correct' },
+                    style: 'primary',
+                    action_id: 'qa_correct',
+                    value: String(result.qaId),
+                  },
+                  {
+                    type: 'button',
+                    text: { type: 'plain_text', text: '👎 Wrong' },
+                    style: 'danger',
+                    action_id: 'qa_incorrect',
+                    value: String(result.qaId),
+                  },
+                ],
+              },
+            ],
+          });
+        } catch (err) {
+          console.error('[listeners] Knowledge bot error on @mention:', err);
+          await client.chat.postMessage({
+            channel: event.channel,
+            thread_ts: event.ts,
+            text: ':x: Failed to search the knowledge base. Please try again.',
+          });
+        }
+        return;
+      }
+
       // Try to extract a task from the @mention message
       const { extractCommitments } = require('../ai/commitment-extractor');
       const { createTask, updateBotReplyTs } = require('../tasks/task-service');
