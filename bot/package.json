@@ -21,7 +21,8 @@
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "nanoid": "^3.3.11",
-    "node-cron": "^4.2.1"
+    "node-cron": "^4.2.1",
+    "openai": "^6.32.0"
   },
   "devDependencies": {
     "@flydotio/dockerfile": "^0.7.10",
