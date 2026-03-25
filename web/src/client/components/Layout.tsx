@@ -5,6 +5,9 @@ const NAV_ITEMS = [
   { label: 'Metrics', href: '/metrics' },
   { label: 'Knowledge', href: '/knowledge' },
   { label: 'SOPs', href: '/sops' },
+  { label: 'Sales Intel', href: '/sales' },
+  { label: 'Product Intel', href: '/product' },
+  { label: 'Coaching', href: '/coaching' },
 ];
 
 interface LayoutProps {

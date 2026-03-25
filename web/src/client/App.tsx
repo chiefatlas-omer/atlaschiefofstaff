@@ -5,6 +5,9 @@ import Dashboard from './pages/Dashboard';
 import Metrics from './pages/Metrics';
 import Knowledge from './pages/Knowledge';
 import SOPs from './pages/SOPs';
+import SalesIntel from './pages/SalesIntel';
+import ProductIntel from './pages/ProductIntel';
+import Coaching from './pages/Coaching';
 
 export default function App() {
   return (
@@ -15,6 +18,9 @@ export default function App() {
           <Route path="/metrics" element={<Metrics />} />
           <Route path="/knowledge" element={<Knowledge />} />
           <Route path="/sops" element={<SOPs />} />
+          <Route path="/sales" element={<SalesIntel />} />
+          <Route path="/product" element={<ProductIntel />} />
+          <Route path="/coaching" element={<Coaching />} />
         </Routes>
       </Layout>
     </BrowserRouter>

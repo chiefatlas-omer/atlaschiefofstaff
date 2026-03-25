@@ -5,6 +5,7 @@ import tasksRouter from './routes/tasks';
 import dashboardRouter from './routes/dashboard';
 import graphRouter from './routes/graph';
 import knowledgeRouter from './routes/knowledge';
+import analyticsRouter from './routes/analytics';
 
 const app = express();
 const PORT = Number(process.env.WEB_PORT) || 3001;
@@ -22,6 +23,7 @@ app.use('/api', tasksRouter);
 app.use('/api', dashboardRouter);
 app.use('/api', graphRouter);
 app.use('/api', knowledgeRouter);
+app.use('/api/analytics', analyticsRouter);
 
 app.listen(PORT, () => {
   console.log(`Atlas Command Center API running on http://localhost:${PORT}`);
