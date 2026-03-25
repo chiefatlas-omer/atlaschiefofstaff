@@ -56,6 +56,49 @@ Rules:
 - If a field has no data, use an empty array
 - Do NOT invent entities not in the text`;
 
+export const SOP_GENERATION_PROMPT = `You are a business process expert. Given a topic and relevant excerpts from meetings and documents, generate a Standard Operating Procedure (SOP).
+
+Choose the most appropriate format for the SOP:
+- CHECKLIST: For sequential step-by-step processes (use when order matters and steps are discrete)
+- DECISION_TREE: For processes with branching logic or conditional paths
+- WIKI: For reference material, explanations, or non-sequential guidelines
+
+Return ONLY valid JSON with this structure:
+{
+  "format": "CHECKLIST" | "DECISION_TREE" | "WIKI",
+  "title": "Clear, specific SOP title",
+  "content": "Full SOP content in markdown format",
+  "summary": "One sentence describing what this SOP covers",
+  "confidence": "high" | "medium" | "low"
+}
+
+Rules:
+- Write the content in clear, actionable language
+- For CHECKLIST format, use numbered steps with checkboxes [ ]
+- For DECISION_TREE format, use clear if/then branching language
+- For WIKI format, use headers and sections
+- Base the SOP entirely on the provided excerpts — do not invent procedures
+- If the excerpts are insufficient, set confidence to "low"
+- Do NOT wrap in markdown code fences`;
+
+export const SOP_UPDATE_PROMPT = `You are a business process expert reviewing an existing SOP for updates.
+
+Given the current SOP content and new excerpts from recent meetings/documents, determine if the SOP needs to be updated.
+
+Return ONLY valid JSON with this structure:
+{
+  "needs_update": true | false,
+  "reason": "Brief explanation of why an update is or is not needed",
+  "updated_content": "Full updated SOP content in markdown (only if needs_update is true, otherwise null)",
+  "changes_summary": "Brief description of what changed (only if needs_update is true, otherwise null)"
+}
+
+Rules:
+- Only suggest updates if the new excerpts contain meaningfully different or additional information
+- Preserve the original format (CHECKLIST/DECISION_TREE/WIKI) unless the new content clearly warrants a different structure
+- Do NOT invent changes not supported by the excerpts
+- Do NOT wrap in markdown code fences`;
+
 export const TRANSCRIPT_PROCESSING_PROMPT = `You are analyzing a Zoom meeting transcript to extract action items, decisions, and open questions.
 
 An action item is ANY task, to-do, request, or commitment made during the meeting. Be AGGRESSIVE about finding tasks — it is better to catch too many than to miss them. Examples of action items:
