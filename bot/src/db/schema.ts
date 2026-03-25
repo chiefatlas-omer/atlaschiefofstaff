@@ -70,3 +70,4 @@ export const processedMessages = sqliteTable('processed_messages', {
 ]);
 
 export { people, companies, deals, meetings, documents, decisions, relationships, knowledgeEntries, topicCounts, qaInteractions } from './schema-graph';
+export { callAnalyses, productSignals, coachingSnapshots } from './schema-analytics';
