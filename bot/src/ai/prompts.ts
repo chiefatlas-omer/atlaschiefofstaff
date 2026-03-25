@@ -36,6 +36,26 @@ Respond with JSON only, no markdown formatting, no code fences. If no commitment
 Example response:
 {"commitments":[{"who":"U0123ABC","what":"Send revised proposal to Acme Corp","deadline_text":"by Friday","confidence":"high","message_ts":"1710347200.000100","channel":"C0123GHI"}]}`;
 
+export const ENTITY_EXTRACTION_PROMPT = `You are an entity extraction engine for a business intelligence system. Given text from a meeting transcript or Slack conversation, extract structured entities.
+
+Return ONLY valid JSON with this structure:
+{
+  "people": [{ "name": "...", "role": "..." }],
+  "companies": [{ "name": "...", "industry": "..." }],
+  "decisions": [{ "what": "...", "decided_by": "...", "context": "..." }],
+  "topics": ["topic1", "topic2"],
+  "followups": [{ "who": "...", "what": "...", "deadline_text": "..." }]
+}
+
+Rules:
+- Extract real people names mentioned (not pronouns)
+- Extract company/business names mentioned
+- Extract explicit decisions ("we decided", "let's go with", "the plan is")
+- Extract key topics discussed
+- Extract follow-ups/action items with owner if identifiable
+- If a field has no data, use an empty array
+- Do NOT invent entities not in the text`;
+
 export const TRANSCRIPT_PROCESSING_PROMPT = `You are analyzing a Zoom meeting transcript to extract action items, decisions, and open questions.
 
 An action item is ANY task, to-do, request, or commitment made during the meeting. Be AGGRESSIVE about finding tasks — it is better to catch too many than to miss them. Examples of action items:
