@@ -3,6 +3,7 @@ import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
 import { getMyTasks } from './db/task-bridge';
 import { classifyIntent } from './ai/intent-classifier';
+import { logVoiceInteraction } from './db/voice-logger';
 
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
   let voiceMode: 'command' | 'dictation' = 'command';
@@ -124,6 +125,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         }
         mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
       }
+
+      // Log voice interaction to knowledge graph (non-blocking)
+      logVoiceInteraction({
+        transcript,
+        response: intent === 'TASK_QUERY' ? 'Showed task panel' : intent === 'MEETING_PREP' ? 'Showed meeting briefing' : transcript,
+        intent,
+        userId: process.env.SLACK_USER_ID,
+      });
 
       // Return to idle after delay (only for quick intents)
       if (intent === 'TASK_QUERY' || intent === 'GENERAL') {
