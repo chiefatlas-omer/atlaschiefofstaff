@@ -4,6 +4,8 @@ import path from 'path';
 import os from 'os';
 import https from 'https';
 
+const WHISPER_PROMPT = 'Atlas Growth, Chief of Staff, landscaping, irrigation, maintenance contract, client onboarding, SOP, CRM, proposal, estimate, crew, site visit';
+
 // Use raw https instead of OpenAI SDK to avoid node-fetch ECONNRESET on Electron + Windows ARM64
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
   const tempPath = path.join(os.tmpdir(), `atlas-cos-${Date.now()}.webm`);
@@ -38,6 +40,20 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string> {
       `--${boundary}\r\n` +
       `Content-Disposition: form-data; name="language"\r\n\r\n` +
       `en\r\n`
+    ));
+
+    // Prompt field (domain-specific vocabulary for improved accuracy)
+    parts.push(Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="prompt"\r\n\r\n` +
+      `${WHISPER_PROMPT}\r\n`
+    ));
+
+    // Temperature field (deterministic transcription)
+    parts.push(Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="temperature"\r\n\r\n` +
+      `0\r\n`
     ));
 
     // End boundary
