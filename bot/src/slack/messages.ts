@@ -9,6 +9,7 @@ import { processedMessages } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { completeTask, dismissTask, reassignTask, getTaskById } from '../tasks/task-service';
 import { tasks } from '../db/schema';
+import { ingestSlackMessage } from '../services/ingestion-service';
 
 interface BufferedMessage {
   user: string;
@@ -543,6 +544,19 @@ async function processBatch(channelId: string, client: any, app: App) {
       // If the original message was a thread reply, use its thread_ts
       const originalThreadTs = threadTsMap.get(commitment.message_ts);
       await handleCommitment(commitment, client, originalThreadTs);
+    }
+
+    // ─── Knowledge Graph Ingestion (non-blocking) ─────────────
+    for (const msg of messages) {
+      ingestSlackMessage({
+        text: msg.text,
+        userId: msg.user,
+        channelId: msg.channel,
+        messageTs: msg.ts,
+        threadTs: msg.thread_ts,
+      }).catch(err => {
+        console.error('[slack] Knowledge ingestion failed (non-fatal):', err);
+      });
     }
   } catch (error) {
     // Processing failed — remove the processed markers so messages can be retried

@@ -5,6 +5,7 @@ import { config } from '../config';
 import { db } from '../db/connection';
 import { zoomUserMappings } from '../db/schema';
 import { extractParticipantsFromVtt } from './transcript-fetcher';
+import { ingestZoomTranscript } from '../services/ingestion-service';
 
 type MeetingType = 'private' | 'external' | 'team';
 
@@ -583,6 +584,24 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
     } else {
       // PRIVATE or EXTERNAL: DM to internal participants only
       await handlePrivateMeeting(result, meetingInfo, meetingTopic, recording, participantMapping, slackClient);
+    }
+
+    // ─── Knowledge Graph Ingestion ────────────────────────────
+    try {
+      await ingestZoomTranscript({
+        transcriptText,
+        zoomMeetingId: meetingUuid,
+        title: meetingTopic,
+        date: recording.start_time ? Math.floor(new Date(recording.start_time).getTime() / 1000) : undefined,
+        duration: recording.duration,
+        meetingType: meetingInfo.type,
+        participants: Object.entries(participantMapping).map(([name, slackId]) => ({
+          name,
+          slackUserId: slackId || undefined,
+        })),
+      });
+    } catch (err) {
+      console.error('[zoom] Knowledge graph ingestion failed (non-fatal):', err);
     }
 
     console.log(

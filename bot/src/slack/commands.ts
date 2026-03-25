@@ -4,6 +4,7 @@ import { taskListBlocks, adminTaskListBlocks } from './blocks';
 import { config } from '../config';
 import { generatePersonalDigest } from '../tasks/digest-service';
 import { deduplicateTasks } from '../tasks/task-service';
+import { ingestDocument } from '../services/ingestion-service';
 
 export function registerCommands(app: App) {
   // /tasks - show your open tasks
@@ -279,6 +280,60 @@ export function registerCommands(app: App) {
         ? ':broom: Cleaned up ' + dismissed + ' duplicate task' + (dismissed > 1 ? 's' : '') + '. Run /alltasks to see the result.'
         : ':sparkles: No duplicates found -- everything looks clean!',
     });
+  });
+
+  // /upload - ingest a document into the knowledge graph
+  app.command('/upload', async ({ command, ack, client }) => {
+    await ack();
+    const text = command.text.trim();
+
+    if (!text) {
+      await client.chat.postEphemeral({
+        channel: command.channel_id,
+        user: command.user_id,
+        text: 'Usage: `/upload Title | type | Content...`\nTypes: sop, playbook, pricing_guide, process_doc, customer_info, general',
+      });
+      return;
+    }
+
+    const parts = text.split('|').map(p => p.trim());
+    if (parts.length < 3) {
+      await client.chat.postEphemeral({
+        channel: command.channel_id,
+        user: command.user_id,
+        text: 'Please use format: `/upload Title | type | Content...`',
+      });
+      return;
+    }
+
+    const [title, type, ...contentParts] = parts;
+    const content = contentParts.join('|');
+    const validTypes = ['sop', 'playbook', 'pricing_guide', 'process_doc', 'customer_info', 'general'];
+
+    if (!validTypes.includes(type)) {
+      await client.chat.postEphemeral({
+        channel: command.channel_id,
+        user: command.user_id,
+        text: `Invalid type "${type}". Valid types: ${validTypes.join(', ')}`,
+      });
+      return;
+    }
+
+    try {
+      const result = await ingestDocument({ title, content, type, uploadedBy: command.user_id });
+      await client.chat.postEphemeral({
+        channel: command.channel_id,
+        user: command.user_id,
+        text: `Document "${title}" ingested. ${result.chunkCount} chunks embedded. ${result.entities.people.length} people, ${result.entities.companies.length} companies detected.`,
+      });
+    } catch (err) {
+      console.error('[upload] Document ingestion failed:', err);
+      await client.chat.postEphemeral({
+        channel: command.channel_id,
+        user: command.user_id,
+        text: 'Failed to ingest document. Please try again.',
+      });
+    }
   });
 
 }
