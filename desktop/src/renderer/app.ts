@@ -7,8 +7,6 @@ declare global {
       onTranscript: (cb: (text: string) => void) => void;
       onTasksUpdate: (cb: (tasks: any[]) => void) => void;
       onError: (cb: (message: string) => void) => void;
-      onComputerUseStatus: (cb: (status: string) => void) => void;
-      onComputerUseResult: (cb: (result: string) => void) => void;
       sendAudioData: (buffer: ArrayBuffer) => void;
       getTasks: () => Promise<any[]>;
       // Briefing
@@ -32,8 +30,6 @@ const errorMessage = document.getElementById('error-message')!;
 const errorText = document.getElementById('error-text')!;
 const taskPanel = document.getElementById('task-panel')!;
 const taskList = document.getElementById('task-list')!;
-const computerUsePanel = document.getElementById('computer-use-panel')!;
-const computerUseStatus = document.getElementById('computer-use-status')!;
 
 // ── Briefing Panel ──
 const briefingPanel = document.getElementById('briefing-panel')!;
@@ -72,12 +68,6 @@ function setState(state: string) {
     errorMessage.classList.add('hidden');
   } else {
     waveformContainer.classList.add('hidden');
-  }
-
-  if (state === 'computer-use') {
-    computerUsePanel.classList.remove('hidden');
-    waveformContainer.classList.add('hidden');
-    transcriptBubble.classList.add('hidden');
   }
 
   if (state === 'idle') {
@@ -208,19 +198,6 @@ window.chiefOfStaff.onTasksUpdate((tasks: any[]) => {
     taskPanel.classList.add('hidden');
     updateClickThrough();
   }, 10000);
-});
-
-// Listen for computer use status updates
-window.chiefOfStaff.onComputerUseStatus((status: string) => {
-  computerUsePanel.classList.remove('hidden');
-  computerUseStatus.textContent = status;
-});
-
-window.chiefOfStaff.onComputerUseResult((result: string) => {
-  computerUseStatus.textContent = '\u2713 ' + result.substring(0, 100);
-  setTimeout(() => {
-    computerUsePanel.classList.add('hidden');
-  }, 5000);
 });
 
 // ── Briefing Panel Events ──

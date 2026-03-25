@@ -3,7 +3,6 @@ export enum AppState {
   LISTENING = 'listening',
   PROCESSING = 'processing',
   ERROR = 'error',
-  COMPUTER_USE = 'computer-use',
 }
 
 export interface Task {
@@ -27,9 +26,6 @@ export const IPC = {
   TASKS_UPDATE: 'tasks:update',
   TASKS_GET: 'tasks:get',
   ERROR: 'app:error',
-  // Computer Use
-  COMPUTER_USE_STATUS: 'computer-use:status',
-  COMPUTER_USE_RESULT: 'computer-use:result',
   // Meeting Briefing
   BRIEFING_SHOW: 'briefing:show',
   BRIEFING_DISMISS: 'briefing:dismiss',

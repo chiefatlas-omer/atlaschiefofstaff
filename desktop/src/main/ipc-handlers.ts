@@ -1,9 +1,8 @@
-import { ipcMain, BrowserWindow, clipboard, shell } from 'electron';
+import { ipcMain, BrowserWindow, clipboard } from 'electron';
 import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
 import { getMyTasks } from './db/task-bridge';
 import { classifyIntent } from './ai/intent-classifier';
-import { runComputerUseAgent } from './computer-use/agent';
 
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
   let voiceMode: 'command' | 'dictation' = 'command';
@@ -107,35 +106,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       mainWindow.webContents.send(IPC.TRANSCRIPT, transcript);
 
       // AI-powered intent classification
-      const { intent, command } = await classifyIntent(transcript);
+      const { intent } = await classifyIntent(transcript);
 
       if (intent === 'TASK_QUERY') {
         const tasks = getMyTasks();
         mainWindow.webContents.send(IPC.TASKS_UPDATE, tasks);
-      } else if (intent === 'COMPUTER_USE') {
-        // Quick shortcut: if it's just "open/go to [URL]", launch directly
-        // Handles: "open tradingview.com", "OpenTradingView.com", "go to x.com", etc.
-        const urlMatch = transcript.match(/(?:open\s*|go\s*to\s*|navigate\s*to\s*|visit\s*)?(?:chrome\s*(?:and\s*)?(?:go\s*to\s*|open\s*|navigate\s*to\s*)?)?([a-zA-Z0-9][\w.-]*\.(?:com|org|net|io|ai|co|dev|app|xyz|ca|us|uk|gg|tv|me)\b(?:\/\S*)?)/i);
-        if (urlMatch) {
-          let url = urlMatch[1];
-          if (!url.startsWith('http')) url = 'https://' + url;
-          console.log('[SHORTCUT] Opening URL directly:', url);
-          mainWindow.webContents.send(IPC.TRANSCRIPT, '🌐 Opening ' + url);
-          await shell.openExternal(url);
-          mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-          return;
-        }
-
-        // Full computer use for complex commands
-        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'computer-use');
-        mainWindow.webContents.send(IPC.COMPUTER_USE_STATUS, 'Starting screen control...');
-        try {
-          const result = await runComputerUseAgent(command || transcript, mainWindow);
-          mainWindow.webContents.send(IPC.COMPUTER_USE_RESULT, result);
-        } catch (err: any) {
-          mainWindow.webContents.send(IPC.ERROR, 'Computer use failed: ' + err.message);
-        }
-        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
       } else if (intent === 'MEETING_PREP') {
         mainWindow.webContents.send(IPC.TRANSCRIPT, 'Checking your calendar...');
         try {

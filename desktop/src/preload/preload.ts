@@ -10,9 +10,6 @@ const IPC = {
   ERROR: 'app:error',
   VOICE_MODE: 'voice:mode',
   DICTATION_DATA: 'voice:dictation-data',
-  // Computer Use
-  COMPUTER_USE_STATUS: 'computer-use:status',
-  COMPUTER_USE_RESULT: 'computer-use:result',
   // Meeting Briefing
   BRIEFING_SHOW: 'briefing:show',
   BRIEFING_DISMISS: 'briefing:dismiss',
@@ -54,13 +51,6 @@ contextBridge.exposeInMainWorld('chiefOfStaff', {
   },
   getTasks: () => ipcRenderer.invoke(IPC.TASKS_GET),
 
-  // Computer Use
-  onComputerUseStatus: (cb: (status: string) => void) => {
-    ipcRenderer.on(IPC.COMPUTER_USE_STATUS, (_event, status) => cb(status));
-  },
-  onComputerUseResult: (cb: (result: string) => void) => {
-    ipcRenderer.on(IPC.COMPUTER_USE_RESULT, (_event, result) => cb(result));
-  },
   // Briefing
   onBriefingShow: (cb: (brief: any) => void) => {
     ipcRenderer.on(IPC.BRIEFING_SHOW, (_event, brief) => cb(brief));

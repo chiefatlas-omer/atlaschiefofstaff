@@ -176,35 +176,6 @@ body {
   border-left: 3px solid #5A3C9E; /* brand secondary */
 }
 
-/* ── Computer Use Panel ── */
-.computer-use-panel {
-  position: fixed;
-  bottom: 40px;
-  left: 40px;
-  background: rgba(79, 53, 136, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 16px;
-  padding: 12px 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #FAF9FE;
-  font-size: 13px;
-  max-width: 400px;
-  border: 1px solid rgba(90, 60, 158, 0.3);
-  -webkit-app-region: no-drag;
-}
-
-.computer-use-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #EC4899; /* pink accent */
-  animation: pulse 1.5s ease-in-out infinite;
-  flex-shrink: 0;
-}
-
 /* ── Briefing Panel ── */
 .briefing-panel {
   position: fixed;
