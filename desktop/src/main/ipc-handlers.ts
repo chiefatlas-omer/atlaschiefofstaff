@@ -46,23 +46,12 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       await new Promise(r => setTimeout(r, 200));
 
       try {
-        const { keyboard, Key } = require('@nut-tree-fork/nut-js');
-        await keyboard.pressKey(Key.LeftControl);
-        await keyboard.pressKey(Key.V);
-        await keyboard.releaseKey(Key.V);
-        await keyboard.releaseKey(Key.LeftControl);
-        console.log('[DICTATION] Pasted via nut.js');
-      } catch (nutErr) {
-        // nut.js not available on ARM64 — use Electron's robot
         const { execSync } = require('child_process');
-        try {
-          // PowerShell SendKeys as fallback
-          execSync(`powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')"`, { timeout: 3000 });
-          console.log('[DICTATION] Pasted via PowerShell SendKeys');
-        } catch (psErr) {
-          console.error('[DICTATION] Paste failed, text is in clipboard:', psErr);
-          mainWindow.webContents.send(IPC.TRANSCRIPT, '📋 Copied to clipboard — Ctrl+V to paste');
-        }
+        execSync(`powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')"`, { timeout: 3000 });
+        console.log('[DICTATION] Pasted via PowerShell SendKeys');
+      } catch (psErr) {
+        console.error('[DICTATION] Paste failed, text is in clipboard:', psErr);
+        mainWindow.webContents.send(IPC.TRANSCRIPT, '📋 Copied to clipboard — Ctrl+V to paste');
       }
 
       // Restore original clipboard after a brief delay
