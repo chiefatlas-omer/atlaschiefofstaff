@@ -131,3 +131,37 @@ export const knowledgeEntries = sqliteTable('knowledge_entries', {
 }, (table) => [
   index('idx_knowledge_entries_source').on(table.sourceType, table.sourceId),
 ]);
+
+// ─── Topic Counts (Pattern Detection) ─────────────────────
+export const topicCounts = sqliteTable('topic_counts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  topic: text('topic').notNull(),
+  normalizedTopic: text('normalized_topic').notNull(),
+  occurrences: integer('occurrences').notNull().default(1),
+  sourceTypes: text('source_types', { mode: 'json' }),
+  sourceIds: text('source_ids', { mode: 'json' }),
+  lastSeenAt: integer('last_seen_at').$defaultFn(() => Math.floor(Date.now() / 1000)),
+  sopGenerated: integer('sop_generated', { mode: 'boolean' }).default(false),
+  sopId: text('sop_id'),
+  createdAt: integer('created_at').$defaultFn(() => Math.floor(Date.now() / 1000)),
+}, (table) => [
+  index('idx_topic_counts_normalized').on(table.normalizedTopic),
+  index('idx_topic_counts_occurrences').on(table.occurrences),
+]);
+
+// ─── Q&A Interactions (Self-Learning Feedback Loop) ───────
+export const qaInteractions = sqliteTable('qa_interactions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  question: text('question').notNull(),
+  answer: text('answer').notNull(),
+  wasCorrect: integer('was_correct', { mode: 'boolean' }),
+  correction: text('correction'),
+  confidence: text('confidence'),
+  sourceEntryIds: text('source_entry_ids', { mode: 'json' }),
+  askedBy: text('asked_by'),
+  askedVia: text('asked_via'),
+  createdAt: integer('created_at').$defaultFn(() => Math.floor(Date.now() / 1000)),
+}, (table) => [
+  index('idx_qa_asked_by').on(table.askedBy),
+  index('idx_qa_was_correct').on(table.wasCorrect),
+]);

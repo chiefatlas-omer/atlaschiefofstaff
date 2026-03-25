@@ -69,4 +69,4 @@ export const processedMessages = sqliteTable('processed_messages', {
   index('idx_processed_channel_ts').on(table.channelId, table.messageTs),
 ]);
 
-export { people, companies, deals, meetings, documents, decisions, relationships, knowledgeEntries } from './schema-graph';
+export { people, companies, deals, meetings, documents, decisions, relationships, knowledgeEntries, topicCounts, qaInteractions } from './schema-graph';

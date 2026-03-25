@@ -199,6 +199,36 @@ sqlite.exec(`
     created_at INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_knowledge_entries_source ON knowledge_entries(source_type, source_id);
+
+  CREATE TABLE IF NOT EXISTS topic_counts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    topic TEXT NOT NULL,
+    normalized_topic TEXT NOT NULL,
+    occurrences INTEGER NOT NULL DEFAULT 1,
+    source_types TEXT,
+    source_ids TEXT,
+    last_seen_at INTEGER,
+    sop_generated INTEGER DEFAULT 0,
+    sop_id TEXT,
+    created_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_topic_counts_normalized ON topic_counts(normalized_topic);
+  CREATE INDEX IF NOT EXISTS idx_topic_counts_occurrences ON topic_counts(occurrences);
+
+  CREATE TABLE IF NOT EXISTS qa_interactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    was_correct INTEGER,
+    correction TEXT,
+    confidence TEXT,
+    source_entry_ids TEXT,
+    asked_by TEXT,
+    asked_via TEXT,
+    created_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_qa_asked_by ON qa_interactions(asked_by);
+  CREATE INDEX IF NOT EXISTS idx_qa_was_correct ON qa_interactions(was_correct);
 `);
 
 console.log('Database initialized.');
