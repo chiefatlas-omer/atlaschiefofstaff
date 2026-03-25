@@ -551,6 +551,7 @@ async function processBatch(channelId: string, client: any, app: App) {
       ingestSlackMessage({
         text: msg.text,
         userId: msg.user,
+        userName: userNameCache.get(msg.user),
         channelId: msg.channel,
         messageTs: msg.ts,
         threadTs: msg.thread_ts,

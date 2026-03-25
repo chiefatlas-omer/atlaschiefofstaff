@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { db } from '../db/connection';
 import { knowledgeEntries } from '../db/schema';
+import { isNotNull } from 'drizzle-orm';
 
 const openai = new OpenAI();
 
@@ -138,14 +139,20 @@ export async function semanticSearch(
 ): Promise<KnowledgeSearchResult[]> {
   const queryEmbedding = await generateEmbedding(query);
 
-  // Load all entries
-  const entries = db.select().from(knowledgeEntries).all();
+  // NOTE: O(n) brute-force search — loads all embedded entries into memory.
+  // Acceptable for Phase 1 with small-medium datasets (< 5000 entries).
+  // Phase 2+ should migrate to sqlite-vec or Postgres pgvector for scale.
+  const entries = db.select().from(knowledgeEntries)
+    .where(isNotNull(knowledgeEntries.embedding))
+    .all();
+
+  if (entries.length > 5000) {
+    console.warn(`[embedding] Semantic search scanning ${entries.length} entries — consider migrating to vector index`);
+  }
 
   const scored: Array<KnowledgeSearchResult & { _sim: number }> = [];
 
   for (const entry of entries) {
-    if (!entry.embedding) continue;
-
     const entryEmbedding = new Float32Array(
       (entry.embedding as Buffer).buffer,
       (entry.embedding as Buffer).byteOffset,

@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db } from '../db/connection';
 import {
   people,
