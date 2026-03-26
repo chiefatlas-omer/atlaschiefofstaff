@@ -2,7 +2,7 @@ import { processTranscript } from '../ai/transcript-processor';
 import { createTask } from '../tasks/task-service';
 import { meetingSummaryBlocks, meetingSummaryDmBlocks } from '../slack/blocks';
 import { config } from '../config';
-import { db } from '../db/connection';
+import { db, sqlite } from '../db/connection';
 import { zoomUserMappings } from '../db/schema';
 import { extractParticipantsFromVtt } from './transcript-fetcher';
 import { ingestZoomTranscript } from '../services/ingestion-service';
@@ -636,6 +636,32 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
         meetingTitle: meetingTopic,
         callAnalysisId,
       });
+
+      // Store drafts in the database
+      if (drafts.length > 0) {
+        try {
+          const now = Math.floor(Date.now() / 1000);
+          for (const draft of drafts) {
+            sqlite.prepare(
+              `INSERT INTO email_drafts (recipient_name, recipient_company, archetype, email_body, meeting_title, call_analysis_id, rep_slack_id, rep_name, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)`
+            ).run(
+              draft.recipientName,
+              draft.recipientCompany,
+              draft.archetype,
+              draft.emailBody,
+              draft.meetingTitle,
+              draft.callAnalysisId,
+              host?.slackId ?? null,
+              host?.name ?? null,
+              now,
+            );
+          }
+          console.log(`[zoom] ${drafts.length} follow-up drafts stored in email_drafts table`);
+        } catch (dbErr) {
+          console.error('[zoom] Failed to store email drafts in DB (non-fatal):', dbErr);
+        }
+      }
 
       if (drafts.length > 0 && host?.slackId) {
         // DM drafts to the rep who hosted the call

@@ -297,6 +297,23 @@ sqlite.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_coaching_snapshots_rep_slack_id ON coaching_snapshots(rep_slack_id);
   CREATE INDEX IF NOT EXISTS idx_coaching_snapshots_week_start ON coaching_snapshots(week_start);
+
+  CREATE TABLE IF NOT EXISTS email_drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipient_name TEXT,
+    recipient_company TEXT,
+    recipient_email TEXT,
+    archetype TEXT,
+    email_body TEXT,
+    meeting_title TEXT,
+    call_analysis_id INTEGER,
+    rep_slack_id TEXT,
+    rep_name TEXT,
+    status TEXT DEFAULT 'draft',
+    created_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_email_drafts_status ON email_drafts(status);
+  CREATE INDEX IF NOT EXISTS idx_email_drafts_created_at ON email_drafts(created_at);
 `);
 
 console.log('Database initialized.');

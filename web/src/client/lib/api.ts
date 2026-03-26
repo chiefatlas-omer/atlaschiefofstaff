@@ -323,7 +323,28 @@ export const api = {
     ),
   search: (q: string) =>
     fetchApi<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
+  emailDrafts: () => fetchApi<EmailDraft[]>('/api/email-drafts'),
+  updateDraftStatus: (id: number, status: string) =>
+    fetchApi<{ success: boolean }>('/api/email-drafts/' + id + '/status', {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
 };
+
+export interface EmailDraft {
+  id: number;
+  recipientName: string | null;
+  recipientCompany: string | null;
+  recipientEmail: string | null;
+  archetype: string | null;
+  emailBody: string | null;
+  meetingTitle: string | null;
+  callAnalysisId: number | null;
+  repSlackId: string | null;
+  repName: string | null;
+  status: string | null;
+  createdAt: number | null;
+}
 
 // ---- Search result type ----
 

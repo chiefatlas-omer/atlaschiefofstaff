@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, DigestData, ProductIntelData, CoachingSnapshot } from '../lib/api';
+import { api, DigestData, ProductIntelData, CoachingSnapshot, EmailDraft } from '../lib/api';
 import MetricCard from '../components/MetricCard';
 
 // ─── Shared badge helpers ────────────────────────────────────────────────────
@@ -68,12 +68,13 @@ function formatDate(unixSeconds: number | null): string {
 
 // ─── Tab definitions ─────────────────────────────────────────────────────────
 
-type TabId = 'calls' | 'product' | 'coaching';
+type TabId = 'calls' | 'product' | 'coaching' | 'email_drafts';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'calls', label: 'Calls' },
   { id: 'product', label: 'Product Signals' },
   { id: 'coaching', label: 'Coaching' },
+  { id: 'email_drafts', label: 'Email Drafts' },
 ];
 
 // ─── Calls Tab Content ──────────────────────────────────────────────────────
@@ -491,6 +492,146 @@ function CoachingTab() {
   );
 }
 
+// ─── Email Drafts Tab Content ──────────────────────────────────────────────
+
+const ARCHETYPE_COLOR: Record<string, string> = {
+  direct_driver: 'bg-purple-50 text-[#4F3588] border-purple-200',
+  analytical: 'bg-blue-50 text-blue-700 border-blue-200',
+  relational: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  executive: 'bg-amber-50 text-amber-700 border-amber-200',
+};
+
+function EmailDraftsTab() {
+  const [drafts, setDrafts] = useState<EmailDraft[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    api
+      .emailDrafts()
+      .then(setDrafts)
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleCopy = (draft: EmailDraft) => {
+    navigator.clipboard.writeText(draft.emailBody ?? '').then(() => {
+      setCopiedId(draft.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  };
+
+  const handleMarkSent = (draft: EmailDraft) => {
+    api.updateDraftStatus(draft.id, 'sent').then(() => {
+      setDrafts((prev) =>
+        prev.map((d) => (d.id === draft.id ? { ...d, status: 'sent' } : d)),
+      );
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-400">
+        Loading email drafts...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
+        Failed to load email drafts: {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {drafts.length === 0 ? (
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
+          <p className="text-gray-400 text-sm">No email drafts yet</p>
+          <p className="text-gray-400 text-xs mt-1">
+            Follow-up drafts are generated automatically after external Zoom calls.
+          </p>
+        </div>
+      ) : (
+        drafts.map((draft) => {
+          const dateStr = draft.createdAt
+            ? new Date(draft.createdAt * 1000).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+              })
+            : '';
+
+          return (
+            <div key={draft.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              {/* Header */}
+              <div className="px-5 py-4 flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    To: {draft.recipientName ?? 'Unknown'}{' '}
+                    {draft.recipientCompany && (
+                      <span className="text-gray-500">({draft.recipientCompany})</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    From: {draft.meetingTitle ?? 'Meeting'}
+                    {dateStr && ` · ${dateStr}`}
+                    {draft.repName && ` · ${draft.repName}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {draft.archetype && (
+                    <span
+                      className={[
+                        'text-xs px-2 py-0.5 rounded border font-medium',
+                        ARCHETYPE_COLOR[draft.archetype] ?? 'bg-gray-50 text-gray-500 border-gray-200',
+                      ].join(' ')}
+                    >
+                      {draft.archetype.replace(/_/g, ' ')}
+                    </span>
+                  )}
+                  {draft.status === 'sent' && (
+                    <span className="text-xs px-2 py-0.5 rounded border font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
+                      Sent &#10003;
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Email body */}
+              <div className="px-5 pb-4">
+                <div className="font-mono text-sm bg-gray-50 rounded-lg p-4 text-gray-700 whitespace-pre-wrap border border-gray-100">
+                  {draft.emailBody ?? ''}
+                </div>
+              </div>
+
+              {/* Actions */}
+              {draft.status !== 'sent' && (
+                <div className="px-5 pb-4 flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => handleCopy(draft)}
+                    className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    {copiedId === draft.id ? 'Copied!' : 'Copy to Clipboard'}
+                  </button>
+                  <button
+                    onClick={() => handleMarkSent(draft)}
+                    className="text-sm px-4 py-2 rounded-lg bg-[#4F3588] text-white hover:bg-[#3d2a6a] transition-colors"
+                  >
+                    Mark as Sent
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
 // ─── Main Intelligence Page ─────────────────────────────────────────────────
 
 export default function Intelligence() {
@@ -528,6 +669,7 @@ export default function Intelligence() {
       {activeTab === 'calls' && <CallsTab />}
       {activeTab === 'product' && <ProductSignalsTab />}
       {activeTab === 'coaching' && <CoachingTab />}
+      {activeTab === 'email_drafts' && <EmailDraftsTab />}
     </div>
   );
 }

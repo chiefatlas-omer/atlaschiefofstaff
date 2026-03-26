@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import CommandBar from './CommandBar';
 
 const NAV_ITEMS = [
-  { label: 'Home', href: '/' },
+  { label: 'Command Center', href: '/' },
   { label: 'Intelligence', href: '/intelligence' },
   { label: 'Tasks', href: '/tasks' },
   { label: 'Knowledge', href: '/knowledge' },
@@ -44,8 +44,14 @@ export default function Layout({ children }: LayoutProps) {
       <aside className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
         {/* Branding */}
         <div className="px-6 py-5 border-b border-gray-200">
-          <span className="text-[#4F3588] font-bold text-lg tracking-tight">Atlas CoS</span>
-          <p className="text-gray-400 text-xs mt-0.5">Command Center</p>
+          <div className="flex items-center gap-2">
+            <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="42" stroke="#4F3588" strokeWidth="8" fill="none"/>
+              <path d="M55 20L35 52H48L42 80L68 45H53L55 20Z" fill="#4F3588"/>
+            </svg>
+            <span className="text-[#4F3588] font-bold text-lg tracking-tight">Atlas CoS</span>
+          </div>
+          <p className="text-gray-400 text-xs mt-0.5 ml-9">Command Center</p>
         </div>
 
         {/* Nav */}

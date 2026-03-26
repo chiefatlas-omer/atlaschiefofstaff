@@ -8,6 +8,23 @@ export default function Briefing() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Quick-Ask state
+  const [askQuery, setAskQuery] = useState('');
+  const [askAnswer, setAskAnswer] = useState<string | null>(null);
+  const [askLoading, setAskLoading] = useState(false);
+
+  const handleAsk = () => {
+    const q = askQuery.trim();
+    if (!q) return;
+    setAskLoading(true);
+    setAskAnswer(null);
+    api
+      .ask(q)
+      .then((res) => setAskAnswer(res.answer))
+      .catch(() => setAskAnswer('Sorry, something went wrong. Please try again.'))
+      .finally(() => setAskLoading(false));
+  };
+
   useEffect(() => {
     api
       .briefing()
@@ -42,6 +59,45 @@ export default function Briefing() {
         <h1 className="text-2xl font-semibold text-gray-900">{data.greeting}</h1>
         <span className="text-gray-500 text-sm">{data.date}</span>
       </div>
+
+      {/* ── Quick-Ask Bar ────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleAsk();
+          }}
+          className="flex items-center gap-3"
+        >
+          <span className="text-gray-400 text-lg pl-1">&#128269;</span>
+          <input
+            type="text"
+            value={askQuery}
+            onChange={(e) => setAskQuery(e.target.value)}
+            placeholder="Ask anything about your business..."
+            className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent"
+          />
+          <button
+            type="submit"
+            disabled={askLoading || !askQuery.trim()}
+            className="bg-[#4F3588] text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-[#3d2a6a] disabled:opacity-50 transition-colors"
+          >
+            Ask
+          </button>
+        </form>
+      </div>
+
+      {/* ── Quick-Ask Answer ─────────────────────────────────── */}
+      {askLoading && (
+        <div className="bg-[#F3F1FC] rounded-xl p-4 text-gray-500 text-sm animate-pulse">
+          Thinking...
+        </div>
+      )}
+      {askAnswer && !askLoading && (
+        <div className="bg-[#F3F1FC] rounded-xl p-4 text-gray-700 text-sm whitespace-pre-wrap">
+          {askAnswer}
+        </div>
+      )}
 
       {/* ── Needs Your Attention ──────────────────────────────── */}
       <section>
