@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { label: 'Sales Intel', href: '/sales' },
   { label: 'Product Intel', href: '/product' },
   { label: 'Coaching', href: '/coaching' },
+  { label: '📄 Upload', href: '/upload' },
 ];
 
 interface LayoutProps {

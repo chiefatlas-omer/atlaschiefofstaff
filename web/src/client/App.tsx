@@ -8,6 +8,7 @@ import SOPs from './pages/SOPs';
 import SalesIntel from './pages/SalesIntel';
 import ProductIntel from './pages/ProductIntel';
 import Coaching from './pages/Coaching';
+import Upload from './pages/Upload';
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/sales" element={<SalesIntel />} />
           <Route path="/product" element={<ProductIntel />} />
           <Route path="/coaching" element={<Coaching />} />
+          <Route path="/upload" element={<Upload />} />
         </Routes>
       </Layout>
     </BrowserRouter>
