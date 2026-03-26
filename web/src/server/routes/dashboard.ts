@@ -10,7 +10,7 @@ import {
   qaInteractions,
 } from '../../../../bot/src/db/schema';
 import { callAnalyses, productSignals, coachingSnapshots } from '../schema-analytics';
-import { eq, ne, and, lt, count, desc, gte, gt } from 'drizzle-orm';
+import { eq, ne, and, lt, count, desc, gte, gt, isNotNull } from 'drizzle-orm';
 
 const router = Router();
 
@@ -44,6 +44,12 @@ router.get('/dashboard', (_req, res) => {
       .select({ count: count() })
       .from(meetings)
       .where(gte(meetings.date, thirtyDaysAgo))
+      .get();
+    // Meetings prepped = meetings with a non-null summary (prep brief was generated)
+    const meetingsPrepped = db
+      .select({ count: count() })
+      .from(meetings)
+      .where(isNotNull(meetings.summary))
       .get();
 
     // SOPs (documents of type 'sop')
@@ -93,6 +99,7 @@ router.get('/dashboard', (_req, res) => {
       meetings: {
         total: totalMeetings?.count ?? 0,
         recentThirtyDays: recentMeetings?.count ?? 0,
+        meetingsPrepped: meetingsPrepped?.count ?? 0,
       },
       sops: {
         total: totalSops?.count ?? 0,
@@ -259,30 +266,30 @@ router.get('/analytics/outcomes', (_req, res) => {
     // ── Meetings ─────────────────────────────────────────────
     const allMeetings = db.select().from(meetings).all();
     const meetingsThisWeek = allMeetings.filter(m => {
-      const ts = m.createdAt instanceof Date ? Math.floor(m.createdAt.getTime() / 1000) : Number(m.createdAt);
+      const ts = Number(m.createdAt);
       return ts >= weekAgo;
     });
     const meetingsLastWeek = allMeetings.filter(m => {
-      const ts = m.createdAt instanceof Date ? Math.floor(m.createdAt.getTime() / 1000) : Number(m.createdAt);
+      const ts = Number(m.createdAt);
       return ts >= twoWeeksAgo && ts < weekAgo;
     });
     // Meetings "prepped" = those with a summary (briefing delivered)
     const meetingsPreppedhisWeek = meetingsThisWeek.filter(m => m.summary).length;
     const meetingsPreppedLastWeek = meetingsLastWeek.filter(m => m.summary).length;
     const meetingsPreppedThisMonth = allMeetings.filter(m => {
-      const ts = m.createdAt instanceof Date ? Math.floor(m.createdAt.getTime() / 1000) : Number(m.createdAt);
-      return ts >= monthAgo && m.summary;
+      const ts = Number(m.createdAt);
+      return ts >= monthAgo && Boolean(m.summary);
     }).length;
 
     // ── Call Analyses / Follow-ups ────────────────────────────
     const allCalls = db.select().from(callAnalyses).all();
     const callsThisWeek = allCalls.filter(c => {
-      return c.createdAt >= weekAgo;
+      return (c.createdAt ?? 0) >= weekAgo;
     });
     const callsLastWeek = allCalls.filter(c => {
-      return c.createdAt >= twoWeeksAgo && c.createdAt < weekAgo;
+      return (c.createdAt ?? 0) >= twoWeeksAgo && (c.createdAt ?? 0) < weekAgo;
     });
-    const callsThisMonth = allCalls.filter(c => c.createdAt >= monthAgo);
+    const callsThisMonth = allCalls.filter(c => (c.createdAt ?? 0) >= monthAgo);
     // Follow-ups = calls where outcome field is non-null (analysis generated follow-up email)
     const followUpsThisWeek = callsThisWeek.filter(c => c.outcome).length;
     const followUpsLastWeek = callsLastWeek.filter(c => c.outcome).length;
@@ -302,9 +309,9 @@ router.get('/analytics/outcomes', (_req, res) => {
 
     // ── Product Signals ───────────────────────────────────────
     const allSignals = db.select().from(productSignals).all();
-    const signalsThisWeek = allSignals.filter(s => s.createdAt >= weekAgo);
-    const signalsLastWeek = allSignals.filter(s => s.createdAt >= twoWeeksAgo && s.createdAt < weekAgo);
-    const signalsThisMonth = allSignals.filter(s => s.createdAt >= monthAgo);
+    const signalsThisWeek = allSignals.filter(s => (s.createdAt ?? 0) >= weekAgo);
+    const signalsLastWeek = allSignals.filter(s => (s.createdAt ?? 0) >= twoWeeksAgo && (s.createdAt ?? 0) < weekAgo);
+    const signalsThisMonth = allSignals.filter(s => (s.createdAt ?? 0) >= monthAgo);
     const featureRequests = signalsThisMonth.filter(s => s.type === 'feature_request').length;
     const bugReports = signalsThisMonth.filter(s => s.type === 'bug').length;
     const churnReasons = signalsThisMonth.filter(s => s.type === 'churn_reason').length;

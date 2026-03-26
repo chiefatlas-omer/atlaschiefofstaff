@@ -3,7 +3,19 @@ import { db } from '../db/connection';
 import { knowledgeEntries } from '../db/schema';
 import { isNotNull } from 'drizzle-orm';
 
-const openai = new OpenAI();
+const OPENAI_API_KEY = process.env['OPENAI_API_KEY'];
+
+// Lazy-initialised so we don't crash on startup when the key is absent.
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not set — embeddings are unavailable');
+  }
+  if (!_openai) {
+    _openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+  }
+  return _openai;
+}
 
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const CHUNK_SIZE = 1000;
@@ -49,7 +61,7 @@ export function chunkText(text: string): string[] {
 // --- Embedding Generation ---
 
 export async function generateEmbedding(text: string): Promise<Float32Array> {
-  const response = await openai.embeddings.create({
+  const response = await getOpenAI().embeddings.create({
     model: EMBEDDING_MODEL,
     input: text,
   });
@@ -85,6 +97,10 @@ export interface StoreKnowledgeEntryInput {
 }
 
 export async function storeKnowledgeEntry(input: StoreKnowledgeEntryInput): Promise<void> {
+  if (!OPENAI_API_KEY) {
+    console.warn('[embedding] OPENAI_API_KEY not set — skipping embedding for knowledge entry');
+    return;
+  }
   const embedding = await generateEmbedding(input.content);
   const embeddingBuffer = Buffer.from(embedding.buffer);
 
@@ -137,6 +153,10 @@ export async function semanticSearch(
   query: string,
   limit = 10,
 ): Promise<KnowledgeSearchResult[]> {
+  if (!OPENAI_API_KEY) {
+    console.warn('[embedding] OPENAI_API_KEY not set — semantic search is unavailable, returning empty results');
+    return [];
+  }
   const queryEmbedding = await generateEmbedding(query);
 
   // NOTE: O(n) brute-force search — loads all embedded entries into memory.

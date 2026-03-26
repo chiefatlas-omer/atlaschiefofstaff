@@ -10,6 +10,7 @@ export interface DashboardData {
   meetings: {
     total: number;
     recentThirtyDays: number;
+    meetingsPrepped: number;
   };
   sops: {
     total: number;
@@ -31,16 +32,27 @@ export interface DashboardData {
 }
 
 export interface Task {
-  id: number;
+  id: string;
+  slackUserId: string;
+  slackUserName: string | null;
   description: string;
-  owner: string | null;
+  rawMessageText: string | null;
+  sourceChannelId: string | null;
+  sourceMessageTs: string | null;
+  sourceThreadTs: string | null;
+  botReplyTs: string | null;
   status: 'DETECTED' | 'CONFIRMED' | 'OVERDUE' | 'ESCALATED' | 'COMPLETED' | 'DISMISSED';
+  confidence: 'high' | 'medium' | null;
+  team: 'team_a' | 'team_b' | null;
+  deadlineText: string | null;
   deadline: string | null;
+  completedAt: string | null;
+  lastReminderAt: string | null;
+  escalatedAt: string | null;
+  source: 'slack' | 'zoom' | 'manual' | 'desktop';
+  zoomMeetingId: string | null;
   createdAt: string;
   updatedAt: string;
-  sourceMessageTs: string | null;
-  channelId: string | null;
-  notes: string | null;
 }
 
 export interface TaskStats {

@@ -57,7 +57,7 @@ export default function TaskList({ tasks }: TaskListProps) {
                 </span>
               </td>
               <td className="py-3 pr-4 text-gray-400 whitespace-nowrap">
-                {task.owner ?? '—'}
+                {task.slackUserName ?? '—'}
               </td>
               <td className="py-3 pr-4">
                 <span

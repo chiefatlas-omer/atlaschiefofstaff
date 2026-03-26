@@ -44,7 +44,7 @@ export default function Metrics() {
 
   const meetingsPrepPct =
     dashboard.meetings.total > 0
-      ? Math.round((dashboard.meetings.recentThirtyDays / dashboard.meetings.total) * 100)
+      ? Math.round((dashboard.meetings.meetingsPrepped / dashboard.meetings.total) * 100)
       : 0;
 
   const overdueTasks = tasks.filter((t) => t.status === 'OVERDUE' || t.status === 'ESCALATED');
@@ -69,9 +69,9 @@ export default function Metrics() {
           />
           <MetricCard
             label="Meetings Prepped"
-            value={`${meetingsPrepPct}%`}
+            value={dashboard.meetings.meetingsPrepped}
             color="blue"
-            subtitle={`${dashboard.meetings.recentThirtyDays} of ${dashboard.meetings.total} total`}
+            subtitle={`${meetingsPrepPct}% of ${dashboard.meetings.total} total (with prep brief)`}
           />
           <MetricCard
             label="Decisions Logged"

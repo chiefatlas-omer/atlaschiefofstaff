@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+dotenv.config({ path: path.resolve(__dirname, '..', '.env'), override: true });
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -23,6 +23,9 @@ export const config = {
   },
   anthropic: {
     apiKey: requireEnv('ANTHROPIC_API_KEY'),
+  },
+  openai: {
+    apiKey: optionalEnv('OPENAI_API_KEY'),
   },
   escalation: {
     omerSlackUserId: optionalEnv('OMER_SLACK_USER_ID'),
