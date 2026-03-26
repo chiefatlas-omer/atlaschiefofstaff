@@ -1,6 +1,7 @@
 import { ipcMain, BrowserWindow, clipboard } from 'electron';
 import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
+import { postProcess } from './voice/post-processor';
 import { getMyTasks } from './db/task-bridge';
 import { classifyIntent } from './ai/intent-classifier';
 import { logVoiceInteraction } from './db/voice-logger';
@@ -8,6 +9,12 @@ import { sqlite } from './db/connection';
 
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
   let voiceMode: 'command' | 'dictation' = 'command';
+
+  // Rolling context window for continuity across consecutive dictation chunks.
+  // Stores the last ~200 chars of the most recent successful transcription so
+  // Whisper can use it as a prompt prefix on the next call.
+  let dictationContext = '';
+  let commandContext = '';
 
   // Track voice mode from hotkey
   ipcMain.handle(IPC.VOICE_MODE, async (_event, mode: string) => {
@@ -26,15 +33,25 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         return;
       }
 
-      console.log('[DICTATION] Transcribing...');
-      const transcript = await transcribeAudio(buffer);
-      console.log('[DICTATION] Result:', transcript);
+      console.log('[DICTATION] Transcribing... (context length:', dictationContext.length, ')');
+      const rawTranscript = await transcribeAudio(buffer, {
+        previousTranscript: dictationContext,
+        highQualityRetry: true,
+      });
+      console.log('[DICTATION] Raw result:', rawTranscript);
 
-      if (!transcript || transcript.trim().length === 0) {
+      if (!rawTranscript || rawTranscript.trim().length === 0) {
         mainWindow.webContents.send(IPC.ERROR, "Couldn't understand audio.");
         mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
         return;
       }
+
+      // Apply post-processing (capitalisation, number formatting, misheard corrections)
+      const transcript = postProcess(rawTranscript, { stripFillers: false });
+      console.log('[DICTATION] Post-processed:', transcript);
+
+      // Update rolling context window for the next chunk
+      dictationContext = transcript.slice(-200);
 
       // Show transcript briefly
       mainWindow.webContents.send(IPC.TRANSCRIPT, '📝 ' + transcript);
@@ -83,15 +100,25 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         return;
       }
 
-      console.log('[AUDIO] Sending to Whisper...');
-      const transcript = await transcribeAudio(buffer);
-      console.log('[AUDIO] Whisper result:', transcript);
+      console.log('[AUDIO] Sending to Whisper... (context length:', commandContext.length, ')');
+      const rawTranscript = await transcribeAudio(buffer, {
+        previousTranscript: commandContext,
+        highQualityRetry: true,
+      });
+      console.log('[AUDIO] Whisper result:', rawTranscript);
 
-      if (!transcript || transcript.trim().length === 0) {
+      if (!rawTranscript || rawTranscript.trim().length === 0) {
         mainWindow.webContents.send(IPC.ERROR, "Couldn't understand audio, try again.");
         mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
         return;
       }
+
+      // Apply post-processing (capitalisation, number formatting, misheard corrections)
+      const transcript = postProcess(rawTranscript, { stripFillers: false });
+      console.log('[AUDIO] Post-processed:', transcript);
+
+      // Update rolling context window
+      commandContext = transcript.slice(-200);
 
       // Send transcript to renderer for display
       mainWindow.webContents.send(IPC.TRANSCRIPT, transcript);
