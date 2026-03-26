@@ -1,101 +1,16 @@
 import { ipcMain, BrowserWindow, clipboard } from 'electron';
 import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
-import { postProcess, polishForCommunication } from './voice/post-processor';
+import { postProcess, smartProcess } from './voice/post-processor';
 import { getMyTasks } from './db/task-bridge';
-import { classifyIntent } from './ai/intent-classifier';
 import { logVoiceInteraction } from './db/voice-logger';
 import { sqlite } from './db/connection';
 
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
-  let voiceMode: 'command' | 'dictation' = 'command';
+  // Rolling context window for continuity across consecutive transcription chunks.
+  let transcriptionContext = '';
 
-  // Rolling context window for continuity across consecutive dictation chunks.
-  // Stores the last ~200 chars of the most recent successful transcription so
-  // Whisper can use it as a prompt prefix on the next call.
-  let dictationContext = '';
-  let commandContext = '';
-
-  // Track voice mode from hotkey
-  ipcMain.handle(IPC.VOICE_MODE, async (_event, mode: string) => {
-    voiceMode = mode as 'command' | 'dictation';
-    console.log('[MODE] Voice mode set to:', voiceMode);
-  });
-
-  // Dictation: transcribe and type into focused app
-  ipcMain.handle(IPC.DICTATION_DATA, async (_event, audioBuffer: ArrayBuffer) => {
-    console.log('[DICTATION] Received audio, size:', audioBuffer?.byteLength || 0);
-    try {
-      const buffer = Buffer.from(audioBuffer);
-      if (buffer.length < 1000) {
-        mainWindow.webContents.send(IPC.ERROR, 'Audio too short.');
-        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-        return;
-      }
-
-      console.log('[DICTATION] Transcribing... (context length:', dictationContext.length, ')');
-      const rawTranscript = await transcribeAudio(buffer, {
-        previousTranscript: dictationContext,
-        highQualityRetry: true,
-      });
-      console.log('[DICTATION] Raw result:', rawTranscript);
-
-      if (!rawTranscript || rawTranscript.trim().length === 0) {
-        mainWindow.webContents.send(IPC.ERROR, "Couldn't understand audio.");
-        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-        return;
-      }
-
-      // Apply post-processing (capitalisation, number formatting, misheard corrections)
-      const transcript = postProcess(rawTranscript, { stripFillers: false });
-      console.log('[DICTATION] Post-processed:', transcript);
-
-      // Update rolling context window for the next chunk
-      dictationContext = transcript.slice(-200);
-
-      // AI Polish: clean up filler words and format for communication (default on)
-      const shouldPolish = process.env.POLISH_DICTATION !== 'false';
-      let finalText = transcript;
-      if (shouldPolish) {
-        console.log('[DICTATION] Polishing with AI...');
-        finalText = await polishForCommunication(transcript, 'general');
-        console.log('[DICTATION] Polished:', finalText);
-      }
-
-      // Show transcript briefly
-      mainWindow.webContents.send(IPC.TRANSCRIPT, '📝 ' + finalText);
-
-      // Save current clipboard, paste transcript, restore clipboard
-      const savedClipboard = clipboard.readText();
-      clipboard.writeText(finalText);
-
-      // Simulate Ctrl+V to paste into focused app
-      // Small delay to ensure our overlay isn't focused
-      await new Promise(r => setTimeout(r, 200));
-
-      try {
-        const { execSync } = require('child_process');
-        execSync(`powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')"`, { timeout: 3000 });
-        console.log('[DICTATION] Pasted via PowerShell SendKeys');
-      } catch (psErr) {
-        console.error('[DICTATION] Paste failed, text is in clipboard:', psErr);
-        mainWindow.webContents.send(IPC.TRANSCRIPT, '📋 Copied to clipboard — Ctrl+V to paste');
-      }
-
-      // Restore original clipboard after a brief delay
-      setTimeout(() => {
-        clipboard.writeText(savedClipboard);
-      }, 500);
-
-      mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-    } catch (err: any) {
-      console.error('[DICTATION] Failed:', err);
-      mainWindow.webContents.send(IPC.ERROR, 'Dictation failed: ' + err.message);
-      mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-    }
-  });
-
-  // Receive audio data from renderer, transcribe with Whisper (command mode)
+  // Unified audio handler — single flow for both command and dictation
   ipcMain.handle(IPC.AUDIO_DATA, async (_event, audioBuffer: ArrayBuffer) => {
     console.log('[AUDIO] Received audio data, size:', audioBuffer?.byteLength || 0, 'bytes');
     try {
@@ -109,9 +24,9 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         return;
       }
 
-      console.log('[AUDIO] Sending to Whisper... (context length:', commandContext.length, ')');
+      console.log('[AUDIO] Sending to Whisper... (context length:', transcriptionContext.length, ')');
       const rawTranscript = await transcribeAudio(buffer, {
-        previousTranscript: commandContext,
+        previousTranscript: transcriptionContext,
         highQualityRetry: true,
       });
       console.log('[AUDIO] Whisper result:', rawTranscript);
@@ -127,81 +42,113 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       console.log('[AUDIO] Post-processed:', transcript);
 
       // Update rolling context window
-      commandContext = transcript.slice(-200);
+      transcriptionContext = transcript.slice(-200);
 
-      // Send transcript to renderer for display
-      mainWindow.webContents.send(IPC.TRANSCRIPT, transcript);
+      // Smart Process: ONE Claude call to detect command vs dictation + classify intent
+      console.log('[AUDIO] Running smartProcess...');
+      const result = await smartProcess(transcript);
+      console.log('[AUDIO] smartProcess result:', result.type, result.intent || '');
 
-      // AI-powered intent classification
-      const { intent } = await classifyIntent(transcript);
+      if (result.type === 'dictation') {
+        // ── Dictation flow: paste polished text into active app ──
+        const finalText = result.output;
+        mainWindow.webContents.send(IPC.TRANSCRIPT, finalText);
 
-      if (intent === 'TASK_QUERY') {
-        const tasks = getMyTasks();
-        mainWindow.webContents.send(IPC.TASKS_UPDATE, tasks);
-      } else if (intent === 'MEETING_PREP') {
-        mainWindow.webContents.send(IPC.TRANSCRIPT, 'Checking your calendar...');
+        // Save current clipboard, paste transcript, restore clipboard
+        const savedClipboard = clipboard.readText();
+        clipboard.writeText(finalText);
+
+        // Simulate Ctrl+V to paste into focused app
+        await new Promise(r => setTimeout(r, 200));
+
         try {
-          const { GoogleAuth } = require('./auth/google-auth');
-          const { CalendarClient } = require('./calendar/google-calendar');
-          const { generateMeetingBrief } = require('./calendar/meeting-prep');
-          const auth = new GoogleAuth();
-          if (auth.isAuthenticated()) {
-            const calendar = new CalendarClient(auth);
-            const meetings = await calendar.getUpcomingMeetings(120); // next 2 hours
-            if (meetings.length > 0) {
-              const brief = await generateMeetingBrief(meetings[0]);
-              mainWindow.webContents.send(IPC.BRIEFING_SHOW, brief);
-            } else {
-              mainWindow.webContents.send(IPC.TRANSCRIPT, 'No upcoming meetings found.');
-            }
-          } else {
-            mainWindow.webContents.send(IPC.ERROR, 'Google not connected. Use tray menu to connect.');
-          }
-        } catch (err: any) {
-          mainWindow.webContents.send(IPC.ERROR, 'Meeting prep failed: ' + err.message);
+          const { execSync } = require('child_process');
+          execSync(`powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')"`, { timeout: 3000 });
+          console.log('[DICTATION] Pasted via PowerShell SendKeys');
+        } catch (psErr) {
+          console.error('[DICTATION] Paste failed, text is in clipboard:', psErr);
+          mainWindow.webContents.send(IPC.TRANSCRIPT, 'Copied to clipboard \u2014 Ctrl+V to paste');
         }
-        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-      } else if (intent === 'KNOWLEDGE_QUERY') {
-        mainWindow.webContents.send(IPC.TRANSCRIPT, 'Searching knowledge base...');
-        try {
-          const rows = sqlite.prepare(
-            'SELECT content, source_type FROM knowledge_entries WHERE embedding IS NOT NULL ORDER BY created_at DESC LIMIT 20'
-          ).all() as Array<{ content: string; source_type: string }>;
 
-          if (rows.length === 0) {
-            mainWindow.webContents.send(IPC.TRANSCRIPT, "I don't have enough information to answer that yet.");
-          } else {
-            const context = rows.map((r, i) => `[${i + 1}] (${r.source_type}) ${r.content}`).join('\n\n');
-            const Anthropic = require('@anthropic-ai/sdk');
-            const ai = new Anthropic.default();
-            const aiResponse = await ai.messages.create({
-              model: 'claude-sonnet-4-20250514',
-              max_tokens: 512,
-              system: 'Answer based ONLY on context. Be concise — voice response. Cite as [N].',
-              messages: [{ role: 'user', content: `Context:\n${context}\n\nQuestion: ${transcript}` }],
-            });
-            const answer = (aiResponse.content[0] as any).text?.trim() || 'No answer found.';
-            mainWindow.webContents.send(IPC.KNOWLEDGE_RESPONSE, answer);
-          }
-        } catch (err: any) {
-          mainWindow.webContents.send(IPC.ERROR, 'Knowledge query failed: ' + err.message);
-        }
-        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-      }
-
-      // Log voice interaction to knowledge graph (non-blocking)
-      logVoiceInteraction({
-        transcript,
-        response: intent === 'TASK_QUERY' ? 'Showed task panel' : intent === 'MEETING_PREP' ? 'Showed meeting briefing' : intent === 'KNOWLEDGE_QUERY' ? 'Showed knowledge response' : transcript,
-        intent,
-        userId: process.env.SLACK_USER_ID,
-      });
-
-      // Return to idle after delay (only for quick intents)
-      if (intent === 'TASK_QUERY' || intent === 'GENERAL') {
+        // Restore original clipboard after a brief delay
         setTimeout(() => {
+          clipboard.writeText(savedClipboard);
+        }, 500);
+
+        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
+      } else {
+        // ── Command flow: route by intent ──
+        mainWindow.webContents.send(IPC.TRANSCRIPT, transcript);
+        const intent = result.intent || 'GENERAL';
+
+        if (intent === 'TASK_QUERY') {
+          const tasks = getMyTasks();
+          mainWindow.webContents.send(IPC.TASKS_UPDATE, tasks);
+        } else if (intent === 'MEETING_PREP') {
+          mainWindow.webContents.send(IPC.TRANSCRIPT, 'Checking your calendar...');
+          try {
+            const { GoogleAuth } = require('./auth/google-auth');
+            const { CalendarClient } = require('./calendar/google-calendar');
+            const { generateMeetingBrief } = require('./calendar/meeting-prep');
+            const auth = new GoogleAuth();
+            if (auth.isAuthenticated()) {
+              const calendar = new CalendarClient(auth);
+              const meetings = await calendar.getUpcomingMeetings(120); // next 2 hours
+              if (meetings.length > 0) {
+                const brief = await generateMeetingBrief(meetings[0]);
+                mainWindow.webContents.send(IPC.BRIEFING_SHOW, brief);
+              } else {
+                mainWindow.webContents.send(IPC.TRANSCRIPT, 'No upcoming meetings found.');
+              }
+            } else {
+              mainWindow.webContents.send(IPC.ERROR, 'Google not connected. Use tray menu to connect.');
+            }
+          } catch (err: any) {
+            mainWindow.webContents.send(IPC.ERROR, 'Meeting prep failed: ' + err.message);
+          }
           mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-        }, 5000);
+        } else if (intent === 'KNOWLEDGE_QUERY') {
+          mainWindow.webContents.send(IPC.TRANSCRIPT, 'Searching knowledge base...');
+          try {
+            const rows = sqlite.prepare(
+              'SELECT content, source_type FROM knowledge_entries WHERE embedding IS NOT NULL ORDER BY created_at DESC LIMIT 20'
+            ).all() as Array<{ content: string; source_type: string }>;
+
+            if (rows.length === 0) {
+              mainWindow.webContents.send(IPC.TRANSCRIPT, "I don't have enough information to answer that yet.");
+            } else {
+              const context = rows.map((r, i) => `[${i + 1}] (${r.source_type}) ${r.content}`).join('\n\n');
+              const Anthropic = require('@anthropic-ai/sdk');
+              const ai = new Anthropic.default();
+              const aiResponse = await ai.messages.create({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 512,
+                system: 'Answer based ONLY on context. Be concise \u2014 voice response. Cite as [N].',
+                messages: [{ role: 'user', content: `Context:\n${context}\n\nQuestion: ${transcript}` }],
+              });
+              const answer = (aiResponse.content[0] as any).text?.trim() || 'No answer found.';
+              mainWindow.webContents.send(IPC.KNOWLEDGE_RESPONSE, answer);
+            }
+          } catch (err: any) {
+            mainWindow.webContents.send(IPC.ERROR, 'Knowledge query failed: ' + err.message);
+          }
+          mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
+        }
+
+        // Log voice interaction to knowledge graph (non-blocking)
+        logVoiceInteraction({
+          transcript,
+          response: intent === 'TASK_QUERY' ? 'Showed task panel' : intent === 'MEETING_PREP' ? 'Showed meeting briefing' : intent === 'KNOWLEDGE_QUERY' ? 'Showed knowledge response' : transcript,
+          intent,
+          userId: process.env.SLACK_USER_ID,
+        });
+
+        // Return to idle after delay (only for quick intents)
+        if (intent === 'TASK_QUERY' || intent === 'GENERAL') {
+          setTimeout(() => {
+            mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
+          }, 5000);
+        }
       }
     } catch (err: any) {
       console.error('Whisper transcription failed:', err);

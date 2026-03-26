@@ -123,21 +123,25 @@ const MISHEAR_CORRECTIONS: Array<[RegExp, string]> = [
 const FILLER_PATTERN = /\b(um+|uh+|er+|hmm+|mhm|like,?\s|you\s+know,?\s|basically,?\s|literally,?\s|actually,?\s)/gi;
 
 // ---------------------------------------------------------------------------
-// AI Polish Layer — cleans up dictation for communication contexts
+// Smart Process — single Claude call that detects intent AND polishes text
 // ---------------------------------------------------------------------------
 
-export type PolishContext = 'slack' | 'email' | 'general';
+export type SmartProcessResult = {
+  type: 'command' | 'dictation';
+  intent?: string; // for commands: TASK_QUERY, MEETING_PREP, KNOWLEDGE_QUERY, GENERAL
+  output: string;  // for dictation: polished text. for commands: the original transcript
+};
 
 /**
- * Uses Claude Haiku to polish raw transcribed text for communication.
- * Removes filler words, fixes grammar, and formats for the given context.
- * Falls back to the raw text if the AI call fails.
+ * Single Claude Haiku call that determines if the transcript is a COMMAND
+ * (user talking TO the AI assistant) or DICTATION (composing text for someone else),
+ * classifies intent for commands, and polishes text for dictation.
+ * Replaces both polishForCommunication and classifyIntent.
  */
-export async function polishForCommunication(
-  rawText: string,
-  context: PolishContext = 'general',
-): Promise<string> {
-  if (!rawText || rawText.trim().length === 0) return rawText;
+export async function smartProcess(rawTranscript: string): Promise<SmartProcessResult> {
+  if (!rawTranscript || rawTranscript.trim().length === 0) {
+    return { type: 'dictation', output: rawTranscript };
+  }
 
   try {
     const Anthropic = require('@anthropic-ai/sdk');
@@ -146,33 +150,44 @@ export async function polishForCommunication(
     const response = await client.messages.create({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `You are a communication polisher. Take this voice-transcribed text and make it ready to send.
+      system: `You process voice transcriptions. Determine if this is a COMMAND (user talking TO the AI assistant) or DICTATION (user composing text for someone else — an email, slack message, document, etc.).
 
-Rules:
+COMMAND examples: "show my tasks", "prep me for my next meeting", "what's our refund policy", "what do we know about Greenscape"
+DICTATION examples: "Hey Tom comma quick note about the irrigation contract period...", "Send a message to the team about the new pricing update", any text that's clearly meant to be written/sent somewhere
+
+Return JSON only:
+{
+  "type": "command" or "dictation",
+  "intent": "TASK_QUERY" | "MEETING_PREP" | "KNOWLEDGE_QUERY" | "GENERAL" (only for commands),
+  "output": "the cleaned up text" (for dictation: remove filler words, fix grammar, format for slack/email. for commands: return the original transcript cleaned up)
+}
+
+Rules for dictation output:
 - Remove ALL filler words (um, uh, like, you know, basically, actually, so, right, I mean)
 - Fix grammar and punctuation
-- Structure it properly for the context (slack message, email, or general text)
-- Keep the person's voice and intent — don't make it sound corporate or AI-generated
-- If it sounds like an email, format it with greeting and sign-off
+- If it sounds like an email, format with proper greeting/sign-off
 - If it sounds like a Slack message, keep it casual and concise
-- Never add information that wasn't in the original
-- Keep it natural and human
-- Return ONLY the polished text, no explanations or preamble
-
-Context: ${context}
-Raw transcription: ${rawText}`,
-        },
-      ],
+- Keep the person's voice and natural tone
+- Never add information not in the original
+- Be fast — concise output, no explanations`,
+      messages: [{ role: 'user', content: rawTranscript }],
     });
 
-    const polished = (response.content[0] as any)?.text?.trim();
-    return polished || rawText;
+    const text = response.content[0].type === 'text' ? response.content[0].text : '{}';
+    try {
+      const parsed = JSON.parse(text);
+      return {
+        type: parsed.type || 'dictation',
+        intent: parsed.intent,
+        output: parsed.output || rawTranscript,
+      };
+    } catch {
+      // If JSON parse fails, treat as dictation
+      return { type: 'dictation', output: rawTranscript };
+    }
   } catch (err) {
-    console.error('[POLISH] AI polish failed, using raw text:', err);
-    return rawText;
+    console.error('[SMART_PROCESS] AI call failed, treating as dictation:', err);
+    return { type: 'dictation', output: rawTranscript };
   }
 }
 

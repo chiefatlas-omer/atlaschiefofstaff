@@ -5,6 +5,7 @@ import {
   meetings,
   documents,
   qaInteractions,
+  knowledgeEntries,
   people,
   companies,
 } from '../../../../bot/src/db/schema';
@@ -364,6 +365,28 @@ router.get('/briefing', (_req, res) => {
     activity.sort((a, b) => b.timestamp - a.timestamp);
     const recentActivity = activity.slice(0, 15);
 
+    // ── Knowledge Stats ─────────────────────────────────────
+    const knowledgeEntryCount = db.select().from(knowledgeEntries).all().length;
+    const callTranscriptCount = allCalls.length;
+    const documentCount = db.select().from(documents).all().length;
+    const recentQueriesRaw = db
+      .select()
+      .from(qaInteractions)
+      .where(isNotNull(qaInteractions.question))
+      .orderBy(desc(qaInteractions.createdAt))
+      .limit(5)
+      .all();
+    const recentQueries = recentQueriesRaw
+      .map((q) => q.question)
+      .filter((q): q is string => Boolean(q));
+
+    const knowledgeStats = {
+      entries: knowledgeEntryCount,
+      callTranscripts: callTranscriptCount,
+      documents: documentCount,
+      recentQueries,
+    };
+
     res.json({
       greeting,
       date: dateStr,
@@ -372,6 +395,7 @@ router.get('/briefing', (_req, res) => {
       weekSummary,
       streaks,
       recentActivity,
+      knowledgeStats,
     });
   } catch (err) {
     console.error('[briefing] GET /briefing error:', err);

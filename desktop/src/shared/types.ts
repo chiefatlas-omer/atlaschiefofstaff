@@ -19,10 +19,8 @@ export interface Task {
 
 export const IPC = {
   STATUS_CHANGE: 'status:change',
-  VOICE_MODE: 'voice:mode',         // 'command' or 'dictation'
   TRANSCRIPT: 'voice:transcript',
   AUDIO_DATA: 'voice:audio-data',
-  DICTATION_DATA: 'voice:dictation-data',
   TASKS_UPDATE: 'tasks:update',
   TASKS_GET: 'tasks:get',
   ERROR: 'app:error',

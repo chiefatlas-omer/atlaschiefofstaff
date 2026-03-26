@@ -286,6 +286,12 @@ export interface BriefingData {
     subtitle?: string;
     timestamp: number;
   }>;
+  knowledgeStats?: {
+    entries: number;
+    callTranscripts: number;
+    documents: number;
+    recentQueries: string[];
+  };
 }
 
 // ---- Base fetch ----

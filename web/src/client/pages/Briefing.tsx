@@ -324,32 +324,69 @@ export default function Briefing() {
         <span className="text-gray-500 text-sm">{data.date}</span>
       </div>
 
-      {/* ── Quick-Ask Bar ────────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleAsk();
-          }}
-          className="flex items-center gap-3"
-        >
-          <span className="text-gray-400 text-lg pl-1">&#128269;</span>
-          <input
-            type="text"
-            value={askQuery}
-            onChange={(e) => setAskQuery(e.target.value)}
-            placeholder="Ask anything about your business..."
-            className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent"
-          />
-          <button
-            type="submit"
-            disabled={askLoading || !askQuery.trim()}
-            className="bg-[#4F3588] text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-[#3d2a6a] disabled:opacity-50 transition-colors"
+      {/* ── Atlas Brain ─────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            Atlas Brain
+          </h2>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4">
+          {/* Ask bar */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAsk();
+            }}
+            className="flex items-center gap-3"
           >
-            Ask
-          </button>
-        </form>
-      </div>
+            <span className="text-gray-400 text-lg pl-1">&#128269;</span>
+            <input
+              type="text"
+              value={askQuery}
+              onChange={(e) => setAskQuery(e.target.value)}
+              placeholder="Ask anything about your business..."
+              className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent"
+            />
+            <button
+              type="submit"
+              disabled={askLoading || !askQuery.trim()}
+              className="bg-[#4F3588] text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-[#3d2a6a] disabled:opacity-50 transition-colors"
+            >
+              Ask
+            </button>
+          </form>
+
+          {/* Knowledge stats subtitle */}
+          {data.knowledgeStats && (
+            <p className="text-xs text-gray-400">
+              Powered by {data.knowledgeStats.entries.toLocaleString()} knowledge entries, {data.knowledgeStats.callTranscripts.toLocaleString()} call transcripts, and {data.knowledgeStats.documents.toLocaleString()} documents
+            </p>
+          )}
+
+          {/* Recent queries as clickable chips */}
+          {data.knowledgeStats && data.knowledgeStats.recentQueries.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {data.knowledgeStats.recentQueries.slice(0, 3).map((q, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setAskQuery(q);
+                    setAskAnswer(null);
+                  }}
+                  className="text-xs text-[#4F3588] bg-[#F3F1FC] hover:bg-[#E8E4F5] px-3 py-1.5 rounded-full transition-colors truncate max-w-[250px]"
+                  title={q}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* ── Quick-Ask Answer ─────────────────────────────────── */}
       {askLoading && (
@@ -555,11 +592,12 @@ export default function Briefing() {
             </div>
             <div className="flex-1">
               <h3 className="text-base font-semibold text-gray-900 mb-1">
-                Atlas Voice — Talk faster than you type
+                Atlas Voice &mdash; One key, infinite power
               </h3>
               <p className="text-sm text-gray-500 mb-4">
-                Dictate emails, ask questions, manage tasks, and get meeting briefs — all by voice.
-                Your AI assistant cleans up filler words and formats your text for Slack or email automatically.
+                Press backslash (\) and talk. Atlas Chief understands whether you're giving a command
+                or dictating &mdash; no mode switching needed. Your words are cleaned, formatted, and
+                ready to send in Slack or email.
               </p>
               <div className="flex items-center gap-3">
                 <a
@@ -582,8 +620,7 @@ export default function Briefing() {
                 </a>
               </div>
               <p className="text-xs text-gray-400 mt-3">
-                Press Insert (top-right of your keyboard) to talk to Atlas Chief.
-                For dictation, press \ (backslash, right above Enter) — your words get polished and pasted instantly.
+                Press \ (right above Enter) to activate. That's it.
               </p>
             </div>
           </div>

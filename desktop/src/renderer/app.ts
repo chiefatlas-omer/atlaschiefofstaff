@@ -87,7 +87,6 @@ const waveformCanvas = document.getElementById('waveform-canvas') as HTMLCanvasE
 const waveform = new (window as any).WaveformVisualizer(waveformCanvas);
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
-let currentVoiceMode: string = 'command';
 
 // ── VAD / chunk-boundary constants ──────────────────────────────────────────
 /** RMS energy below this level is considered silence (0–255 scale from AnalyserNode byte data) */
@@ -96,8 +95,6 @@ const VAD_SILENCE_THRESHOLD = 8;
 const VAD_SILENCE_FRAMES = 45; // ~1.5 s at 60fps analyser ticks
 /** Minimum audio duration to bother sending to Whisper (ms) */
 const MIN_CHUNK_MS = 1000;
-/** Maximum audio duration before we force a chunk boundary (ms) */
-const MAX_CHUNK_MS = 25000;
 
 // VAD state
 let vadAnalyser: AnalyserNode | null = null;
@@ -156,44 +153,8 @@ function startVad(stream: MediaStream) {
         mediaRecorder &&
         mediaRecorder.state === 'recording'
       ) {
-        console.log('[VAD] Silence break detected at', elapsed, 'ms — stopping chunk');
+        console.log('[VAD] Silence break detected at', elapsed, 'ms');
         silentFrameCount = 0;
-        recordingStartTime = Date.now();
-        mediaRecorder.requestData(); // flush current data
-        // For command mode: let the user keep holding the hotkey; just note the break.
-        // For dictation mode: auto-submit this chunk and restart.
-        if (currentVoiceMode === 'dictation') {
-          mediaRecorder.stop();
-          // onstop will send the chunk; we restart recording after a brief yield
-          setTimeout(() => {
-            if (mediaRecorder && (window as any)._dictationActive) {
-              audioChunks = [];
-              recordingStartTime = Date.now();
-              mediaRecorder.start();
-              console.log('[VAD] Restarted recorder for next dictation chunk');
-            }
-          }, 50);
-        }
-      }
-
-      // Hard maximum: force chunk boundary to stay under Whisper's sweet spot
-      if (
-        elapsed >= MAX_CHUNK_MS &&
-        mediaRecorder &&
-        mediaRecorder.state === 'recording' &&
-        currentVoiceMode === 'dictation'
-      ) {
-        console.log('[VAD] Max chunk duration reached — forcing split at', elapsed, 'ms');
-        silentFrameCount = 0;
-        recordingStartTime = Date.now();
-        mediaRecorder.stop();
-        setTimeout(() => {
-          if (mediaRecorder && (window as any)._dictationActive) {
-            audioChunks = [];
-            recordingStartTime = Date.now();
-            mediaRecorder.start();
-          }
-        }, 50);
       }
 
       vadAnimFrame = requestAnimationFrame(tick);
@@ -206,33 +167,21 @@ function startVad(stream: MediaStream) {
   }
 }
 
-// Track voice mode from hotkey (command vs dictation)
-(window as any).chiefOfStaff.onVoiceMode((mode: string) => {
-  currentVoiceMode = mode;
-  console.log('[MODE] Voice mode:', mode);
-});
-
-/** Send accumulated chunks to the appropriate IPC handler */
+/** Send accumulated chunks to the unified audio handler */
 async function flushAudioChunks(chunks: Blob[]) {
   if (chunks.length === 0) return;
   const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-  const elapsed = Date.now() - recordingStartTime;
-  console.log('[RECORDER] Blob size:', audioBlob.size, 'bytes, elapsed:', elapsed, 'ms');
+  console.log('[RECORDER] Blob size:', audioBlob.size, 'bytes');
 
-  // Enforce minimum chunk duration guard
+  // Enforce minimum chunk size guard
   if (audioBlob.size < 2000) {
     console.log('[RECORDER] Chunk too small, discarding');
     return;
   }
 
   const buffer = await audioBlob.arrayBuffer();
-  if (currentVoiceMode === 'dictation') {
-    console.log('[RECORDER] Sending to DICTATION handler');
-    (window as any).chiefOfStaff.sendDictationData(buffer);
-  } else {
-    console.log('[RECORDER] Sending to COMMAND handler');
-    window.chiefOfStaff.sendAudioData(buffer);
-  }
+  console.log('[RECORDER] Sending to unified audio handler');
+  window.chiefOfStaff.sendAudioData(buffer);
 }
 
 // Main status change handler — manages UI state, waveform, and recording
@@ -240,7 +189,6 @@ window.chiefOfStaff.onStatusChange(async (state: string) => {
   setState(state);
 
   if (state === 'listening') {
-    (window as any)._dictationActive = true;
     try {
       const stream = await waveform.start();
       recordingStartTime = Date.now();
@@ -256,7 +204,7 @@ window.chiefOfStaff.onStatusChange(async (state: string) => {
       };
 
       mediaRecorder.onstop = async () => {
-        console.log('[RECORDER] Stopped. Chunks:', audioChunks.length, 'Mode:', currentVoiceMode);
+        console.log('[RECORDER] Stopped. Chunks:', audioChunks.length);
         const chunksCopy = [...audioChunks];
         audioChunks = [];
         await flushAudioChunks(chunksCopy);
@@ -265,13 +213,12 @@ window.chiefOfStaff.onStatusChange(async (state: string) => {
       // Start VAD alongside recorder
       startVad(stream);
       mediaRecorder.start();
-      console.log('[RECORDER] Started recording (mode:', currentVoiceMode, ')');
+      console.log('[RECORDER] Started recording');
     } catch (err) {
       console.error('[RECORDER] Failed to start audio capture:', err);
     }
   } else if (state === 'processing') {
     console.log('[RECORDER] Processing state — stopping recorder');
-    (window as any)._dictationActive = false;
     stopVad();
     waveform.stop();
     if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -328,7 +275,7 @@ window.chiefOfStaff.onTasksUpdate((tasks: any[]) => {
       descDiv.textContent = task.description;
       const metaDiv = document.createElement('div');
       metaDiv.className = 'task-meta';
-      metaDiv.textContent = `${task.status} · ${task.deadlineText || 'No deadline'}`;
+      metaDiv.textContent = `${task.status} \u00B7 ${task.deadlineText || 'No deadline'}`;
       div.appendChild(descDiv);
       div.appendChild(metaDiv);
       taskList.appendChild(div);

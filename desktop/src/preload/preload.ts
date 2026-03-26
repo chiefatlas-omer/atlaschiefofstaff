@@ -8,8 +8,6 @@ const IPC = {
   TASKS_UPDATE: 'tasks:update',
   TASKS_GET: 'tasks:get',
   ERROR: 'app:error',
-  VOICE_MODE: 'voice:mode',
-  DICTATION_DATA: 'voice:dictation-data',
   // Knowledge Query
   KNOWLEDGE_RESPONSE: 'knowledge:response',
   // Meeting Briefing
@@ -39,17 +37,9 @@ contextBridge.exposeInMainWorld('chiefOfStaff', {
     ipcRenderer.on(IPC.ERROR, (_event, message) => cb(message));
   },
 
-  // Voice mode
-  onVoiceMode: (cb: (mode: string) => void) => {
-    ipcRenderer.on(IPC.VOICE_MODE, (_event, mode) => cb(mode));
-  },
-
   // Renderer -> Main commands
   sendAudioData: (buffer: ArrayBuffer) => {
     ipcRenderer.invoke(IPC.AUDIO_DATA, buffer);
-  },
-  sendDictationData: (buffer: ArrayBuffer) => {
-    ipcRenderer.invoke(IPC.DICTATION_DATA, buffer);
   },
   getTasks: () => ipcRenderer.invoke(IPC.TASKS_GET),
 
