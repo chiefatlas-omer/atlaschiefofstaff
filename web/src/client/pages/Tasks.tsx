@@ -9,7 +9,7 @@ export default function Tasks() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadTasks = () => {
     Promise.all([api.tasks(), api.taskStats()])
       .then(([taskData, statsData]) => {
         setTasks(taskData);
@@ -17,6 +17,10 @@ export default function Tasks() {
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadTasks();
   }, []);
 
   if (loading) {
@@ -63,7 +67,7 @@ export default function Tasks() {
       {/* Task list */}
       <section>
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-          <TaskList tasks={tasks} />
+          <TaskList tasks={tasks} onTaskAction={loadTasks} />
         </div>
       </section>
     </div>

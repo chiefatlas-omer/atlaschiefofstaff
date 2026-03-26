@@ -299,6 +299,23 @@ export default function Briefing() {
   const attentionItems = data.needsAttention;
   const hasAttention = attentionItems.length > 0;
 
+  const handleCompleteTask = async (taskId: string) => {
+    try {
+      await api.completeTask(taskId);
+      // Refresh briefing data
+      const fresh = await api.briefing();
+      setData(fresh);
+    } catch { /* ignore */ }
+  };
+
+  const handlePushTask = async (taskId: string) => {
+    try {
+      await api.pushTask(taskId, 1);
+      const fresh = await api.briefing();
+      setData(fresh);
+    } catch { /* ignore */ }
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       {/* ── Header ────────────────────────────────────────────── */}
@@ -392,6 +409,22 @@ export default function Briefing() {
                   </p>
                   <p className="text-sm font-medium text-gray-900">{item.title}</p>
                   <p className="text-xs text-gray-500 mt-1">{item.subtitle}</p>
+                  {item.type === 'overdue_task' && item.taskId && (
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => handleCompleteTask(item.taskId!)}
+                        className="text-xs font-medium px-3 py-1 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                      >
+                        Complete
+                      </button>
+                      <button
+                        onClick={() => handlePushTask(item.taskId!)}
+                        className="text-xs font-medium px-3 py-1 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                      >
+                        Push 1 day
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -433,7 +466,7 @@ export default function Briefing() {
         )}
       </section>
 
-      {/* ── This Week + Recent Activity (side by side) ────────── */}
+      {/* ── This Week + Streaks (side by side) ────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* This Week */}
         <section>
@@ -466,7 +499,25 @@ export default function Briefing() {
           </div>
         </section>
 
-        {/* Recent Activity */}
+        {/* Streaks */}
+        <section>
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              Streaks
+            </h2>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 space-y-4">
+            <StreakItem emoji={'\uD83D\uDD25'} value={data.streaks.tasksCompleted.current} label="day task streak" />
+            <StreakItem emoji={'\uD83D\uDCDE'} value={data.streaks.callsAnalyzed.current} label="day call streak" />
+            <StreakItem emoji={'\u26A1'} value={data.streaks.systemActive.current} label="days active" />
+          </div>
+        </section>
+      </div>
+
+      {/* ── Recent Activity ───────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6">
         <section>
           <div className="flex items-center gap-3 mb-4">
             <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
@@ -558,6 +609,36 @@ function StatItem({ value, label }: { value: string | number; label: string }) {
     <div>
       <p className="text-2xl font-semibold text-gray-900">{value}</p>
       <p className="text-xs text-gray-500 mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+function StreakItem({ emoji, value, label }: { emoji: string; value: number; label: string }) {
+  const maxBar = 30; // full bar at 30 days
+  const pct = Math.min(100, (value / maxBar) * 100);
+
+  if (value === 0) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-lg opacity-30">{emoji}</span>
+        <span className="text-sm text-gray-400">Start your streak today!</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-3">
+        <span className="text-lg">{emoji}</span>
+        <span className="text-2xl font-bold text-[#4F3588]">{value}</span>
+        <span className="text-xs text-gray-500">{label}</span>
+      </div>
+      <div className="ml-9 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-[#4F3588] rounded-full transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }

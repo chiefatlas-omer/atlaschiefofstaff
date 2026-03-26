@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { tasks } from '../../../../bot/src/db/schema';
-import { eq, ne, and, lt, count, sql } from 'drizzle-orm';
+import { eq, ne, and, lt, count } from 'drizzle-orm';
 
 const router = Router();
 
@@ -64,6 +64,47 @@ router.get('/tasks/stats', (_req, res) => {
   } catch (err) {
     console.error('[tasks] GET /tasks/stats error:', err);
     res.status(500).json({ error: 'Failed to fetch task stats' });
+  }
+});
+
+// POST /api/tasks/:id/complete — mark task as completed
+router.post('/tasks/:id/complete', (req, res) => {
+  try {
+    const id = req.params.id;
+    db.update(tasks).set({ status: 'COMPLETED', completedAt: new Date() }).where(eq(tasks.id, id)).run();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[tasks] POST /tasks/:id/complete error:', err);
+    res.status(500).json({ error: 'Failed to complete task' });
+  }
+});
+
+// POST /api/tasks/:id/push — push task deadline by N days
+router.post('/tasks/:id/push', (req, res) => {
+  try {
+    const id = req.params.id;
+    const { days } = req.body as { days?: number };
+    const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return; }
+    const currentDeadline = task.deadline instanceof Date ? task.deadline : new Date(Number(task.deadline) * 1000);
+    const newDeadline = new Date(currentDeadline.getTime() + (days || 1) * 24 * 60 * 60 * 1000);
+    db.update(tasks).set({ deadline: newDeadline }).where(eq(tasks.id, id)).run();
+    res.json({ success: true, newDeadline: newDeadline.toISOString() });
+  } catch (err) {
+    console.error('[tasks] POST /tasks/:id/push error:', err);
+    res.status(500).json({ error: 'Failed to push task' });
+  }
+});
+
+// POST /api/tasks/:id/dismiss — dismiss a task
+router.post('/tasks/:id/dismiss', (req, res) => {
+  try {
+    const id = req.params.id;
+    db.update(tasks).set({ status: 'DISMISSED' }).where(eq(tasks.id, id)).run();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[tasks] POST /tasks/:id/dismiss error:', err);
+    res.status(500).json({ error: 'Failed to dismiss task' });
   }
 });
 

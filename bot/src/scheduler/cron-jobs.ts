@@ -8,8 +8,8 @@ import { generateProactiveAlerts, formatAlertsForSlack } from '../services/proac
 import { generateWeeklyDigest, formatDigestForSlack } from '../services/sales-digest';
 import { generateCoachingSnapshot, formatCoachingForSlack, formatCoachingForRep } from '../services/coaching-engine';
 import { db } from '../db/connection';
-import { callAnalyses } from '../db/schema';
-import { gt, gte } from 'drizzle-orm';
+import { tasks, callAnalyses } from '../db/schema';
+import { gt, gte, ne, eq, and } from 'drizzle-orm';
 
 export function startCronJobs(client: any) {
   // Reminders: 8:00 AM and 4:00 PM CT, Mon-Fri (DM'd to each person)
@@ -272,6 +272,84 @@ export function startCronJobs(client: any) {
     }
   }, { timezone: 'America/Chicago' });
 
+  // Daily 8:00 AM CT — Personalized morning briefing DM to each team member with open tasks
+  cron.schedule('0 8 * * 1-5', async () => {
+    console.log('[cron] Sending personalized morning briefings...');
+    try {
+      const allOpenTasks = db
+        .select()
+        .from(tasks)
+        .where(and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')))
+        .all();
+
+      const userIds = [...new Set(allOpenTasks.map((t) => t.slackUserId))];
+
+      for (const userId of userIds) {
+        try {
+          const userTasks = allOpenTasks.filter((t) => t.slackUserId === userId);
+          const overdue = userTasks.filter((t) => {
+            if (!t.deadline) return false;
+            const dl = t.deadline instanceof Date ? t.deadline : new Date(Number(t.deadline) * 1000);
+            return dl < new Date();
+          });
+          const dueToday = userTasks.filter((t) => {
+            if (!t.deadline) return false;
+            const dl = t.deadline instanceof Date ? t.deadline : new Date(Number(t.deadline) * 1000);
+            const today = new Date();
+            return dl.toDateString() === today.toDateString();
+          });
+          const upcoming = userTasks.filter((t) => t.status !== 'DISMISSED').slice(0, 5);
+
+          // Get their recent call analyses
+          const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
+          const recentCalls = db
+            .select()
+            .from(callAnalyses)
+            .where(and(eq(callAnalyses.repSlackId, userId), gt(callAnalyses.createdAt, weekAgo)))
+            .all();
+
+          // Build message
+          const hour = new Date().getHours();
+          const greeting = hour < 12 ? 'Good morning' : 'Good afternoon';
+
+          let msg = `${greeting}! Here's your daily briefing from Atlas Chief:\n\n`;
+
+          if (overdue.length > 0) {
+            msg += `\uD83D\uDD34 *${overdue.length} overdue task${overdue.length > 1 ? 's' : ''}:*\n`;
+            for (const t of overdue) msg += `\u2022 ${t.description}\n`;
+            msg += '\n';
+          }
+
+          if (dueToday.length > 0) {
+            msg += `\uD83D\uDCC5 *Due today:*\n`;
+            for (const t of dueToday) msg += `\u2022 ${t.description}\n`;
+            msg += '\n';
+          }
+
+          if (upcoming.length > 0 && overdue.length === 0 && dueToday.length === 0) {
+            msg += `\uD83D\uDCCB *Your open tasks (${upcoming.length}):*\n`;
+            for (const t of upcoming) msg += `\u2022 ${t.description}\n`;
+            msg += '\n';
+          }
+
+          if (recentCalls.length > 0) {
+            msg += `\uD83D\uDCDE *${recentCalls.length} call${recentCalls.length > 1 ? 's' : ''} analyzed this week*\n`;
+          }
+
+          msg += `\n_Open your Command Center for the full briefing._`;
+
+          await client.chat.postMessage({ channel: userId, text: msg });
+        } catch (err) {
+          console.error(`[cron] Morning briefing failed for ${userId}:`, err);
+        }
+      }
+
+      console.log(`[cron] Morning briefings sent to ${userIds.length} team member(s).`);
+    } catch (error) {
+      console.error('Morning briefing cron error:', error);
+    }
+  }, { timezone: 'America/Chicago' });
+
   console.log('Cron jobs started (timezone: America/Chicago)');
   console.log('  - Reminders: 8:00 AM + 4:00 PM CT, Mon-Fri (DM to each person)');
   console.log('  - Escalation: 9:00 AM + 5:00 PM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
@@ -280,4 +358,5 @@ export function startCronJobs(client: any) {
   console.log('  - Proactive alerts: 8:30 AM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
   console.log('  - Sales digest: Fridays at 10:00 AM CT (leadership channel + DMs)');
   console.log('  - Coaching snapshots: Mondays at 9:00 AM CT (DM to reps + leadership)');
+  console.log('  - Morning briefing: 8:00 AM CT, Mon-Fri (personalized DM to each member)');
 }

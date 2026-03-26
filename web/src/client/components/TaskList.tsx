@@ -1,5 +1,5 @@
 import React from 'react';
-import { Task } from '../lib/api';
+import { Task, api } from '../lib/api';
 
 const STATUS_COLORS: Record<Task['status'], string> = {
   DETECTED:  'bg-amber-50 text-amber-700 border border-amber-200',
@@ -11,7 +11,7 @@ const STATUS_COLORS: Record<Task['status'], string> = {
 };
 
 function formatDeadline(deadline: string | null): string {
-  if (!deadline) return '—';
+  if (!deadline) return '\u2014';
   try {
     return new Date(deadline).toLocaleDateString('en-US', {
       month: 'short',
@@ -25,14 +25,39 @@ function formatDeadline(deadline: string | null): string {
 
 interface TaskListProps {
   tasks: Task[];
+  onTaskAction?: () => void;
 }
 
-export default function TaskList({ tasks }: TaskListProps) {
+export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
   if (tasks.length === 0) {
     return (
       <p className="text-gray-400 text-sm py-4">No tasks to display.</p>
     );
   }
+
+  const isOpen = (status: Task['status']) =>
+    status !== 'COMPLETED' && status !== 'DISMISSED';
+
+  const handleComplete = async (id: string) => {
+    try {
+      await api.completeTask(id);
+      onTaskAction?.();
+    } catch { /* ignore */ }
+  };
+
+  const handlePush = async (id: string) => {
+    try {
+      await api.pushTask(id, 1);
+      onTaskAction?.();
+    } catch { /* ignore */ }
+  };
+
+  const handleDismiss = async (id: string) => {
+    try {
+      await api.dismissTask(id);
+      onTaskAction?.();
+    } catch { /* ignore */ }
+  };
 
   return (
     <div className="overflow-x-auto">
@@ -42,7 +67,8 @@ export default function TaskList({ tasks }: TaskListProps) {
             <th className="text-left py-2 pr-4 font-medium">Task</th>
             <th className="text-left py-2 pr-4 font-medium">Owner</th>
             <th className="text-left py-2 pr-4 font-medium">Status</th>
-            <th className="text-left py-2 font-medium">Deadline</th>
+            <th className="text-left py-2 pr-4 font-medium">Deadline</th>
+            <th className="text-left py-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -57,7 +83,7 @@ export default function TaskList({ tasks }: TaskListProps) {
                 </span>
               </td>
               <td className="py-3 pr-4 text-gray-500 whitespace-nowrap">
-                {task.slackUserName ?? '—'}
+                {task.slackUserName ?? '\u2014'}
               </td>
               <td className="py-3 pr-4">
                 <span
@@ -69,8 +95,35 @@ export default function TaskList({ tasks }: TaskListProps) {
                   {task.status}
                 </span>
               </td>
-              <td className="py-3 text-gray-500 whitespace-nowrap">
+              <td className="py-3 pr-4 text-gray-500 whitespace-nowrap">
                 {formatDeadline(task.deadline)}
+              </td>
+              <td className="py-3 whitespace-nowrap">
+                {isOpen(task.status) && (
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => handleComplete(task.id)}
+                      className="text-xs font-medium px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                      title="Complete"
+                    >
+                      Complete
+                    </button>
+                    <button
+                      onClick={() => handlePush(task.id)}
+                      className="text-xs font-medium px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors"
+                      title="Push 1 day"
+                    >
+                      Push
+                    </button>
+                    <button
+                      onClick={() => handleDismiss(task.id)}
+                      className="text-xs font-medium px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+                      title="Dismiss"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
               </td>
             </tr>
           ))}

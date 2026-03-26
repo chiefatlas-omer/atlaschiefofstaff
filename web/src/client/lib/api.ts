@@ -272,6 +272,11 @@ export interface BriefingData {
     hoursSaved: number;
     roiDollars: number;
   };
+  streaks: {
+    tasksCompleted: { current: number; best: number };
+    callsAnalyzed: { current: number; best: number };
+    systemActive: { current: number; best: number };
+  };
   recentActivity: Array<{
     type: string;
     title: string;
@@ -321,6 +326,16 @@ export const api = {
       '/api/upload',
       { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } },
     ),
+  completeTask: (id: string) =>
+    fetchApi<{ success: boolean }>(`/api/tasks/${id}/complete`, { method: 'POST' }),
+  pushTask: (id: string, days: number) =>
+    fetchApi<{ success: boolean; newDeadline: string }>(`/api/tasks/${id}/push`, {
+      method: 'POST',
+      body: JSON.stringify({ days }),
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  dismissTask: (id: string) =>
+    fetchApi<{ success: boolean }>(`/api/tasks/${id}/dismiss`, { method: 'POST' }),
   search: (q: string) =>
     fetchApi<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
   emailDrafts: () => fetchApi<EmailDraft[]>('/api/email-drafts'),

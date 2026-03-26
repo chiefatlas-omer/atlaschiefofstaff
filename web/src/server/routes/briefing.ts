@@ -170,6 +170,103 @@ router.get('/briefing', (_req, res) => {
       roiDollars: Math.round(hoursSaved * 50),
     };
 
+    // ── Streaks ─────────────────────────────────────────────
+    // Task streak: consecutive days with at least 1 task completed ending at today
+    const allCompletedTasks = allTasks.filter((t) => t.status === 'COMPLETED' && t.completedAt);
+    let taskStreak = 0;
+    {
+      const completedDates = new Set<string>();
+      for (const t of allCompletedTasks) {
+        const ts = t.completedAt instanceof Date
+          ? t.completedAt.getTime()
+          : Number(t.completedAt) * 1000;
+        if (ts > 0) {
+          completedDates.add(new Date(ts).toISOString().slice(0, 10));
+        }
+      }
+      const today = new Date();
+      for (let i = 0; ; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        if (completedDates.has(key)) {
+          taskStreak++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    // Call streak: consecutive business days (Mon-Fri) with at least 1 call analyzed
+    let callStreak = 0;
+    {
+      const callDates = new Set<string>();
+      for (const c of allCalls) {
+        const ts = (c.createdAt ?? 0) * 1000;
+        if (ts > 0) {
+          callDates.add(new Date(ts).toISOString().slice(0, 10));
+        }
+      }
+      const today = new Date();
+      // Walk backwards through business days
+      const d = new Date(today);
+      for (;;) {
+        const day = d.getDay();
+        // Skip weekends
+        if (day === 0 || day === 6) {
+          d.setDate(d.getDate() - 1);
+          continue;
+        }
+        const key = d.toISOString().slice(0, 10);
+        if (callDates.has(key)) {
+          callStreak++;
+          d.setDate(d.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+
+    // System streak: consecutive days with ANY activity
+    let systemStreak = 0;
+    {
+      const activityDates = new Set<string>();
+      // Tasks created
+      for (const t of allTasks) {
+        const ts = t.createdAt instanceof Date
+          ? t.createdAt.getTime()
+          : Number(t.createdAt) * 1000;
+        if (ts > 0) activityDates.add(new Date(ts).toISOString().slice(0, 10));
+      }
+      // Calls analyzed
+      for (const c of allCalls) {
+        const ts = (c.createdAt ?? 0) * 1000;
+        if (ts > 0) activityDates.add(new Date(ts).toISOString().slice(0, 10));
+      }
+      // QA interactions
+      for (const q of allQA) {
+        const ts = (q.createdAt ?? 0) * 1000;
+        if (ts > 0) activityDates.add(new Date(ts).toISOString().slice(0, 10));
+      }
+      const today = new Date();
+      for (let i = 0; ; i++) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const key = d.toISOString().slice(0, 10);
+        if (activityDates.has(key)) {
+          systemStreak++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    const streaks = {
+      tasksCompleted: { current: taskStreak, best: taskStreak },
+      callsAnalyzed: { current: callStreak, best: callStreak },
+      systemActive: { current: systemStreak, best: systemStreak },
+    };
+
     // ── Recent Activity ──────────────────────────────────────
     interface ActivityItem {
       type: string;
@@ -273,6 +370,7 @@ router.get('/briefing', (_req, res) => {
       needsAttention,
       todaysMeetings,
       weekSummary,
+      streaks,
       recentActivity,
     });
   } catch (err) {
