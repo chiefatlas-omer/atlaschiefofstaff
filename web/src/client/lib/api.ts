@@ -145,6 +145,9 @@ export interface DigestData {
   periodStart: number;
   periodEnd: number;
   totalCalls: number;
+  avgTalkRatio: number | null;
+  avgQuestionsPerCall: number | null;
+  coachingFlagCount: number;
   outcomeBreakdown: Record<string, number>;
   awarenessBreakdown: Record<string, number>;
   calls: CallAnalysis[];

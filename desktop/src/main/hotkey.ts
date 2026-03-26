@@ -8,7 +8,7 @@ let mainWindow: BrowserWindow | null = null;
 export function initHotkeys(window: BrowserWindow) {
   mainWindow = window;
 
-  // Insert = voice command mode (AI actions); Ctrl+Shift+K as fallback
+  // Insert = voice command mode (AI detects intent); Ctrl+Shift+K as fallback
   const commandShortcuts = ['Insert', 'CommandOrControl+Shift+K'];
   for (const shortcut of commandShortcuts) {
     const ok = globalShortcut.register(shortcut, () => {
@@ -23,8 +23,11 @@ export function initHotkeys(window: BrowserWindow) {
     }
   }
 
-  // Pause = dictation mode (types what you say); Ctrl+Shift+D as fallback
-  const dictationShortcuts = ['Pause', 'CommandOrControl+Shift+D'];
+  // Backslash = explicit dictation mode (transcribe + AI polish + paste)
+  // Electron doesn't support '\' as a direct accelerator, so we use F6 as the
+  // globalShortcut registration and also listen for backslash via uiohook-napi below.
+  // Ctrl+Shift+D remains as a fallback.
+  const dictationShortcuts = ['F6', 'CommandOrControl+Shift+D'];
   for (const shortcut of dictationShortcuts) {
     const ok = globalShortcut.register(shortcut, () => {
       console.log(`[HOTKEY] ${shortcut} pressed (dictation mode), isListening:`, isListening);
@@ -38,14 +41,20 @@ export function initHotkeys(window: BrowserWindow) {
     }
   }
 
-  // Optional: uiohook-napi for Fn key
+  // uiohook-napi: listen for Backslash key (keycode 43) as primary dictation trigger
   try {
-    const { uIOhook } = require('uiohook-napi');
-    uIOhook.on('keydown', (_e: any) => {});
+    const { uIOhook, UiohookKey } = require('uiohook-napi');
+    const BACKSLASH_KEYCODE = UiohookKey?.Backslash ?? 43;
+    uIOhook.on('keydown', (e: any) => {
+      if (e.keycode === BACKSLASH_KEYCODE) {
+        console.log('[HOTKEY] Backslash pressed via uiohook (dictation mode), isListening:', isListening);
+        toggleRecording('dictation');
+      }
+    });
     uIOhook.start();
-    console.log('uIOhook started.');
+    console.log('[HOTKEY] uIOhook started — Backslash key mapped to dictation mode.');
   } catch (err) {
-    console.warn('uIOhook not available on this platform.');
+    console.warn('[HOTKEY] uIOhook not available — use F6 or Ctrl+Shift+D for dictation.');
   }
 }
 

@@ -109,78 +109,42 @@ function CallsTab() {
     );
   }
 
-  const demosScheduled = data.outcomeBreakdown['demo_scheduled'] ?? 0;
-  const closedWon = data.outcomeBreakdown['closed_won'] ?? 0;
+  const talkRatioColor = data.avgTalkRatio !== null && data.avgTalkRatio < 50 ? 'green' : 'red';
+  const questionsColor = data.avgQuestionsPerCall !== null && data.avgQuestionsPerCall >= 5 ? 'green' : 'red';
 
   return (
     <div className="space-y-8">
-      {/* Metric cards */}
+      {/* Gong/Rilla-style metric cards */}
       <section>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
-            label="Calls This Week"
+            label="Calls Analyzed"
             value={data.totalCalls}
             color="purple"
-            subtitle="analyzed by AI"
+            subtitle="this week"
           />
           <MetricCard
-            label="Demos Scheduled"
-            value={demosScheduled}
-            color="blue"
+            label="Avg Talk Ratio"
+            value={data.avgTalkRatio !== null ? `${data.avgTalkRatio}%` : '—'}
+            color={talkRatioColor}
+            subtitle={data.avgTalkRatio !== null && data.avgTalkRatio < 50 ? 'target: <50%' : 'target: <50%'}
           />
           <MetricCard
-            label="Closed Won"
-            value={closedWon}
-            color="green"
+            label="Avg Questions/Call"
+            value={data.avgQuestionsPerCall ?? '—'}
+            color={questionsColor}
+            subtitle="target: 5+"
+          />
+          <MetricCard
+            label="Coaching Flags"
+            value={data.coachingFlagCount}
+            color={data.coachingFlagCount > 0 ? 'red' : 'green'}
+            subtitle="this week"
           />
         </div>
       </section>
 
-      {/* Awareness breakdown */}
-      {Object.keys(data.awarenessBreakdown).length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Prospect Awareness</h2>
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(data.awarenessBreakdown)
-                .sort((a, b) => b[1] - a[1])
-                .map(([level, count]) => (
-                  <div key={level} className="flex items-center gap-2">
-                    <Badge
-                      label={level}
-                      colorClass={AWARENESS_COLOR[level] ?? 'bg-gray-50 text-gray-500 border-gray-200'}
-                    />
-                    <span className="text-gray-500 text-sm font-medium">{count}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Outcome breakdown */}
-      {Object.keys(data.outcomeBreakdown).length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Outcome Breakdown</h2>
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-            <div className="flex flex-wrap gap-3">
-              {Object.entries(data.outcomeBreakdown)
-                .sort((a, b) => b[1] - a[1])
-                .map(([outcome, count]) => (
-                  <div key={outcome} className="flex items-center gap-2">
-                    <Badge
-                      label={outcome}
-                      colorClass={OUTCOME_COLOR[outcome] ?? 'bg-gray-50 text-gray-500 border-gray-200'}
-                    />
-                    <span className="text-gray-500 text-sm font-medium">{count}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Recent calls list */}
+      {/* Recent calls — Gong/Rilla-style scorecard per call */}
       <section>
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Recent Calls</h2>
         {data.calls.length === 0 ? (
@@ -188,53 +152,91 @@ function CallsTab() {
             No calls analyzed this week yet.
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
-                  <th className="text-left px-4 py-3 font-medium">Title</th>
-                  <th className="text-left px-4 py-3 font-medium">Business</th>
-                  <th className="text-left px-4 py-3 font-medium">Rep</th>
-                  <th className="text-left px-4 py-3 font-medium">Outcome</th>
-                  <th className="text-left px-4 py-3 font-medium">Awareness</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {data.calls.map((call) => (
-                  <tr key={call.id} className="hover:bg-purple-50/50 transition-colors">
-                    <td className="px-4 py-3 text-gray-700 max-w-xs truncate">
-                      {call.title ?? 'Untitled'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {call.businessName ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {call.repName ?? '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {call.outcome ? (
+          <div className="space-y-3">
+            {data.calls.map((call) => {
+              const talkRatio = call.talkListenRatio ?? 50;
+              const prospectRatio = 100 - talkRatio;
+              const ratioGood = talkRatio < 50;
+              const objectionCount = call.objections?.length ?? 0;
+              const painCount = call.pains?.length ?? 0;
+              const risks = call.riskFlags ?? [];
+              const callDate = call.date
+                ? new Date(call.date * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : '';
+
+              return (
+                <div key={call.id} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                  {/* Header row */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        {call.title ?? 'Untitled Call'}
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {callDate}{call.repName ? ` · ${call.repName}` : ''}{call.businessName ? ` · ${call.businessName}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {call.outcome && (
                         <Badge
                           label={call.outcome}
                           colorClass={OUTCOME_COLOR[call.outcome] ?? 'bg-gray-50 text-gray-500 border-gray-200'}
                         />
-                      ) : (
-                        <span className="text-gray-400">—</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {call.awarenessLevel ? (
-                        <Badge
-                          label={call.awarenessLevel}
-                          colorClass={AWARENESS_COLOR[call.awarenessLevel] ?? 'bg-gray-50 text-gray-500 border-gray-200'}
-                        />
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+
+                  {/* Talk ratio bar */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                      <span>Rep {talkRatio}%</span>
+                      <span>Prospect {prospectRatio}%</span>
+                    </div>
+                    <div className="flex h-2.5 rounded-full overflow-hidden bg-gray-100">
+                      <div
+                        className={['h-full transition-all', ratioGood ? 'bg-emerald-500' : 'bg-red-400'].join(' ')}
+                        style={{ width: `${talkRatio}%` }}
+                      />
+                      <div
+                        className="h-full bg-blue-300"
+                        style={{ width: `${prospectRatio}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Key insight */}
+                  {call.summary && (
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                      {call.summary}
+                    </p>
+                  )}
+
+                  {/* Badges row: objections, pains, risk flags */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {objectionCount > 0 && (
+                      <span className="text-xs px-2 py-0.5 rounded border font-medium bg-amber-50 text-amber-700 border-amber-200">
+                        {objectionCount} objection{objectionCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {painCount > 0 && (
+                      <span className="text-xs px-2 py-0.5 rounded border font-medium bg-blue-50 text-blue-700 border-blue-200">
+                        {painCount} pain{painCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {call.questionCount !== null && (
+                      <span className="text-xs px-2 py-0.5 rounded border font-medium bg-purple-50 text-[#4F3588] border-purple-200">
+                        {call.questionCount} question{call.questionCount !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {risks.map((flag, i) => (
+                      <span key={i} className="text-xs px-2 py-0.5 rounded border font-medium bg-red-50 text-red-700 border-red-200">
+                        {flag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </section>

@@ -123,6 +123,60 @@ const MISHEAR_CORRECTIONS: Array<[RegExp, string]> = [
 const FILLER_PATTERN = /\b(um+|uh+|er+|hmm+|mhm|like,?\s|you\s+know,?\s|basically,?\s|literally,?\s|actually,?\s)/gi;
 
 // ---------------------------------------------------------------------------
+// AI Polish Layer — cleans up dictation for communication contexts
+// ---------------------------------------------------------------------------
+
+export type PolishContext = 'slack' | 'email' | 'general';
+
+/**
+ * Uses Claude Haiku to polish raw transcribed text for communication.
+ * Removes filler words, fixes grammar, and formats for the given context.
+ * Falls back to the raw text if the AI call fails.
+ */
+export async function polishForCommunication(
+  rawText: string,
+  context: PolishContext = 'general',
+): Promise<string> {
+  if (!rawText || rawText.trim().length === 0) return rawText;
+
+  try {
+    const Anthropic = require('@anthropic-ai/sdk');
+    const client = new Anthropic.default();
+
+    const response = await client.messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: `You are a communication polisher. Take this voice-transcribed text and make it ready to send.
+
+Rules:
+- Remove ALL filler words (um, uh, like, you know, basically, actually, so, right, I mean)
+- Fix grammar and punctuation
+- Structure it properly for the context (slack message, email, or general text)
+- Keep the person's voice and intent — don't make it sound corporate or AI-generated
+- If it sounds like an email, format it with greeting and sign-off
+- If it sounds like a Slack message, keep it casual and concise
+- Never add information that wasn't in the original
+- Keep it natural and human
+- Return ONLY the polished text, no explanations or preamble
+
+Context: ${context}
+Raw transcription: ${rawText}`,
+        },
+      ],
+    });
+
+    const polished = (response.content[0] as any)?.text?.trim();
+    return polished || rawText;
+  } catch (err) {
+    console.error('[POLISH] AI polish failed, using raw text:', err);
+    return rawText;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
 export function postProcess(text: string, options: PostProcessOptions = {}): string {

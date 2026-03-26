@@ -167,10 +167,41 @@ router.get('/analytics/digest', (_req, res) => {
       awarenessBreakdown[level] = (awarenessBreakdown[level] ?? 0) + 1;
     }
 
+    // Avg talk ratio across calls this week
+    const talkRatios = calls
+      .map(c => c.talkListenRatio)
+      .filter((v): v is number => v !== null && v !== undefined);
+    const avgTalkRatio = talkRatios.length > 0
+      ? Math.round(talkRatios.reduce((a, b) => a + b, 0) / talkRatios.length)
+      : null;
+
+    // Avg questions per call this week
+    const questionCounts = calls
+      .map(c => c.questionCount)
+      .filter((v): v is number => v !== null && v !== undefined);
+    const avgQuestionsPerCall = questionCounts.length > 0
+      ? Math.round((questionCounts.reduce((a, b) => a + b, 0) / questionCounts.length) * 10) / 10
+      : null;
+
+    // Count coaching flags generated this week (from coaching snapshots)
+    const coachingThisWeek = db
+      .select()
+      .from(coachingSnapshots)
+      .where(gt(coachingSnapshots.weekStart, weekAgo))
+      .all();
+    let coachingFlagCount = 0;
+    for (const snap of coachingThisWeek) {
+      const flags = snap.coachingFlags as any[] | null;
+      coachingFlagCount += flags?.length ?? 0;
+    }
+
     res.json({
       periodStart: weekAgo,
       periodEnd: Math.floor(Date.now() / 1000),
       totalCalls: calls.length,
+      avgTalkRatio,
+      avgQuestionsPerCall,
+      coachingFlagCount,
       outcomeBreakdown,
       awarenessBreakdown,
       calls,

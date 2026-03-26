@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow, clipboard } from 'electron';
 import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
-import { postProcess } from './voice/post-processor';
+import { postProcess, polishForCommunication } from './voice/post-processor';
 import { getMyTasks } from './db/task-bridge';
 import { classifyIntent } from './ai/intent-classifier';
 import { logVoiceInteraction } from './db/voice-logger';
@@ -53,12 +53,21 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       // Update rolling context window for the next chunk
       dictationContext = transcript.slice(-200);
 
+      // AI Polish: clean up filler words and format for communication (default on)
+      const shouldPolish = process.env.POLISH_DICTATION !== 'false';
+      let finalText = transcript;
+      if (shouldPolish) {
+        console.log('[DICTATION] Polishing with AI...');
+        finalText = await polishForCommunication(transcript, 'general');
+        console.log('[DICTATION] Polished:', finalText);
+      }
+
       // Show transcript briefly
-      mainWindow.webContents.send(IPC.TRANSCRIPT, '📝 ' + transcript);
+      mainWindow.webContents.send(IPC.TRANSCRIPT, '📝 ' + finalText);
 
       // Save current clipboard, paste transcript, restore clipboard
       const savedClipboard = clipboard.readText();
-      clipboard.writeText(transcript);
+      clipboard.writeText(finalText);
 
       // Simulate Ctrl+V to paste into focused app
       // Small delay to ensure our overlay isn't focused

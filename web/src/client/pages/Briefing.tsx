@@ -559,7 +559,7 @@ export default function Briefing() {
               </h3>
               <p className="text-sm text-gray-500 mb-4">
                 Dictate emails, ask questions, manage tasks, and get meeting briefs — all by voice.
-                Average user saves 45 minutes per day by talking instead of typing.
+                Your AI assistant cleans up filler words and formats your text for Slack or email automatically.
               </p>
               <div className="flex items-center gap-3">
                 <a
@@ -582,7 +582,8 @@ export default function Briefing() {
                 </a>
               </div>
               <p className="text-xs text-gray-400 mt-3">
-                Your voice hotkeys are on the top-right corner of your keyboard — Insert for voice commands, Pause for hands-free dictation.
+                Press Insert (top-right of your keyboard) to talk to Atlas Chief.
+                For dictation, press \ (backslash, right above Enter) — your words get polished and pasted instantly.
               </p>
             </div>
           </div>
