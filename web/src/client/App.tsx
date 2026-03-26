@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
+import Briefing from './pages/Briefing';
 import Dashboard from './pages/Dashboard';
 import Metrics from './pages/Metrics';
 import Outcomes from './pages/Outcomes';
@@ -16,7 +17,8 @@ export default function App() {
     <BrowserRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Briefing />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/metrics" element={<Metrics />} />
           <Route path="/outcomes" element={<Outcomes />} />
           <Route path="/knowledge" element={<Knowledge />} />

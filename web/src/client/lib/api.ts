@@ -247,6 +247,39 @@ export interface CoachingSnapshot {
   createdAt: number;
 }
 
+export interface BriefingData {
+  greeting: string;
+  date: string;
+  needsAttention: Array<{
+    type: 'overdue_task' | 'risk_flag' | 'unprepped_meeting';
+    title: string;
+    subtitle: string;
+    severity: 'high' | 'medium';
+    taskId?: string;
+    callId?: number;
+    meetingId?: string;
+  }>;
+  todaysMeetings: Array<{
+    id: string;
+    title: string;
+    time: string;
+    hasPrep: boolean;
+  }>;
+  weekSummary: {
+    callsAnalyzed: number;
+    followUpsSent: number;
+    tasksCompleted: number;
+    hoursSaved: number;
+    roiDollars: number;
+  };
+  recentActivity: Array<{
+    type: string;
+    title: string;
+    subtitle?: string;
+    timestamp: number;
+  }>;
+}
+
 // ---- Base fetch ----
 
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -264,6 +297,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
 // ---- Typed API methods ----
 
 export const api = {
+  briefing: () => fetchApi<BriefingData>('/api/briefing'),
   dashboard: () => fetchApi<DashboardData>('/api/dashboard'),
   tasks: () => fetchApi<Task[]>('/api/tasks'),
   taskStats: () => fetchApi<TaskStats>('/api/tasks/stats'),

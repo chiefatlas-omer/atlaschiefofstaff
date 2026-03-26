@@ -1,7 +1,8 @@
 import React from 'react';
 
 const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/' },
+  { label: 'Briefing', href: '/' },
+  { label: 'Dashboard', href: '/dashboard' },
   { label: 'Metrics', href: '/metrics' },
   { label: 'Outcomes', href: '/outcomes' },
   { label: 'Knowledge', href: '/knowledge' },
