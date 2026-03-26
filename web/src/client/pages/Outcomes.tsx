@@ -4,23 +4,23 @@ import MetricCard from '../components/MetricCard';
 
 function TrendBadge({ pct }: { pct: number | null }) {
   if (pct === null) {
-    return <span className="text-gray-500 text-xs ml-1">—</span>;
+    return <span className="text-gray-400 text-xs ml-1">—</span>;
   }
   if (pct > 0) {
     return (
-      <span className="text-green-400 text-xs font-semibold ml-1">
+      <span className="text-emerald-600 text-xs font-semibold ml-1">
         ↑ {pct}%
       </span>
     );
   }
   if (pct < 0) {
     return (
-      <span className="text-red-400 text-xs font-semibold ml-1">
+      <span className="text-red-600 text-xs font-semibold ml-1">
         ↓ {Math.abs(pct)}%
       </span>
     );
   }
-  return <span className="text-gray-500 text-xs ml-1">→ 0%</span>;
+  return <span className="text-gray-400 text-xs ml-1">→ 0%</span>;
 }
 
 interface WoWCardProps {
@@ -32,16 +32,16 @@ interface WoWCardProps {
 
 function WoWCard({ label, thisWeek, pct, unit }: WoWCardProps) {
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
-      <p className="text-gray-400 text-sm font-medium mb-2">{label}</p>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <p className="text-gray-500 text-sm font-medium mb-2">{label}</p>
       <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-bold text-gray-100">
+        <span className="text-3xl font-bold text-gray-900">
           {thisWeek}
           {unit && <span className="text-lg ml-0.5 text-gray-400">{unit}</span>}
         </span>
         <TrendBadge pct={pct} />
       </div>
-      <p className="text-gray-600 text-xs mt-1">vs last week</p>
+      <p className="text-gray-400 text-xs mt-1">vs last week</p>
     </div>
   );
 }
@@ -53,16 +53,16 @@ interface SectionCardProps {
 
 function SectionCard({ title, rows }: SectionCardProps) {
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
-      <h3 className="text-sm font-semibold text-gray-300 mb-4">{title}</h3>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">{title}</h3>
       <div className="space-y-3">
         {rows.map(({ label, value, highlight }) => (
           <div key={label} className="flex justify-between items-center">
-            <span className="text-gray-400 text-sm">{label}</span>
+            <span className="text-gray-500 text-sm">{label}</span>
             <span
               className={[
                 'text-sm font-bold',
-                highlight ? 'text-green-400' : 'text-gray-100',
+                highlight ? 'text-emerald-600' : 'text-gray-900',
               ].join(' ')}
             >
               {value}
@@ -89,7 +89,7 @@ export default function Outcomes() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-gray-400">
         Loading outcome data...
       </div>
     );
@@ -97,7 +97,7 @@ export default function Outcomes() {
 
   if (error || !data) {
     return (
-      <div className="bg-red-900/30 border border-red-700 rounded-xl p-6 text-red-300">
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
         Failed to load outcomes: {error ?? 'Unknown error'}
       </div>
     );
@@ -109,7 +109,7 @@ export default function Outcomes() {
     <div className="space-y-10">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Outcomes</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Outcomes</h1>
         <p className="text-gray-500 text-sm mt-1">
           What Atlas CoS actually accomplished — measured in impact, not activity
         </p>
@@ -117,7 +117,7 @@ export default function Outcomes() {
 
       {/* Hero — Time Saved */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-200 mb-4">This Month</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">This Month</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetricCard
             label="Hours Saved"
@@ -142,7 +142,7 @@ export default function Outcomes() {
 
       {/* Week-over-Week Trends */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-200 mb-4">This Week vs Last Week</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">This Week vs Last Week</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <WoWCard
             label="Meetings Prepped"
@@ -179,7 +179,7 @@ export default function Outcomes() {
 
       {/* Activity Breakdown */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-200 mb-4">Activity Breakdown — This Month</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Breakdown — This Month</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <SectionCard
             title="Task Management"
@@ -226,13 +226,13 @@ export default function Outcomes() {
 
       {/* ROI Calculator */}
       <section>
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-200 mb-2">ROI Summary</h2>
-          <p className="text-gray-400 text-sm leading-relaxed">
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">ROI Summary</h2>
+          <p className="text-gray-700 text-sm leading-relaxed">
             Atlas CoS has saved your team approximately{' '}
-            <span className="text-green-400 font-bold">{timeSaved.hours} hours</span> this month,
+            <span className="text-emerald-600 font-bold">{timeSaved.hours} hours</span> this month,
             equivalent to{' '}
-            <span className="text-purple-400 font-bold">
+            <span className="text-[#4F3588] font-bold">
               ${timeSaved.roiDollars.toLocaleString()}
             </span>{' '}
             at $50/hr. This includes{' '}

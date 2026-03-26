@@ -26,7 +26,7 @@ export default function SOPs() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-gray-400">
         Loading SOPs...
       </div>
     );
@@ -34,7 +34,7 @@ export default function SOPs() {
 
   if (error) {
     return (
-      <div className="bg-red-900/30 border border-red-700 rounded-xl p-6 text-red-300">
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
         Failed to load SOPs: {error}
       </div>
     );
@@ -48,17 +48,17 @@ export default function SOPs() {
     <div className="space-y-10">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">SOP Library</h1>
+        <h1 className="text-2xl font-bold text-gray-900">SOP Library</h1>
         <p className="text-gray-500 text-sm mt-1">
           {sops.length} SOP{sops.length !== 1 ? 's' : ''} total
         </p>
       </div>
 
       {sops.length === 0 && (
-        <div className="bg-gray-900 rounded-xl border border-gray-800 p-10 text-center">
-          <p className="text-gray-500 text-sm">No SOPs generated yet.</p>
-          <p className="text-gray-600 text-xs mt-2">
-            Use <code className="text-purple-400">/generate-sop</code> in Slack to create your
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-10 text-center">
+          <p className="text-gray-400 text-sm">No SOPs generated yet.</p>
+          <p className="text-gray-400 text-xs mt-2">
+            Use <code className="text-[#4F3588]">/generate-sop</code> in Slack to create your
             first SOP.
           </p>
         </div>
@@ -67,7 +67,7 @@ export default function SOPs() {
       {/* Active SOPs */}
       {activeSops.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-green-400 mb-4">
+          <h2 className="text-lg font-semibold text-emerald-600 mb-4">
             Active SOPs ({activeSops.length})
           </h2>
           <div className="space-y-3">
@@ -81,7 +81,7 @@ export default function SOPs() {
       {/* Draft SOPs */}
       {draftSops.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-yellow-400 mb-4">
+          <h2 className="text-lg font-semibold text-amber-600 mb-4">
             Draft SOPs ({draftSops.length})
           </h2>
           <div className="space-y-3">
@@ -95,7 +95,7 @@ export default function SOPs() {
       {/* Other / unknown status */}
       {otherSops.length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-400 mb-4">
+          <h2 className="text-lg font-semibold text-gray-500 mb-4">
             Other ({otherSops.length})
           </h2>
           <div className="space-y-3">

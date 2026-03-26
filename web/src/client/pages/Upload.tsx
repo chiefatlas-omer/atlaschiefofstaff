@@ -100,35 +100,35 @@ export default function Upload() {
     <div className="space-y-8 max-w-2xl">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Upload Document</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Upload Document</h1>
         <p className="text-gray-500 text-sm mt-1">Ingest a document into the knowledge graph</p>
       </div>
 
       {/* Success state */}
       {result && (
-        <div className="bg-green-900/30 border border-green-700 rounded-xl p-6 space-y-3">
-          <p className="text-green-300 font-semibold text-base">Document ingested successfully</p>
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 space-y-3">
+          <p className="text-emerald-700 font-semibold text-base">Document ingested successfully</p>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
               <p className="text-gray-500 text-xs mb-1">Document ID</p>
-              <p className="text-gray-200 font-mono text-xs break-all">{result.docId}</p>
+              <p className="text-gray-700 font-mono text-xs break-all">{result.docId}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
               <p className="text-gray-500 text-xs mb-1">Chunks Embedded</p>
-              <p className="text-gray-200 font-semibold">{result.chunkCount}</p>
+              <p className="text-gray-700 font-semibold">{result.chunkCount}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
               <p className="text-gray-500 text-xs mb-1">People Detected</p>
-              <p className="text-gray-200 font-semibold">{result.entities.people}</p>
+              <p className="text-gray-700 font-semibold">{result.entities.people}</p>
             </div>
-            <div className="bg-gray-900 border border-gray-800 rounded-lg p-3">
+            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-3">
               <p className="text-gray-500 text-xs mb-1">Companies Detected</p>
-              <p className="text-gray-200 font-semibold">{result.entities.companies}</p>
+              <p className="text-gray-700 font-semibold">{result.entities.companies}</p>
             </div>
           </div>
           <button
             onClick={handleReset}
-            className="mt-2 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+            className="mt-2 text-sm text-[#4F3588] hover:text-[#5A3C9E] transition-colors"
           >
             Upload another document
           </button>
@@ -140,14 +140,14 @@ export default function Upload() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Error */}
           {error && (
-            <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-red-300 text-sm">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
               {error}
             </div>
           )}
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Title
             </label>
             <input
@@ -155,19 +155,19 @@ export default function Upload() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Onboarding SOP v2"
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-2.5 text-gray-100 placeholder-gray-600 text-sm focus:outline-none focus:border-purple-600 transition-colors"
+              className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]/20 transition-colors"
             />
           </div>
 
           {/* Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Document Type
             </label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-2.5 text-gray-100 text-sm focus:outline-none focus:border-purple-600 transition-colors"
+              className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2.5 text-gray-900 text-sm focus:outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]/20 transition-colors"
             >
               {DOC_TYPES.map(({ value, label }) => (
                 <option key={value} value={value}>{label}</option>
@@ -177,7 +177,7 @@ export default function Upload() {
 
           {/* Content — textarea + drag-and-drop */}
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Content
             </label>
 
@@ -190,16 +190,16 @@ export default function Upload() {
               className={[
                 'border-2 border-dashed rounded-lg px-4 py-5 text-center cursor-pointer transition-colors mb-3',
                 isDragging
-                  ? 'border-purple-500 bg-purple-900/20'
-                  : 'border-gray-700 hover:border-gray-600 bg-gray-900/50',
+                  ? 'border-[#4F3588] bg-purple-50'
+                  : 'border-gray-300 hover:border-gray-400 bg-gray-50',
               ].join(' ')}
             >
-              <p className="text-gray-400 text-sm">
-                Drop a <span className="text-gray-300 font-medium">.txt file</span> here, or{' '}
-                <span className="text-purple-400">click to browse</span>
+              <p className="text-gray-500 text-sm">
+                Drop a <span className="text-gray-700 font-medium">.txt file</span> here, or{' '}
+                <span className="text-[#4F3588]">click to browse</span>
               </p>
               {content && (
-                <p className="text-green-400 text-xs mt-1">
+                <p className="text-emerald-600 text-xs mt-1">
                   File loaded — {content.length.toLocaleString()} characters
                 </p>
               )}
@@ -217,7 +217,7 @@ export default function Upload() {
               onChange={(e) => setContent(e.target.value)}
               placeholder="Or paste document content here..."
               rows={12}
-              className="w-full bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-600 text-sm font-mono focus:outline-none focus:border-purple-600 transition-colors resize-y"
+              className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 text-sm font-mono focus:outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]/20 transition-colors resize-y"
             />
           </div>
 
@@ -226,7 +226,7 @@ export default function Upload() {
             <button
               type="submit"
               disabled={submitting}
-              className="bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 disabled:cursor-not-allowed text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors"
+              className="bg-[#4F3588] hover:bg-[#5A3C9E] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium px-6 py-2.5 rounded-lg text-sm transition-colors"
             >
               {submitting ? 'Ingesting...' : 'Upload Document'}
             </button>
@@ -234,7 +234,7 @@ export default function Upload() {
               <button
                 type="button"
                 onClick={handleReset}
-                className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+                className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
               >
                 Clear
               </button>

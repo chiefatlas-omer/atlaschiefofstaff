@@ -3,21 +3,21 @@ import { api, DigestData } from '../lib/api';
 import MetricCard from '../components/MetricCard';
 
 const OUTCOME_COLOR: Record<string, string> = {
-  closed_won: 'bg-green-900/40 text-green-300 border-green-700',
-  demo_scheduled: 'bg-blue-900/40 text-blue-300 border-blue-700',
-  follow_up: 'bg-yellow-900/40 text-yellow-300 border-yellow-700',
-  no_decision: 'bg-gray-800 text-gray-400 border-gray-700',
-  churned: 'bg-red-900/40 text-red-300 border-red-700',
-  unknown: 'bg-gray-800 text-gray-500 border-gray-700',
+  closed_won: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  demo_scheduled: 'bg-blue-50 text-blue-700 border-blue-200',
+  follow_up: 'bg-amber-50 text-amber-700 border-amber-200',
+  no_decision: 'bg-gray-50 text-gray-500 border-gray-200',
+  churned: 'bg-red-50 text-red-700 border-red-200',
+  unknown: 'bg-gray-50 text-gray-400 border-gray-200',
 };
 
 const AWARENESS_COLOR: Record<string, string> = {
-  problem_aware: 'bg-yellow-900/40 text-yellow-300 border-yellow-700',
-  solution_aware: 'bg-blue-900/40 text-blue-300 border-blue-700',
-  product_aware: 'bg-purple-900/40 text-purple-300 border-purple-700',
-  most_aware: 'bg-green-900/40 text-green-300 border-green-700',
-  unaware: 'bg-gray-800 text-gray-400 border-gray-700',
-  unknown: 'bg-gray-800 text-gray-500 border-gray-700',
+  problem_aware: 'bg-amber-50 text-amber-700 border-amber-200',
+  solution_aware: 'bg-blue-50 text-blue-700 border-blue-200',
+  product_aware: 'bg-purple-50 text-[#4F3588] border-purple-200',
+  most_aware: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  unaware: 'bg-gray-50 text-gray-500 border-gray-200',
+  unknown: 'bg-gray-50 text-gray-400 border-gray-200',
 };
 
 function Badge({ label, colorClass }: { label: string; colorClass: string }) {
@@ -43,7 +43,7 @@ export default function SalesIntel() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-gray-400">
         Loading sales intelligence...
       </div>
     );
@@ -51,7 +51,7 @@ export default function SalesIntel() {
 
   if (error || !data) {
     return (
-      <div className="bg-red-900/30 border border-red-700 rounded-xl p-6 text-red-300">
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
         Failed to load sales intelligence: {error ?? 'Unknown error'}
       </div>
     );
@@ -64,7 +64,7 @@ export default function SalesIntel() {
     <div className="space-y-10">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Sales Intelligence</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Sales Intelligence</h1>
         <p className="text-gray-500 text-sm mt-1">Weekly call analysis — last 7 days</p>
       </div>
 
@@ -93,8 +93,8 @@ export default function SalesIntel() {
       {/* Awareness breakdown */}
       {Object.keys(data.awarenessBreakdown).length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">Prospect Awareness Breakdown</h2>
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Prospect Awareness Breakdown</h2>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <div className="flex flex-wrap gap-3">
               {Object.entries(data.awarenessBreakdown)
                 .sort((a, b) => b[1] - a[1])
@@ -102,9 +102,9 @@ export default function SalesIntel() {
                   <div key={level} className="flex items-center gap-2">
                     <Badge
                       label={level}
-                      colorClass={AWARENESS_COLOR[level] ?? 'bg-gray-800 text-gray-400 border-gray-700'}
+                      colorClass={AWARENESS_COLOR[level] ?? 'bg-gray-50 text-gray-500 border-gray-200'}
                     />
-                    <span className="text-gray-400 text-sm font-medium">{count}</span>
+                    <span className="text-gray-500 text-sm font-medium">{count}</span>
                   </div>
                 ))}
             </div>
@@ -115,8 +115,8 @@ export default function SalesIntel() {
       {/* Outcome breakdown */}
       {Object.keys(data.outcomeBreakdown).length > 0 && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-200 mb-4">Outcome Breakdown</h2>
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-5">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Outcome Breakdown</h2>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
             <div className="flex flex-wrap gap-3">
               {Object.entries(data.outcomeBreakdown)
                 .sort((a, b) => b[1] - a[1])
@@ -124,9 +124,9 @@ export default function SalesIntel() {
                   <div key={outcome} className="flex items-center gap-2">
                     <Badge
                       label={outcome}
-                      colorClass={OUTCOME_COLOR[outcome] ?? 'bg-gray-800 text-gray-400 border-gray-700'}
+                      colorClass={OUTCOME_COLOR[outcome] ?? 'bg-gray-50 text-gray-500 border-gray-200'}
                     />
-                    <span className="text-gray-400 text-sm font-medium">{count}</span>
+                    <span className="text-gray-500 text-sm font-medium">{count}</span>
                   </div>
                 ))}
             </div>
@@ -136,16 +136,16 @@ export default function SalesIntel() {
 
       {/* Recent calls list */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-200 mb-4">Recent Calls</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Calls</h2>
         {data.calls.length === 0 ? (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 text-gray-500 text-sm">
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-gray-400 text-sm">
             No calls analyzed this week yet.
           </div>
         ) : (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-800 text-gray-400">
+                <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                   <th className="text-left px-4 py-3 font-medium">Title</th>
                   <th className="text-left px-4 py-3 font-medium">Business</th>
                   <th className="text-left px-4 py-3 font-medium">Rep</th>
@@ -153,36 +153,36 @@ export default function SalesIntel() {
                   <th className="text-left px-4 py-3 font-medium">Awareness</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-gray-100">
                 {data.calls.map((call) => (
-                  <tr key={call.id} className="hover:bg-gray-800/50 transition-colors">
-                    <td className="px-4 py-3 text-gray-200 max-w-xs truncate">
+                  <tr key={call.id} className="hover:bg-purple-50/50 transition-colors">
+                    <td className="px-4 py-3 text-gray-700 max-w-xs truncate">
                       {call.title ?? 'Untitled'}
                     </td>
-                    <td className="px-4 py-3 text-gray-400">
+                    <td className="px-4 py-3 text-gray-500">
                       {call.businessName ?? '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-400">
+                    <td className="px-4 py-3 text-gray-500">
                       {call.repName ?? '—'}
                     </td>
                     <td className="px-4 py-3">
                       {call.outcome ? (
                         <Badge
                           label={call.outcome}
-                          colorClass={OUTCOME_COLOR[call.outcome] ?? 'bg-gray-800 text-gray-400 border-gray-700'}
+                          colorClass={OUTCOME_COLOR[call.outcome] ?? 'bg-gray-50 text-gray-500 border-gray-200'}
                         />
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       {call.awarenessLevel ? (
                         <Badge
                           label={call.awarenessLevel}
-                          colorClass={AWARENESS_COLOR[call.awarenessLevel] ?? 'bg-gray-800 text-gray-400 border-gray-700'}
+                          colorClass={AWARENESS_COLOR[call.awarenessLevel] ?? 'bg-gray-50 text-gray-500 border-gray-200'}
                         />
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-400">—</span>
                       )}
                     </td>
                   </tr>

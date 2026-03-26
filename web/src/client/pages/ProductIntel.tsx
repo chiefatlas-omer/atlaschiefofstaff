@@ -14,9 +14,9 @@ const TYPE_EMOJI: Record<string, string> = {
 };
 
 const SEVERITY_COLOR: Record<string, string> = {
-  critical: 'text-red-400',
-  high: 'text-orange-400',
-  medium: 'text-yellow-400',
+  critical: 'text-red-600',
+  high: 'text-amber-600',
+  medium: 'text-gray-600',
   low: 'text-gray-400',
 };
 
@@ -35,7 +35,7 @@ export default function ProductIntel() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-gray-400">
         Loading product intelligence...
       </div>
     );
@@ -43,7 +43,7 @@ export default function ProductIntel() {
 
   if (error || !data) {
     return (
-      <div className="bg-red-900/30 border border-red-700 rounded-xl p-6 text-red-300">
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
         Failed to load product intelligence: {error ?? 'Unknown error'}
       </div>
     );
@@ -57,7 +57,7 @@ export default function ProductIntel() {
     <div className="space-y-10">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-100">Product Intelligence</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Product Intelligence</h1>
         <p className="text-gray-500 text-sm mt-1">Signals extracted from sales calls</p>
       </div>
 
@@ -89,16 +89,16 @@ export default function ProductIntel() {
 
       {/* Signals table */}
       <section>
-        <h2 className="text-lg font-semibold text-gray-200 mb-4">All Product Signals</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">All Product Signals</h2>
         {data.signals.length === 0 ? (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 p-6 text-gray-500 text-sm">
+          <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-gray-400 text-sm">
             No product signals captured yet. Signals are extracted automatically from analyzed sales calls.
           </div>
         ) : (
-          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-800 text-gray-400">
+                <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
                   <th className="text-left px-4 py-3 font-medium">Type</th>
                   <th className="text-left px-4 py-3 font-medium">Description</th>
                   <th className="text-left px-4 py-3 font-medium">Category</th>
@@ -106,22 +106,22 @@ export default function ProductIntel() {
                   <th className="text-left px-4 py-3 font-medium">Business</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800">
+              <tbody className="divide-y divide-gray-100">
                 {data.signals.map((signal) => (
-                  <tr key={signal.id} className="hover:bg-gray-800/50 transition-colors">
-                    <td className="px-4 py-3 text-gray-200 whitespace-nowrap">
+                  <tr key={signal.id} className="hover:bg-purple-50/50 transition-colors">
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">
                       <span className="mr-1.5">{TYPE_EMOJI[signal.type] ?? '📌'}</span>
                       {signal.type.replace(/_/g, ' ')}
                     </td>
-                    <td className="px-4 py-3 text-gray-300 max-w-sm">
+                    <td className="px-4 py-3 text-gray-700 max-w-sm">
                       <p className="truncate">{signal.description}</p>
                       {signal.verbatimQuote && (
-                        <p className="text-gray-500 text-xs mt-0.5 truncate italic">
+                        <p className="text-gray-400 text-xs mt-0.5 truncate italic">
                           "{signal.verbatimQuote}"
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-400">
+                    <td className="px-4 py-3 text-gray-500">
                       {signal.category ?? '—'}
                     </td>
                     <td className="px-4 py-3">
@@ -130,10 +130,10 @@ export default function ProductIntel() {
                           {signal.severity}
                         </span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-400">
+                    <td className="px-4 py-3 text-gray-500">
                       {signal.businessName ?? '—'}
                     </td>
                   </tr>

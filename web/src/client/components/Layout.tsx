@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { label: 'Sales Intel', href: '/sales' },
   { label: 'Product Intel', href: '/product' },
   { label: 'Coaching', href: '/coaching' },
-  { label: '📄 Upload', href: '/upload' },
+  { label: 'Upload', href: '/upload' },
 ];
 
 interface LayoutProps {
@@ -20,13 +20,13 @@ export default function Layout({ children }: LayoutProps) {
   const currentPath = window.location.pathname;
 
   return (
-    <div className="flex min-h-screen bg-gray-950 text-gray-100">
+    <div className="flex min-h-screen bg-[#FAFAFA] text-gray-900">
       {/* Sidebar */}
-      <aside className="w-56 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0">
+      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
         {/* Branding */}
-        <div className="px-6 py-5 border-b border-gray-800">
-          <span className="text-purple-400 font-bold text-lg tracking-tight">Atlas CoS</span>
-          <p className="text-gray-500 text-xs mt-0.5">Command Center</p>
+        <div className="px-6 py-5 border-b border-gray-200">
+          <span className="text-[#4F3588] font-bold text-lg tracking-tight">Atlas CoS</span>
+          <p className="text-gray-400 text-xs mt-0.5">Command Center</p>
         </div>
 
         {/* Nav */}
@@ -41,8 +41,8 @@ export default function Layout({ children }: LayoutProps) {
                 className={[
                   'flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-purple-600 text-white'
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100',
+                    ? 'bg-[#F3F1FC] text-[#4F3588] font-medium'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
                 ].join(' ')}
               >
                 {label}
@@ -52,8 +52,8 @@ export default function Layout({ children }: LayoutProps) {
         </nav>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-800">
-          <p className="text-gray-600 text-xs">Phase 4 — Web UI</p>
+        <div className="px-6 py-4 border-t border-gray-200">
+          <p className="text-gray-300 text-xs">Atlas Chief of Staff</p>
         </div>
       </aside>
 
