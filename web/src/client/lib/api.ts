@@ -321,4 +321,15 @@ export const api = {
       '/api/upload',
       { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } },
     ),
+  search: (q: string) =>
+    fetchApi<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
 };
+
+// ---- Search result type ----
+
+export interface SearchResult {
+  type: 'task' | 'person' | 'company' | 'meeting' | 'call' | 'document' | 'coaching';
+  id: string | number;
+  title: string;
+  subtitle?: string;
+}

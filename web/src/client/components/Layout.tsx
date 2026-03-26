@@ -1,16 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import CommandBar from './CommandBar';
 
 const NAV_ITEMS = [
-  { label: 'Briefing', href: '/' },
-  { label: 'Dashboard', href: '/dashboard' },
-  { label: 'Metrics', href: '/metrics' },
-  { label: 'Outcomes', href: '/outcomes' },
+  { label: 'Home', href: '/' },
+  { label: 'Intelligence', href: '/intelligence' },
+  { label: 'Tasks', href: '/tasks' },
   { label: 'Knowledge', href: '/knowledge' },
-  { label: 'SOPs', href: '/sops' },
-  { label: 'Sales Intel', href: '/sales' },
-  { label: 'Product Intel', href: '/product' },
-  { label: 'Coaching', href: '/coaching' },
-  { label: 'Upload', href: '/upload' },
+  { label: 'Outcomes', href: '/outcomes' },
 ];
 
 interface LayoutProps {
@@ -19,6 +16,27 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const currentPath = window.location.pathname;
+  const [commandBarOpen, setCommandBarOpen] = useState(false);
+  const navigate = useNavigate();
+
+  // Global Cmd+K / Ctrl+K listener
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandBarOpen((open) => !open);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleNavigate = useCallback(
+    (path: string) => {
+      navigate(path);
+    },
+    [navigate],
+  );
 
   return (
     <div className="flex min-h-screen bg-[#FAFAFA] text-gray-900">
@@ -53,13 +71,26 @@ export default function Layout({ children }: LayoutProps) {
         </nav>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200">
+        <div className="px-6 py-4 border-t border-gray-200 space-y-2">
+          <button
+            onClick={() => setCommandBarOpen(true)}
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            ⌘K to search
+          </button>
           <p className="text-gray-300 text-xs">Atlas Chief of Staff</p>
         </div>
       </aside>
 
       {/* Main content */}
       <main className="flex-1 p-8 overflow-auto">{children}</main>
+
+      {/* Command Bar */}
+      <CommandBar
+        open={commandBarOpen}
+        onClose={() => setCommandBarOpen(false)}
+        onNavigate={handleNavigate}
+      />
     </div>
   );
 }

@@ -8,9 +8,11 @@ import {
   knowledgeEntries,
   topicCounts,
   qaInteractions,
+  people,
+  companies,
 } from '../../../../bot/src/db/schema';
 import { callAnalyses, productSignals, coachingSnapshots } from '../schema-analytics';
-import { eq, ne, and, lt, count, desc, gte, gt, isNotNull } from 'drizzle-orm';
+import { eq, ne, and, lt, count, desc, gte, gt, isNotNull, like } from 'drizzle-orm';
 
 const router = Router();
 
@@ -675,6 +677,159 @@ router.get('/briefing', (_req, res) => {
   } catch (err) {
     console.error('[briefing] GET /briefing error:', err);
     res.status(500).json({ error: 'Failed to fetch briefing data' });
+  }
+});
+
+// GET /api/search?q=<query> — unified search across tasks, people, companies, meetings, calls, documents
+router.get('/search', (req, res) => {
+  try {
+    const q = (req.query.q as string || '').trim().toLowerCase();
+
+    interface SearchResult {
+      type: string;
+      id: string | number;
+      title: string;
+      subtitle?: string;
+    }
+
+    const results: SearchResult[] = [];
+
+    if (q === '') {
+      // Return recent items: last 5 tasks + last 5 calls
+      const recentTasks = db
+        .select()
+        .from(tasks)
+        .where(and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')))
+        .orderBy(desc(tasks.createdAt))
+        .limit(5)
+        .all();
+      for (const t of recentTasks) {
+        results.push({
+          type: 'task',
+          id: t.id,
+          title: t.description,
+          subtitle: t.slackUserName ?? undefined,
+        });
+      }
+
+      const recentCalls = db
+        .select()
+        .from(callAnalyses)
+        .orderBy(desc(callAnalyses.createdAt))
+        .limit(5)
+        .all();
+      for (const c of recentCalls) {
+        results.push({
+          type: 'call',
+          id: c.id,
+          title: c.title ?? 'Untitled call',
+          subtitle: c.businessName ?? c.repName ?? undefined,
+        });
+      }
+    } else {
+      const pattern = `%${q}%`;
+
+      // Tasks
+      const matchedTasks = db
+        .select()
+        .from(tasks)
+        .where(like(tasks.description, pattern))
+        .limit(3)
+        .all();
+      for (const t of matchedTasks) {
+        results.push({
+          type: 'task',
+          id: t.id,
+          title: t.description,
+          subtitle: t.slackUserName ?? undefined,
+        });
+      }
+
+      // People
+      const matchedPeople = db
+        .select()
+        .from(people)
+        .where(like(people.name, pattern))
+        .limit(3)
+        .all();
+      for (const p of matchedPeople) {
+        results.push({
+          type: 'person',
+          id: p.id,
+          title: p.name,
+          subtitle: p.role ?? p.company ?? undefined,
+        });
+      }
+
+      // Companies
+      const matchedCompanies = db
+        .select()
+        .from(companies)
+        .where(like(companies.name, pattern))
+        .limit(3)
+        .all();
+      for (const c of matchedCompanies) {
+        results.push({
+          type: 'company',
+          id: c.id,
+          title: c.name,
+          subtitle: c.industry ?? undefined,
+        });
+      }
+
+      // Meetings
+      const matchedMeetings = db
+        .select()
+        .from(meetings)
+        .where(like(meetings.title, pattern))
+        .limit(3)
+        .all();
+      for (const m of matchedMeetings) {
+        results.push({
+          type: 'meeting',
+          id: m.id,
+          title: m.title,
+        });
+      }
+
+      // Call analyses
+      const matchedCalls = db
+        .select()
+        .from(callAnalyses)
+        .where(like(callAnalyses.title, pattern))
+        .limit(3)
+        .all();
+      for (const c of matchedCalls) {
+        results.push({
+          type: 'call',
+          id: c.id,
+          title: c.title ?? 'Untitled call',
+          subtitle: c.businessName ?? c.repName ?? undefined,
+        });
+      }
+
+      // Documents
+      const matchedDocs = db
+        .select()
+        .from(documents)
+        .where(like(documents.title, pattern))
+        .limit(3)
+        .all();
+      for (const d of matchedDocs) {
+        results.push({
+          type: 'document',
+          id: d.id,
+          title: d.title,
+          subtitle: d.type ?? undefined,
+        });
+      }
+    }
+
+    // Limit total to 10
+    res.json(results.slice(0, 10));
+  } catch (err) {
+    console.error('[search] GET /search error:', err);
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 
