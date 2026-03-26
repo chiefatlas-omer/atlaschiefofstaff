@@ -10,6 +10,7 @@ import {
   companies,
 } from '../../../../bot/src/db/schema';
 import { callAnalyses, coachingSnapshots } from '../schema-analytics';
+import { emailDrafts } from '../schema-email-drafts';
 // emailDrafts routes moved to email-drafts.ts
 import { eq, ne, and, lt, gt, gte, desc, isNotNull, like } from 'drizzle-orm';
 
@@ -387,6 +388,53 @@ router.get('/briefing', (_req, res) => {
       recentQueries,
     };
 
+    // ── AI Usage Score ────────────────────────────────────────
+    const allTasksCount = allTasks.length;
+    const allCallsCount = allCalls.length;
+    const coachingCount = db.select().from(coachingSnapshots).all().length;
+    const sopCount = db.select().from(documents).where(eq(documents.type, 'sop')).all().length;
+    const totalQaCount = db.select().from(qaInteractions).all().length;
+    const emailDraftCount = db.select().from(emailDrafts).all().length;
+
+    interface AiScoreMilestone {
+      label: string;
+      completed: boolean;
+      points: number;
+    }
+
+    const scoreMilestones: AiScoreMilestone[] = [
+      { label: 'Zoom connected', completed: allCallsCount > 0, points: 15 },
+      { label: 'Slack connected', completed: allTasksCount > 0, points: 15 },
+      { label: 'Knowledge uploaded', completed: documentCount > 0, points: 10 },
+      { label: 'Voice app installed', completed: false, points: 10 },
+      { label: 'First call analyzed', completed: allCallsCount > 0, points: 10 },
+      { label: 'First SOP generated', completed: sopCount > 0, points: 10 },
+      { label: '10+ calls analyzed', completed: allCallsCount >= 10, points: 10 },
+      { label: 'Team coaching active', completed: coachingCount > 0, points: 10 },
+      { label: '5+ knowledge queries answered', completed: totalQaCount >= 5, points: 5 },
+      { label: '3+ email drafts generated', completed: emailDraftCount >= 3, points: 5 },
+    ];
+
+    const aiScoreTotal = scoreMilestones
+      .filter((m) => m.completed)
+      .reduce((sum, m) => sum + m.points, 0);
+
+    const aiScoreLevel =
+      aiScoreTotal <= 30
+        ? 'Getting Started'
+        : aiScoreTotal <= 60
+          ? 'Growing'
+          : aiScoreTotal <= 80
+            ? 'Good'
+            : 'Power User';
+
+    const aiScore = {
+      score: aiScoreTotal,
+      maxScore: 100,
+      level: aiScoreLevel,
+      milestones: scoreMilestones.map(({ label, completed }) => ({ label, completed })),
+    };
+
     res.json({
       greeting,
       date: dateStr,
@@ -396,6 +444,7 @@ router.get('/briefing', (_req, res) => {
       streaks,
       recentActivity,
       knowledgeStats,
+      aiScore,
     });
   } catch (err) {
     console.error('[briefing] GET /briefing error:', err);

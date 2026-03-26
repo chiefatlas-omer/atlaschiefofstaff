@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, OutcomeData } from '../lib/api';
+import { api, OutcomeData, LeaderboardEntry } from '../lib/api';
 import MetricCard from '../components/MetricCard';
 
 function TrendBadge({ pct }: { pct: number | null }) {
@@ -70,6 +70,81 @@ function SectionCard({ title, rows }: SectionCardProps) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+
+function LeaderboardSection() {
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .leaderboard()
+      .then(setEntries)
+      .catch(() => setEntries([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="text-gray-400 text-sm py-4">Loading leaderboard...</div>
+    );
+  }
+
+  if (entries.length === 0) {
+    return (
+      <div className="text-gray-400 text-sm py-4">
+        No activity this week yet — complete tasks or analyze calls to appear here.
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      {entries.map((entry, idx) => (
+        <div
+          key={entry.name}
+          className={[
+            'flex items-center gap-3 px-5 py-3',
+            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50',
+            idx < entries.length - 1 ? 'border-b border-gray-100' : '',
+          ].join(' ')}
+        >
+          {/* Rank */}
+          <span className="text-lg w-8 flex-shrink-0 text-center">
+            {entry.rank <= 3 ? RANK_MEDALS[entry.rank - 1] : `${entry.rank}.`}
+          </span>
+
+          {/* Name */}
+          <span className="flex-1 text-sm font-medium text-gray-900">{entry.name}</span>
+
+          {/* Stats */}
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span>
+              <span className="font-semibold text-gray-700">{entry.tasksCompleted}</span> tasks
+            </span>
+            <span>
+              <span className="font-semibold text-gray-700">{entry.callsAnalyzed}</span> calls
+            </span>
+            {entry.latestGrade && (
+              <span
+                className={[
+                  'font-bold px-2 py-0.5 rounded',
+                  entry.latestGrade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                  entry.latestGrade === 'B+' ? 'bg-blue-100 text-blue-700' :
+                  entry.latestGrade === 'B' ? 'bg-sky-100 text-sky-700' :
+                  'bg-amber-100 text-amber-700',
+                ].join(' ')}
+              >
+                {entry.latestGrade}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -242,6 +317,15 @@ export default function Outcomes() {
             {productIntelligence.signalsCapturedThisMonth} product signals captured.
           </p>
         </div>
+      </section>
+
+      {/* Team Leaderboard */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Team Leaderboard — This Week</h2>
+          <span className="text-xs text-gray-400">Ranked by tasks × 2 + calls</span>
+        </div>
+        <LeaderboardSection />
       </section>
     </div>
   );

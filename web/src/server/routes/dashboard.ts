@@ -441,4 +441,99 @@ router.get('/analytics/outcomes', (_req, res) => {
   }
 });
 
+// GET /api/analytics/leaderboard — weekly team leaderboard
+router.get('/analytics/leaderboard', (_req, res) => {
+  try {
+    const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
+
+    // Tasks completed this week grouped by slackUserName
+    const allTasksAll = db.select().from(tasks).all();
+    const completedThisWeek = allTasksAll.filter((t) => {
+      if (t.status !== 'COMPLETED') return false;
+      const ts =
+        t.completedAt instanceof Date
+          ? Math.floor(t.completedAt.getTime() / 1000)
+          : t.completedAt
+            ? Number(t.completedAt)
+            : null;
+      return ts != null && ts >= weekAgo;
+    });
+
+    const tasksByName: Record<string, number> = {};
+    for (const t of completedThisWeek) {
+      const name = t.slackUserName ?? 'Unknown';
+      tasksByName[name] = (tasksByName[name] ?? 0) + 1;
+    }
+
+    // Calls analyzed this week grouped by repName
+    const allCallsAll = db.select().from(callAnalyses).all();
+    const callsThisWeek = allCallsAll.filter((c) => (c.createdAt ?? 0) >= weekAgo);
+    const callsByName: Record<string, number> = {};
+    for (const c of callsThisWeek) {
+      const name = c.repName ?? 'Unknown';
+      callsByName[name] = (callsByName[name] ?? 0) + 1;
+    }
+
+    // Latest coaching grade per rep (most recent coaching snapshot)
+    const allCoachingAll = db
+      .select()
+      .from(coachingSnapshots)
+      .orderBy(desc(coachingSnapshots.weekStart))
+      .all();
+    const latestGradeByName: Record<string, string> = {};
+    for (const snap of allCoachingAll) {
+      const name = snap.repName ?? 'Unknown';
+      if (!latestGradeByName[name]) {
+        // Derive grade from coaching flags: 0 flags=A, 1=B+, 2=B, 3+=C
+        const flags = snap.coachingFlags as unknown[] | null;
+        const flagCount = flags?.length ?? 0;
+        const grade =
+          flagCount === 0 ? 'A' : flagCount === 1 ? 'B+' : flagCount === 2 ? 'B' : 'C';
+        latestGradeByName[name] = grade;
+      }
+    }
+
+    // Combine into ranked list — union of all names
+    const allNames = new Set([
+      ...Object.keys(tasksByName),
+      ...Object.keys(callsByName),
+    ]);
+
+    // Remove 'Unknown' from leaderboard
+    allNames.delete('Unknown');
+
+    interface LeaderboardEntry {
+      rank: number;
+      name: string;
+      tasksCompleted: number;
+      callsAnalyzed: number;
+      latestGrade: string | null;
+    }
+
+    // Score: tasks × 2 + calls × 1 (weighted ranking)
+    const entries: LeaderboardEntry[] = Array.from(allNames).map((name) => ({
+      rank: 0,
+      name,
+      tasksCompleted: tasksByName[name] ?? 0,
+      callsAnalyzed: callsByName[name] ?? 0,
+      latestGrade: latestGradeByName[name] ?? null,
+    }));
+
+    entries.sort((a, b) => {
+      const scoreA = a.tasksCompleted * 2 + a.callsAnalyzed;
+      const scoreB = b.tasksCompleted * 2 + b.callsAnalyzed;
+      return scoreB - scoreA;
+    });
+
+    entries.forEach((e, i) => {
+      e.rank = i + 1;
+    });
+
+    res.json(entries);
+  } catch (err) {
+    console.error('[analytics] GET /leaderboard error:', err);
+    res.status(500).json({ error: 'Failed to fetch leaderboard data' });
+  }
+});
+
 export default router;

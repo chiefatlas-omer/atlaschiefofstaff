@@ -547,6 +547,80 @@ export default function Briefing() {
         </section>
       </div>
 
+      {/* ── AI Usage Score ────────────────────────────────────── */}
+      {data.aiScore && (
+        <section>
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              AI Usage Score
+            </h2>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+
+          {/* Achievement banner for new/early users */}
+          {data.aiScore.score === 0 && (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-[#4F3588] text-sm font-medium mb-4">
+              🚀 Welcome to Atlas Chief! Complete milestones above to unlock your team's full AI potential.
+            </div>
+          )}
+          {data.aiScore.score > 0 && data.aiScore.score < 30 && (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-[#4F3588] text-sm font-medium mb-4">
+              🎉 You're getting started! Keep completing milestones to unlock Atlas Chief's full power.
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            {/* Score row */}
+            <div className="flex items-center gap-4 mb-3">
+              <span className="text-4xl font-bold text-[#4F3588]">{data.aiScore.score}</span>
+              <span className="text-lg text-gray-400 font-light">/100</span>
+              <span
+                className={[
+                  'text-xs font-semibold px-2.5 py-1 rounded-full',
+                  data.aiScore.level === 'Getting Started' ? 'bg-gray-100 text-gray-600' :
+                  data.aiScore.level === 'Growing' ? 'bg-blue-100 text-blue-700' :
+                  data.aiScore.level === 'Good' ? 'bg-emerald-100 text-emerald-700' :
+                  'bg-purple-100 text-[#4F3588]',
+                ].join(' ')}
+              >
+                {data.aiScore.level}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-3 bg-[#F3F1FC] rounded-full overflow-hidden mb-5">
+              <div
+                className="h-full bg-[#4F3588] rounded-full transition-all duration-500"
+                style={{ width: `${data.aiScore.score}%` }}
+              />
+            </div>
+
+            {/* Milestones grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {data.aiScore.milestones.map((m) => (
+                <div key={m.label} className="flex items-center gap-2">
+                  <span className="text-sm leading-none">
+                    {m.completed ? '✅' : '⬜'}
+                  </span>
+                  <span
+                    className={[
+                      'text-sm',
+                      m.completed ? 'text-emerald-600' : 'text-gray-400',
+                    ].join(' ')}
+                  >
+                    {m.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-xs text-gray-400 mt-4">
+              Complete all milestones to unlock full AI potential
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* ── Recent Activity ───────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6">
         <section>

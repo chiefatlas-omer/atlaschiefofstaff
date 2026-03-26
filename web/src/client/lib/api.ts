@@ -250,6 +250,18 @@ export interface CoachingSnapshot {
   createdAt: number;
 }
 
+export interface AiScoreMilestone {
+  label: string;
+  completed: boolean;
+}
+
+export interface AiScore {
+  score: number;
+  maxScore: number;
+  level: 'Getting Started' | 'Growing' | 'Good' | 'Power User';
+  milestones: AiScoreMilestone[];
+}
+
 export interface BriefingData {
   greeting: string;
   date: string;
@@ -292,6 +304,7 @@ export interface BriefingData {
     documents: number;
     recentQueries: string[];
   };
+  aiScore?: AiScore;
 }
 
 // ---- Base fetch ----
@@ -347,6 +360,7 @@ export const api = {
     fetchApi<{ success: boolean }>(`/api/tasks/${id}/dismiss`, { method: 'POST' }),
   search: (q: string) =>
     fetchApi<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`),
+  leaderboard: () => fetchApi<LeaderboardEntry[]>('/api/analytics/leaderboard'),
   emailDrafts: () => fetchApi<EmailDraft[]>('/api/email-drafts'),
   updateDraftStatus: (id: number, status: string) =>
     fetchApi<{ success: boolean }>('/api/email-drafts/' + id + '/status', {
@@ -368,6 +382,14 @@ export interface EmailDraft {
   repName: string | null;
   status: string | null;
   createdAt: number | null;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  name: string;
+  tasksCompleted: number;
+  callsAnalyzed: number;
+  latestGrade: string | null;
 }
 
 // ---- Search result type ----
