@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import briefingRouter from './routes/briefing';
 import tasksRouter from './routes/tasks';
 import dashboardRouter from './routes/dashboard';
 import graphRouter from './routes/graph';
@@ -15,6 +16,8 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Routes - order matters in Express 5
+// Mount briefing first — avoids Express 5 router ordering issues
+app.use('/api', briefingRouter);
 app.use('/api', tasksRouter);
 app.use('/api', dashboardRouter);
 app.use('/api', graphRouter);
