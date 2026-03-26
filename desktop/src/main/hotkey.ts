@@ -8,8 +8,8 @@ let mainWindow: BrowserWindow | null = null;
 export function initHotkeys(window: BrowserWindow) {
   mainWindow = window;
 
-  // Alt+A = voice command mode (AI actions)
-  const commandShortcuts = ['Alt+A', 'CommandOrControl+Shift+K'];
+  // Insert = voice command mode (AI actions); Ctrl+Shift+K as fallback
+  const commandShortcuts = ['Insert', 'CommandOrControl+Shift+K'];
   for (const shortcut of commandShortcuts) {
     const ok = globalShortcut.register(shortcut, () => {
       console.log(`[HOTKEY] ${shortcut} pressed (command mode), isListening:`, isListening);
@@ -23,8 +23,8 @@ export function initHotkeys(window: BrowserWindow) {
     }
   }
 
-  // Alt+D = dictation mode (types what you say)
-  const dictationShortcuts = ['Alt+D', 'CommandOrControl+Shift+D'];
+  // Pause = dictation mode (types what you say); Ctrl+Shift+D as fallback
+  const dictationShortcuts = ['Pause', 'CommandOrControl+Shift+D'];
   for (const shortcut of dictationShortcuts) {
     const ok = globalShortcut.register(shortcut, () => {
       console.log(`[HOTKEY] ${shortcut} pressed (dictation mode), isListening:`, isListening);
