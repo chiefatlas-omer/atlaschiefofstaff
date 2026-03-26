@@ -359,17 +359,32 @@ export default function Briefing() {
             </button>
           </form>
 
-          {/* Knowledge stats subtitle */}
-          {data.knowledgeStats && (
-            <p className="text-xs text-gray-400">
-              Powered by {data.knowledgeStats.entries.toLocaleString()} knowledge entries, {data.knowledgeStats.callTranscripts.toLocaleString()} call transcripts, and {data.knowledgeStats.documents.toLocaleString()} documents
-            </p>
-          )}
+          {/* Value prop subtitle */}
+          <p className="text-xs text-gray-400">
+            Your company's operating system — ask questions, draft emails, search calls, and get instant answers about your business.
+          </p>
 
-          {/* Recent queries as clickable chips */}
-          {data.knowledgeStats && data.knowledgeStats.recentQueries.length > 0 && (
+          {/* Suggested questions / recent queries as clickable chips */}
+          {data.knowledgeStats && data.knowledgeStats.recentQueries.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {data.knowledgeStats.recentQueries.slice(0, 3).map((q, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    setAskQuery(q);
+                    setAskAnswer(null);
+                  }}
+                  className="text-xs text-[#4F3588] bg-[#F3F1FC] hover:bg-[#E8E4F5] px-3 py-1.5 rounded-full transition-colors truncate max-w-[250px]"
+                  title={q}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {["What's our onboarding process?", "Draft a follow-up for the last call", "What are our top customer pain points?"].map((q, i) => (
                 <button
                   key={i}
                   type="button"
@@ -387,6 +402,19 @@ export default function Briefing() {
           )}
         </div>
       </section>
+
+      {/* ── Voice Assistant Hint ──────────────────────────────── */}
+      <a
+        href="#voice-assistant"
+        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#4F3588] transition-colors -mt-4"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" fill="currentColor"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          <path d="M12 19v4M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+        Press \ to talk to Atlas Chief — dictate, ask questions, or give commands by voice.
+      </a>
 
       {/* ── Quick-Ask Answer ─────────────────────────────────── */}
       {askLoading && (
@@ -469,40 +497,6 @@ export default function Briefing() {
         )}
       </section>
 
-      {/* ── Today's Schedule ──────────────────────────────────── */}
-      <section>
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Today's Schedule
-          </h2>
-          <div className="flex-1 h-px bg-gray-200" />
-        </div>
-
-        {data.todaysMeetings.length === 0 ? (
-          <p className="text-gray-400 text-sm">No meetings scheduled today.</p>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-xl shadow-sm divide-y divide-gray-100">
-            {data.todaysMeetings.map((m) => (
-              <div key={m.id} className="flex items-center gap-4 px-4 py-3">
-                <span className="text-sm text-gray-400 font-mono w-20 flex-shrink-0">
-                  {m.time}
-                </span>
-                <span className="text-sm text-gray-900 font-medium flex-1">{m.title}</span>
-                {m.hasPrep ? (
-                  <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                    Prepped
-                  </span>
-                ) : (
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                    No prep
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
       {/* ── This Week + Streaks (side by side) ────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* This Week */}
@@ -573,7 +567,7 @@ export default function Briefing() {
       </div>
 
       {/* ── Voice Assistant Download ─────────────────────────── */}
-      <section>
+      <section id="voice-assistant">
         <div className="flex items-center gap-3 mb-4">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             Voice Assistant
@@ -656,10 +650,15 @@ function StreakItem({ emoji, value, label }: { emoji: string; value: number; lab
   const pct = Math.min(100, (value / maxBar) * 100);
 
   if (value === 0) {
+    const hint = emoji === '\uD83D\uDD25'
+      ? 'Complete a task to start your streak \uD83D\uDD25'
+      : emoji === '\uD83D\uDCDE'
+        ? 'Analyze a call to start your streak \uD83D\uDCDE'
+        : 'Start your streak today!';
     return (
       <div className="flex items-center gap-3">
         <span className="text-lg opacity-30">{emoji}</span>
-        <span className="text-sm text-gray-400">Start your streak today!</span>
+        <span className="text-sm text-gray-400">{hint}</span>
       </div>
     );
   }

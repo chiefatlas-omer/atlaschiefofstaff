@@ -106,6 +106,7 @@ export async function queryKnowledgeBot(input: KnowledgeBotQuery): Promise<Knowl
         'If the provided context does not contain enough information to answer, say so clearly — do not fabricate.',
         'If sources conflict, note the conflict briefly.',
         'Keep answers tight: bullet points over paragraphs when listing items.',
+        'If the user asks you to draft an email, write a follow-up, or compose a message, generate the email content directly. Use what you know about the business, the person, and recent interactions. Format it ready to send — with greeting, body, and sign-off. Keep it concise and natural.',
       ].join(' '),
       messages: [
         {

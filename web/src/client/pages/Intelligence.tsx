@@ -71,11 +71,11 @@ function formatDate(unixSeconds: number | null): string {
 type TabId = 'calls' | 'product' | 'coaching' | 'email_drafts' | 'sops';
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'calls', label: 'Calls' },
+  { id: 'calls', label: 'Call Analysis' },
   { id: 'product', label: 'Product Signals' },
-  { id: 'coaching', label: 'Coaching' },
-  { id: 'email_drafts', label: 'Email Drafts' },
-  { id: 'sops', label: 'SOPs' },
+  { id: 'coaching', label: 'Rep Coaching' },
+  { id: 'email_drafts', label: 'Follow-Up Emails' },
+  { id: 'sops', label: 'Playbooks & SOPs' },
 ];
 
 // ─── Calls Tab Content ──────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ function CallsTab() {
     );
   }
 
-  const talkRatioColor = data.avgTalkRatio !== null && data.avgTalkRatio < 50 ? 'green' : 'red';
+  const talkRatioColor = data.avgTalkRatio !== null && data.avgTalkRatio < 60 ? 'green' : 'red';
   const questionsColor = data.avgQuestionsPerCall !== null && data.avgQuestionsPerCall >= 5 ? 'green' : 'red';
 
   return (
@@ -127,7 +127,7 @@ function CallsTab() {
             label="Avg Talk Ratio"
             value={data.avgTalkRatio !== null ? `${data.avgTalkRatio}%` : '—'}
             color={talkRatioColor}
-            subtitle={data.avgTalkRatio !== null && data.avgTalkRatio < 50 ? 'target: <50%' : 'target: <50%'}
+            subtitle="target: <60%"
           />
           <MetricCard
             label="Avg Questions/Call"
@@ -148,15 +148,29 @@ function CallsTab() {
       <section>
         <h2 className="text-sm font-semibold text-gray-700 mb-3">Recent Calls</h2>
         {data.calls.length === 0 ? (
-          <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-gray-400 text-sm">
-            No calls analyzed this week yet.
+          <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-gray-400 text-sm space-y-4">
+            <p className="font-medium text-gray-500">What you'll see here:</p>
+            <div className="space-y-3 font-mono text-xs">
+              <div>
+                <p className="text-gray-500">{'📞'} Greenscape QBR — March 24</p>
+                <p className="ml-5">Talk ratio: {'████████░░'} 42% (great!)</p>
+                <p className="ml-5">Key insight: Customer interested in automated scheduling module</p>
+                <p className="ml-5">Objections: 2 · Pains: 1 · Risk flags: 0</p>
+              </div>
+              <div>
+                <p className="text-gray-500">{'📞'} Lakeside Properties Demo — March 23</p>
+                <p className="ml-5">Talk ratio: {'██████████░'} 68% (too high)</p>
+                <p className="ml-5">Key insight: Price objection — comparing with competitor</p>
+                <p className="ml-5">Objections: 3 · Pains: 2 · Risk flags: 1</p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
             {data.calls.map((call) => {
               const talkRatio = call.talkListenRatio ?? 50;
               const prospectRatio = 100 - talkRatio;
-              const ratioGood = talkRatio < 50;
+              const ratioGood = talkRatio < 60;
               const objectionCount = call.objections?.length ?? 0;
               const painCount = call.pains?.length ?? 0;
               const risks = call.riskFlags ?? [];
@@ -401,10 +415,16 @@ function CoachingTab() {
   return (
     <div className="space-y-6">
       {snapshots.length === 0 ? (
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
-          <p className="text-gray-400 text-sm">No coaching data yet</p>
-          <p className="text-gray-400 text-xs mt-1">
-            Snapshots are generated every Monday after reps complete calls.
+        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-gray-400 text-sm space-y-3">
+          <p className="font-medium text-gray-500">What you'll see here:</p>
+          <div className="font-mono text-xs space-y-1">
+            <p className="text-gray-500">Matt Chen · CS Manager · B+ this week</p>
+            <p>{'🟢'} Great discovery questions — averaged 8 per call</p>
+            <p>{'🟡'} Talk ratio slightly high (58%) — try pausing after questions</p>
+            <p>{'📝'} This week's focus: "Let the customer finish before responding"</p>
+          </div>
+          <p className="text-gray-400 text-xs">
+            Coaching is sent immediately after each call and summarized every Monday.
           </p>
         </div>
       ) : (
@@ -552,9 +572,17 @@ function EmailDraftsTab() {
   return (
     <div className="space-y-4">
       {drafts.length === 0 ? (
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
-          <p className="text-gray-400 text-sm">No email drafts yet</p>
-          <p className="text-gray-400 text-xs mt-1">
+        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-gray-400 text-sm space-y-3">
+          <p className="font-medium text-gray-500">What you'll see here:</p>
+          <div className="font-mono text-xs space-y-1">
+            <p className="text-gray-500">To: Tom Rivera (Greenscape) · analytical style</p>
+            <p className="text-gray-500">From: QBR March 24</p>
+            <p className="mt-2">Hey Tom,</p>
+            <p className="mt-1">The sensor alert issue you raised — we've patched it in v3.2 rolling out Friday.</p>
+            <p>I'll send the updated pricing for the scheduling module by EOD tomorrow.</p>
+            <p className="mt-1">Does Thursday at 2 work for a quick 15-min walkthrough?</p>
+          </div>
+          <p className="text-gray-400 text-xs">
             Follow-up drafts are generated automatically after external Zoom calls.
           </p>
         </div>
@@ -669,10 +697,15 @@ function SOPsTab() {
   return (
     <div className="space-y-4">
       {sops.length === 0 ? (
-        <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
-          <p className="text-gray-400 text-sm">No SOPs generated yet.</p>
-          <p className="text-gray-400 text-xs mt-1">
-            SOPs are automatically created when topics appear 5+ times in calls and messages.
+        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-gray-400 text-sm space-y-3">
+          <p className="font-medium text-gray-500">What you'll see here:</p>
+          <div className="font-mono text-xs space-y-1">
+            <p>{'📄'} Customer Onboarding Checklist · Published</p>
+            <p>{'📄'} Handling Pricing Objections · Draft</p>
+            <p>{'📄'} Irrigation System Troubleshooting · Published</p>
+          </div>
+          <p className="text-gray-400 text-xs">
+            Playbooks are automatically created when topics appear 3+ times in calls and messages.
           </p>
         </div>
       ) : (
@@ -722,7 +755,7 @@ export default function Intelligence() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Intelligence</h1>
-        <p className="text-gray-500 text-sm mt-1">Call analysis, product signals, and rep coaching</p>
+        <p className="text-gray-500 text-sm mt-1">Every call analyzed. Every rep coached. Every product signal captured. Every follow-up drafted.</p>
       </div>
 
       {/* Tab bar */}

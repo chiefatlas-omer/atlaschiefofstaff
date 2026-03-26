@@ -2,7 +2,7 @@ import { eq, desc } from 'drizzle-orm';
 import { db } from '../db/connection';
 import { topicCounts } from '../db/schema';
 
-const SOP_THRESHOLD = 5;
+const SOP_THRESHOLD = 3;
 
 // --- Normalization ---
 

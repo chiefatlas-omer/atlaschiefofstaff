@@ -31,7 +31,14 @@ interface TaskListProps {
 export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
   if (tasks.length === 0) {
     return (
-      <p className="text-gray-400 text-sm py-4">No tasks to display.</p>
+      <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-gray-400 text-sm space-y-3">
+        <p className="font-medium text-gray-500">What you'll see here:</p>
+        <div className="font-mono text-xs space-y-1">
+          <p>{'\u2610'} Send revised proposal to Lakeside Properties · Due tomorrow</p>
+          <p>{'\u2610'} Review Matt's onboarding notes for Premier Lawns · Due Friday</p>
+          <p>{'\u2611'} Follow up with Greenscape about irrigation contract · Completed</p>
+        </div>
+      </div>
     );
   }
 

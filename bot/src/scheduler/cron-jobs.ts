@@ -200,9 +200,10 @@ export function startCronJobs(client: any) {
     }
   }, { timezone: 'America/Chicago' });
 
-  // Monday 9 AM CT: Coaching snapshots — DM to reps (motivational) + leadership (detailed)
+  // Monday 9 AM CT: Weekly coaching summary — DM to reps (motivational) + leadership (detailed)
+  // Note: Individual post-call coaching is sent immediately after each call in webhook-handler.ts
   cron.schedule('0 9 * * 1', async () => {
-    console.log('Generating weekly coaching snapshots (Monday 9 AM CT)...');
+    console.log('Generating weekly coaching summary (Monday 9 AM CT)...');
     try {
       const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
 
@@ -220,7 +221,7 @@ export function startCronJobs(client: any) {
       )];
 
       if (repIds.length === 0) {
-        console.log('[coaching] No reps with calls last week, skipping snapshots.');
+        console.log('[coaching] No reps with calls last week, skipping weekly summary.');
         return;
       }
 
@@ -234,14 +235,14 @@ export function startCronJobs(client: any) {
         try {
           const snapshot = await generateCoachingSnapshot(repId);
 
-          // 1. DM the rep themselves with motivational coaching
+          // 1. DM the rep themselves with weekly summary coaching
           try {
             const repMessage = formatCoachingForRep(snapshot.repName ?? repId, snapshot);
             await client.chat.postMessage({
               channel: repId,
-              text: repMessage,
+              text: `Weekly summary\n\n${repMessage}`,
             });
-            console.log(`[coaching] Sent coaching DM to rep ${repId} (${snapshot.role}, grade=${snapshot.overallGrade})`);
+            console.log(`[coaching] Sent weekly coaching summary to rep ${repId} (${snapshot.role}, grade=${snapshot.overallGrade})`);
           } catch (err) {
             console.error(`[coaching] Failed to DM rep ${repId}:`, err);
           }
@@ -254,7 +255,7 @@ export function startCronJobs(client: any) {
               try {
                 await client.chat.postMessage({
                   channel: leaderId,
-                  text: leaderMessage,
+                  text: `Weekly summary\n\n${leaderMessage}`,
                 });
               } catch (err) {
                 console.error(`[coaching] Failed to DM leader ${leaderId}:`, err);
@@ -266,7 +267,7 @@ export function startCronJobs(client: any) {
         }
       }
 
-      console.log(`[coaching] Processed snapshots for ${repIds.length} rep(s).`);
+      console.log(`[coaching] Processed weekly summaries for ${repIds.length} rep(s).`);
     } catch (error) {
       console.error('Coaching cron error:', error);
     }
@@ -357,6 +358,6 @@ export function startCronJobs(client: any) {
   console.log('  - SOP review: Wednesdays at 10:00 AM CT');
   console.log('  - Proactive alerts: 8:30 AM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
   console.log('  - Sales digest: Fridays at 10:00 AM CT (leadership channel + DMs)');
-  console.log('  - Coaching snapshots: Mondays at 9:00 AM CT (DM to reps + leadership)');
+  console.log('  - Coaching weekly summary: Mondays at 9:00 AM CT (DM to reps + leadership)');
   console.log('  - Morning briefing: 8:00 AM CT, Mon-Fri (personalized DM to each member)');
 }

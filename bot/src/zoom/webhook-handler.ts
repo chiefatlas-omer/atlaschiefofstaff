@@ -7,6 +7,7 @@ import { zoomUserMappings } from '../db/schema';
 import { extractParticipantsFromVtt } from './transcript-fetcher';
 import { ingestZoomTranscript } from '../services/ingestion-service';
 import { analyzeCall } from '../services/call-analyzer';
+import { generateCoachingSnapshot, formatCoachingForSlack, formatCoachingForRep } from '../services/coaching-engine';
 
 type MeetingType = 'private' | 'external' | 'team';
 
@@ -699,6 +700,50 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
       }
     } catch (err) {
       console.error('[zoom] Follow-up draft generation failed (non-fatal):', err);
+    }
+
+    // ─── Post-Call Coaching (immediate) ─────────────────────
+    try {
+      if (host?.slackId) {
+        const snapshot = await generateCoachingSnapshot(host.slackId);
+
+        // DM the rep with post-call coaching
+        try {
+          const repMessage = formatCoachingForRep(snapshot.repName ?? host.name, snapshot);
+          const callLabel = `From your call: ${meetingTopic}`;
+          await slackClient.chat.postMessage({
+            channel: host.slackId,
+            text: `${callLabel}\n\n${repMessage}`,
+          });
+          console.log(`[zoom] Post-call coaching sent to rep ${host.slackId}`);
+        } catch (coachErr) {
+          console.error(`[zoom] Failed to DM post-call coaching to rep ${host.slackId}:`, coachErr);
+        }
+
+        // DM leadership with detailed coaching
+        if (snapshot.coachingFlags.length > 0) {
+          const leaderMessage = formatCoachingForSlack(snapshot.repName ?? host.name, snapshot);
+          const callLabel = `From call: ${meetingTopic}`;
+          const leadershipIds = [
+            config.escalation.omerSlackUserId,
+            config.escalation.markSlackUserId,
+            config.escalation.ehsanSlackUserId,
+          ].filter(Boolean);
+
+          for (const leaderId of leadershipIds) {
+            try {
+              await slackClient.chat.postMessage({
+                channel: leaderId,
+                text: `${callLabel}\n\n${leaderMessage}`,
+              });
+            } catch (leadErr) {
+              console.error(`[zoom] Failed to DM post-call coaching to leader ${leaderId}:`, leadErr);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[zoom] Post-call coaching failed (non-fatal):', err);
     }
 
     console.log(
