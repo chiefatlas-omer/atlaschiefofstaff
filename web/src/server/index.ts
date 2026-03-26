@@ -15,6 +15,42 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Email drafts — use raw SQL to avoid import-triggered Express dual-instance issues
+app.get('/api/email-drafts', (_req, res) => {
+  try {
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const dbPath = path.resolve(process.env.DATABASE_PATH || '../bot/data/chiefofstaff.db');
+    const sqlite = new Database(dbPath, { readonly: true });
+    const drafts = sqlite.prepare('SELECT * FROM email_drafts ORDER BY created_at DESC LIMIT 20').all();
+    sqlite.close();
+    res.json(drafts);
+  } catch (err) {
+    console.error('[email-drafts] error:', err);
+    res.json([]);
+  }
+});
+
+app.post('/api/email-drafts/:id/status', (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { status } = req.body as { status: string };
+    if (!status || !['sent', 'dismissed', 'draft'].includes(status)) {
+      res.status(400).json({ error: 'Invalid status' });
+      return;
+    }
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const dbPath = path.resolve(process.env.DATABASE_PATH || '../bot/data/chiefofstaff.db');
+    const sqlite = new Database(dbPath);
+    sqlite.prepare('UPDATE email_drafts SET status = ? WHERE id = ?').run(status, id);
+    sqlite.close();
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update' });
+  }
+});
+
 // Routes - order matters in Express 5
 // Mount briefing first — avoids Express 5 router ordering issues
 app.use('/api', briefingRouter);
