@@ -606,6 +606,7 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
     }
 
     // ─── Sales Call Analysis ───────────────────────────────────
+    let callAnalysisId: number | undefined;
     try {
       const analysisResult = await analyzeCall({
         transcript: transcriptText,
@@ -617,6 +618,7 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
         repSlackId: host?.slackId,
         repName: host?.name,
       });
+      callAnalysisId = analysisResult.analysisId;
       console.log(
         '[zoom] Call analysis complete: id=' + analysisResult.analysisId +
         ', outcome=' + analysisResult.outcome +
@@ -624,6 +626,53 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
       );
     } catch (err) {
       console.error('[zoom] Call analysis failed (non-fatal):', err);
+    }
+
+    // ─── Follow-Up Email Drafts (external meetings only) ──────
+    try {
+      const { generateFollowUpDrafts } = await import('../services/followup-drafter');
+      const drafts = await generateFollowUpDrafts({
+        transcript: transcriptText,
+        meetingTitle: meetingTopic,
+        callAnalysisId,
+      });
+
+      if (drafts.length > 0 && host?.slackId) {
+        // DM drafts to the rep who hosted the call
+        for (const draft of drafts) {
+          const msg = `📧 *Follow-Up Draft for ${draft.recipientName}* (${draft.recipientCompany})\n_${draft.archetype.replace(/_/g, ' ')} style | from: ${draft.meetingTitle}_\n\n${draft.emailBody}\n\n_Copy to Superhuman and send. Edit as needed._`;
+          try {
+            await slackClient.chat.postMessage({ channel: host.slackId, text: msg });
+          } catch {}
+        }
+        console.log(`[zoom] ${drafts.length} follow-up drafts sent to ${host.slackId}`);
+      }
+
+      // Store communication profiles in knowledge graph
+      if (drafts.length > 0) {
+        try {
+          const { findOrCreatePerson, findOrCreateCompany } = await import('../services/graph-service');
+          for (const draft of drafts) {
+            const company = draft.recipientCompany
+              ? findOrCreateCompany({ name: draft.recipientCompany })
+              : null;
+            findOrCreatePerson({
+              name: draft.recipientName,
+              companyId: company?.id ?? undefined,
+              source: 'zoom',
+              metadata: {
+                communicationArchetype: draft.archetype,
+                lastMeeting: meetingTopic,
+                lastSeenAt: Math.floor(Date.now() / 1000),
+              },
+            });
+          }
+        } catch (graphErr) {
+          console.error('[zoom] Knowledge graph profile storage failed (non-fatal):', graphErr);
+        }
+      }
+    } catch (err) {
+      console.error('[zoom] Follow-up draft generation failed (non-fatal):', err);
     }
 
     console.log(
