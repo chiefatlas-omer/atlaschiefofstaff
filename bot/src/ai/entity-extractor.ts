@@ -1,4 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { anthropic } from './client';
 import { ENTITY_EXTRACTION_PROMPT } from './prompts';
 

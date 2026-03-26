@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { tasks, digestLogs } from '../../../../bot/src/db/schema';
+import { tasks } from '../../../../bot/src/db/schema';
 import {
   meetings,
   documents,

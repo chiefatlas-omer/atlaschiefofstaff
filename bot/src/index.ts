@@ -4,6 +4,7 @@ import { registerAllListeners } from './slack/listeners';
 import { startCronJobs } from './scheduler/cron-jobs';
 import { handleZoomWebhook } from './zoom/webhook-handler';
 import http from 'http';
+import crypto from 'crypto';
 
 // Run database migrations on startup
 import './db/connection';
@@ -262,7 +263,6 @@ const httpServer = http.createServer(async (req, res) => {
         const webhookSecret = config.zoom.webhookSecretToken || config.zoom.clientSecret;
 
         if (webhookSecret && signature && timestamp) {
-          const crypto = require('crypto');
           const message = `v0:${timestamp}:${body}`;
           const expectedSig = 'v0=' + crypto.createHmac('sha256', webhookSecret).update(message).digest('hex');
           if (signature !== expectedSig) {
@@ -281,21 +281,8 @@ const httpServer = http.createServer(async (req, res) => {
         // Log every incoming webhook event for debugging
         console.log('Zoom webhook received:', payload.event, JSON.stringify(payload).substring(0, 200));
 
-        // Zoom webhook signature verification (warn-only, does not block)
-        const zoomSignature = req.headers['x-zm-signature'] as string | undefined;
-        const zoomTimestamp = req.headers['x-zm-request-timestamp'] as string | undefined;
-        if (zoomSignature && zoomTimestamp && config.zoom.webhookSecretToken) {
-          const crypto = require('crypto');
-          const message = `v0:${zoomTimestamp}:${body}`;
-          const expectedSig = 'v0=' + crypto.createHmac('sha256', config.zoom.webhookSecretToken).update(message).digest('hex');
-          if (zoomSignature !== expectedSig) {
-            console.warn('Zoom webhook signature mismatch! Expected:', expectedSig.substring(0, 20) + '...', 'Got:', zoomSignature.substring(0, 20) + '...');
-          }
-        }
-
         // Zoom webhook validation challenge
         if (payload.event === 'endpoint.url_validation') {
-          const crypto = require('crypto');
           const hashForValidation = crypto
             .createHmac('sha256', config.zoom.webhookSecretToken || config.zoom.clientSecret || '')
             .update(payload.payload.plainToken)
