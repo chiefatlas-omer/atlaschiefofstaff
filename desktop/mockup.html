@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Atlas CoS Desktop — Visual Mockup</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #fff; }
+h1 { text-align: center; padding: 30px 0 10px; color: #A78BFA; font-size: 28px; }
+.subtitle { text-align: center; color: #888; font-size: 14px; margin-bottom: 40px; }
+.states { display: flex; flex-wrap: wrap; justify-content: center; gap: 40px; padding: 0 40px 60px; }
+.state { position: relative; width: 500px; height: 340px; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 16px; overflow: hidden; border: 1px solid #333; }
+.state-label { position: absolute; top: 12px; left: 16px; background: rgba(79,53,136,0.8); color: #F3F1FC; font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; z-index: 10; }
+.state-hotkey { position: absolute; top: 12px; right: 16px; background: rgba(255,255,255,0.1); color: #ccc; font-size: 11px; padding: 4px 10px; border-radius: 6px; z-index: 10; font-family: monospace; }
+.fake-desktop { position: absolute; inset: 0; opacity: 0.15; display: flex; align-items: center; justify-content: center; font-size: 60px; color: #444; }
+
+/* Status Dot */
+.dot { position: absolute; bottom: 30px; right: 30px; width: 16px; height: 16px; border-radius: 50%; }
+.dot.idle { background: rgba(79,53,136,0.4); }
+.dot.listening { background: #5A3C9E; box-shadow: 0 0 12px rgba(90,60,158,0.6); animation: pulse 1.5s ease-in-out infinite; }
+.dot.processing { background: #EAB308; animation: spin 1s linear infinite; }
+
+@keyframes pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Waveform */
+.waveform-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(79,53,136,0.88); backdrop-filter: blur(20px); border-radius: 60px; padding: 24px 40px; display: flex; flex-direction: column; align-items: center; gap: 10px; border: 1px solid rgba(90,60,158,0.3); }
+.waveform-bars { display: flex; align-items: center; gap: 3px; height: 80px; }
+.bar { width: 7px; border-radius: 4px; background: linear-gradient(to top, #4F3588, #EC4899); animation: barPulse 0.8s ease-in-out infinite alternate; }
+.bar:nth-child(1) { height: 20px; animation-delay: 0s; }
+.bar:nth-child(2) { height: 35px; animation-delay: 0.1s; }
+.bar:nth-child(3) { height: 55px; animation-delay: 0.15s; }
+.bar:nth-child(4) { height: 70px; animation-delay: 0.2s; }
+.bar:nth-child(5) { height: 50px; animation-delay: 0.25s; }
+.bar:nth-child(6) { height: 65px; animation-delay: 0.3s; }
+.bar:nth-child(7) { height: 45px; animation-delay: 0.35s; }
+.bar:nth-child(8) { height: 60px; animation-delay: 0.4s; }
+.bar:nth-child(9) { height: 75px; animation-delay: 0.45s; }
+.bar:nth-child(10) { height: 40px; animation-delay: 0.5s; }
+.bar:nth-child(11) { height: 55px; animation-delay: 0.55s; }
+.bar:nth-child(12) { height: 30px; animation-delay: 0.6s; }
+.bar:nth-child(13) { height: 50px; animation-delay: 0.65s; }
+.bar:nth-child(14) { height: 65px; animation-delay: 0.7s; }
+.bar:nth-child(15) { height: 25px; animation-delay: 0.75s; }
+.bar:nth-child(16) { height: 45px; animation-delay: 0.8s; }
+.bar:nth-child(17) { height: 60px; animation-delay: 0.85s; }
+.bar:nth-child(18) { height: 35px; animation-delay: 0.9s; }
+.bar:nth-child(19) { height: 50px; animation-delay: 0.95s; }
+.bar:nth-child(20) { height: 20px; animation-delay: 1s; }
+@keyframes barPulse { 0% { transform: scaleY(0.4); } 100% { transform: scaleY(1); } }
+.waveform-label { color: #F3F1FC; font-size: 13px; font-weight: 500; letter-spacing: 0.5px; }
+
+/* Transcript Bubble */
+.transcript-bubble { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); background: rgba(79,53,136,0.92); backdrop-filter: blur(20px); border-radius: 20px; padding: 18px 28px; color: #FAF9FE; font-size: 15px; max-width: 420px; text-align: center; border: 1px solid rgba(90,60,158,0.3); line-height: 1.5; }
+
+/* Task Panel */
+.task-panel { position: absolute; top: 0; right: 0; width: 280px; height: 100%; background: rgba(79,53,136,0.95); backdrop-filter: blur(20px); padding: 20px 14px; border-left: 1px solid rgba(90,60,158,0.3); }
+.task-panel-header { color: #FAF9FE; font-size: 16px; font-weight: 600; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(243,241,252,0.15); }
+.task-item { background: rgba(243,241,252,0.08); border-radius: 8px; padding: 10px; margin-bottom: 6px; color: #FAF9FE; font-size: 12px; border-left: 3px solid #5A3C9E; }
+.task-item.overdue { border-left-color: #EF4444; }
+.task-meta { font-size: 10px; color: rgba(243,241,252,0.5); margin-top: 4px; }
+
+/* Briefing Panel */
+.briefing-panel { position: absolute; top: 0; right: 0; width: 320px; height: 100%; background: rgba(79,53,136,0.96); backdrop-filter: blur(20px); padding: 20px 16px; border-left: 1px solid rgba(90,60,158,0.3); overflow-y: auto; }
+.briefing-title { color: #FAF9FE; font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.briefing-time { color: rgba(243,241,252,0.5); font-size: 12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(243,241,252,0.15); }
+.section-label { color: #EC4899; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; margin-top: 12px; }
+.attendee { color: #FAF9FE; font-size: 13px; padding: 3px 0; }
+.attendee-email { color: rgba(243,241,252,0.4); font-size: 11px; margin-left: 6px; }
+.talking-point { color: #FAF9FE; font-size: 13px; padding: 4px 0 4px 16px; position: relative; }
+.talking-point::before { content: '\2192'; position: absolute; left: 0; color: #FB923C; }
+.brief-task { background: rgba(243,241,252,0.08); border-radius: 6px; padding: 6px 10px; margin-bottom: 4px; color: #FAF9FE; font-size: 12px; border-left: 2px solid #5A3C9E; }
+
+/* Knowledge Panel */
+.knowledge-panel { position: absolute; bottom: 60px; left: 30px; max-width: 400px; background: rgba(79,53,136,0.94); backdrop-filter: blur(20px); border-radius: 14px; padding: 14px; border: 1px solid rgba(90,60,158,0.35); }
+.knowledge-header { color: #A78BFA; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.knowledge-content { color: #FAF9FE; font-size: 13px; line-height: 1.6; }
+
+.wide { width: 600px; }
+</style>
+</head>
+<body>
+
+<h1>Atlas Chief of Staff — Desktop App</h1>
+<p class="subtitle">Transparent overlay that sits on top of everything. Invisible until activated.</p>
+
+<div class="states">
+
+  <!-- State 1: Idle -->
+  <div class="state">
+    <div class="state-label">1. Idle State</div>
+    <div class="state-hotkey">Always visible</div>
+    <div class="fake-desktop">Your Desktop</div>
+    <div class="dot idle"></div>
+  </div>
+
+  <!-- State 2: Listening -->
+  <div class="state">
+    <div class="state-label">2. Listening</div>
+    <div class="state-hotkey">Press INSERT</div>
+    <div class="fake-desktop">Your Desktop</div>
+    <div class="waveform-container">
+      <div class="waveform-bars">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      </div>
+      <div class="waveform-label">Listening...</div>
+    </div>
+    <div class="dot listening"></div>
+  </div>
+
+  <!-- State 3: Processing -->
+  <div class="state">
+    <div class="state-label">3. Processing</div>
+    <div class="state-hotkey">Press INSERT again</div>
+    <div class="fake-desktop">Your Desktop</div>
+    <div class="dot processing"></div>
+  </div>
+
+  <!-- State 4: Transcript Result -->
+  <div class="state">
+    <div class="state-label">4. Transcript</div>
+    <div class="state-hotkey">Auto (5 sec)</div>
+    <div class="fake-desktop">Your Desktop</div>
+    <div class="transcript-bubble">"Schedule a follow-up with the Greenscape team about the irrigation contract renewal"</div>
+    <div class="dot idle"></div>
+  </div>
+
+  <!-- State 5: Task Panel -->
+  <div class="state">
+    <div class="state-label">5. Task Panel</div>
+    <div class="state-hotkey">"Show my tasks"</div>
+    <div class="fake-desktop">Your Desktop</div>
+    <div class="task-panel">
+      <div class="task-panel-header">Your Tasks (4)</div>
+      <div class="task-item">Follow up with Greenscape about irrigation contract<div class="task-meta">Due: Tomorrow</div></div>
+      <div class="task-item overdue">Send revised proposal to Lakeside Properties<div class="task-meta">Due: Yesterday (OVERDUE)</div></div>
+      <div class="task-item">Review Matt's onboarding notes for Premier Lawns<div class="task-meta">Due: Friday</div></div>
+      <div class="task-item">Turn off underperforming ad campaigns<div class="task-meta">Due: Tomorrow</div></div>
+    </div>
+    <div class="dot idle"></div>
+  </div>
+
+  <!-- State 6: Meeting Briefing -->
+  <div class="state wide">
+    <div class="state-label">6. Meeting Briefing</div>
+    <div class="state-hotkey">"Prep me for my next meeting"</div>
+    <div class="fake-desktop">Your Desktop</div>
+    <div class="briefing-panel">
+      <div class="briefing-title">Greenscape Irrigation — QBR</div>
+      <div class="briefing-time">Today at 2:00 PM CT (in 45 min)</div>
+      <div class="section-label">Attendees</div>
+      <div class="attendee">Tom Rivera <span class="attendee-email">tom@greenscape.com</span></div>
+      <div class="attendee">Sarah Chen <span class="attendee-email">sarah@greenscape.com</span></div>
+      <div class="section-label">Talking Points</div>
+      <div class="talking-point">Contract renewal — they mentioned Q1 budget concerns last call</div>
+      <div class="talking-point">Upsell: automated scheduling module (mentioned interest Nov)</div>
+      <div class="talking-point">Address support ticket #4521 (irrigation sensor alerts)</div>
+      <div class="section-label">Open Tasks</div>
+      <div class="brief-task">Follow up on irrigation contract renewal</div>
+      <div class="brief-task">Send updated pricing sheet</div>
+    </div>
+    <div class="dot idle"></div>
+  </div>
+
+  <!-- State 7: Knowledge Answer -->
+  <div class="state wide">
+    <div class="state-label">7. Knowledge Answer</div>
+    <div class="state-hotkey">"What's our refund policy?"</div>
+    <div class="fake-desktop">Your Desktop</div>
+    <div class="knowledge-panel">
+      <div class="knowledge-header">Knowledge Base</div>
+      <div class="knowledge-content">Atlas Growth offers a 30-day refund policy for all subscription products. For annual contracts, a prorated refund is available within the first 90 days. Refund requests should be submitted to support@atlasgrowth.ai and are processed within 5 business days.</div>
+    </div>
+    <div class="dot idle"></div>
+  </div>
+
+  <!-- State 8: Dictation Mode -->
+  <div class="state wide">
+    <div class="state-label">8. Dictation Mode</div>
+    <div class="state-hotkey">Press PAUSE</div>
+    <div class="fake-desktop" style="font-size: 16px; opacity: 0.7; text-align: left; padding: 60px 40px; line-height: 1.8;">
+      <div style="background: #1e1e2e; border-radius: 8px; padding: 20px; width: 100%; font-family: monospace; font-size: 13px;">
+        <span style="color: #666;">To: </span><span style="color: #ddd;">tom@greenscape.com</span><br>
+        <span style="color: #666;">Subject: </span><span style="color: #ddd;">Irrigation contract renewal</span><br><br>
+        <span style="color: #ddd;">Hey Tom,<br><br>Quick note on the irrigation contract. We've updated the pricing to reflect the new sensor package you asked about. I'll send over the revised proposal by end of day.<br><br>Let me know if Thursday works for a quick call to walk through it.</span><span style="color: #5A3C9E; animation: blink 1s infinite;">|</span>
+      </div>
+    </div>
+    <div class="waveform-container" style="top: auto; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 14px 30px; border-radius: 40px;">
+      <div class="waveform-bars" style="height: 40px;">
+        <div class="bar" style="height: 10px;"></div><div class="bar" style="height: 18px;"></div><div class="bar" style="height: 28px;"></div><div class="bar" style="height: 20px;"></div><div class="bar" style="height: 35px;"></div>
+        <div class="bar" style="height: 15px;"></div><div class="bar" style="height: 25px;"></div><div class="bar" style="height: 30px;"></div><div class="bar" style="height: 12px;"></div><div class="bar" style="height: 22px;"></div>
+      </div>
+      <div class="waveform-label" style="font-size: 11px;">Dictating... (auto-paste)</div>
+    </div>
+    <div class="dot listening"></div>
+  </div>
+
+</div>
+
+<style>@keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }</style>
+</body>
+</html>
