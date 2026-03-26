@@ -9,4 +9,7 @@ sqlite.pragma('journal_mode = WAL');
 sqlite.pragma('busy_timeout = 5000');
 
 import * as schema from '../../../bot/src/db/schema';
-export const db = drizzle(sqlite, { schema });
+import * as analyticsSchema from './schema-analytics';
+export const db = drizzle(sqlite, { schema: { ...schema, ...analyticsSchema } });
+// Re-export analytics tables for use by routes without bot imports
+export { callAnalyses, productSignals, coachingSnapshots } from './schema-analytics';

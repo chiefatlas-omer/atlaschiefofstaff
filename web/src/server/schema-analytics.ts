@@ -20,7 +20,7 @@ export const callAnalyses = sqliteTable('call_analyses', {
   pains: text('pains', { mode: 'json' }),
   desires: text('desires', { mode: 'json' }),
   awarenessLevel: text('awareness_level'),
-  talkListenRatio: text('talk_listen_ratio'),
+  talkListenRatio: integer('talk_listen_ratio'),
   questionCount: integer('question_count'),
   openQuestionCount: integer('open_question_count'),
   nextSteps: text('next_steps', { mode: 'json' }),
