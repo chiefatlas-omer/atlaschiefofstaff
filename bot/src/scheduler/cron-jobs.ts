@@ -6,7 +6,7 @@ import { createSOPForTopic } from '../services/sop-service';
 import { config } from '../config';
 import { generateProactiveAlerts, formatAlertsForSlack } from '../services/proactive-alerts';
 import { generateWeeklyDigest, formatDigestForSlack } from '../services/sales-digest';
-import { generateCoachingSnapshot, formatCoachingForSlack } from '../services/coaching-engine';
+import { generateCoachingSnapshot, formatCoachingForSlack, formatCoachingForRep } from '../services/coaching-engine';
 import { db } from '../db/connection';
 import { callAnalyses } from '../db/schema';
 import { gt, gte } from 'drizzle-orm';
@@ -200,7 +200,7 @@ export function startCronJobs(client: any) {
     }
   }, { timezone: 'America/Chicago' });
 
-  // Monday 9 AM CT: Coaching snapshots — per-rep coaching flags DM'd to leadership
+  // Monday 9 AM CT: Coaching snapshots — DM to reps (motivational) + leadership (detailed)
   cron.schedule('0 9 * * 1', async () => {
     console.log('Generating weekly coaching snapshots (Monday 9 AM CT)...');
     try {
@@ -233,17 +233,31 @@ export function startCronJobs(client: any) {
       for (const repId of repIds) {
         try {
           const snapshot = await generateCoachingSnapshot(repId);
+
+          // 1. DM the rep themselves with motivational coaching
+          try {
+            const repMessage = formatCoachingForRep(snapshot.repName ?? repId, snapshot);
+            await client.chat.postMessage({
+              channel: repId,
+              text: repMessage,
+            });
+            console.log(`[coaching] Sent coaching DM to rep ${repId} (${snapshot.role}, grade=${snapshot.overallGrade})`);
+          } catch (err) {
+            console.error(`[coaching] Failed to DM rep ${repId}:`, err);
+          }
+
+          // 2. DM leadership with detailed coaching flags
           if (snapshot.coachingFlags.length > 0) {
-            const message = formatCoachingForSlack(snapshot.repName ?? repId, snapshot.coachingFlags);
+            const leaderMessage = formatCoachingForSlack(snapshot.repName ?? repId, snapshot);
 
             for (const leaderId of leadershipIds) {
               try {
                 await client.chat.postMessage({
                   channel: leaderId,
-                  text: message,
+                  text: leaderMessage,
                 });
               } catch (err) {
-                console.error(`[coaching] Failed to DM ${leaderId}:`, err);
+                console.error(`[coaching] Failed to DM leader ${leaderId}:`, err);
               }
             }
           }
@@ -265,5 +279,5 @@ export function startCronJobs(client: any) {
   console.log('  - SOP review: Wednesdays at 10:00 AM CT');
   console.log('  - Proactive alerts: 8:30 AM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
   console.log('  - Sales digest: Fridays at 10:00 AM CT (leadership channel + DMs)');
-  console.log('  - Coaching snapshots: Mondays at 9:00 AM CT (DM to leadership)');
+  console.log('  - Coaching snapshots: Mondays at 9:00 AM CT (DM to reps + leadership)');
 }
