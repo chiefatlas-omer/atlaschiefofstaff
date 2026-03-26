@@ -158,6 +158,61 @@ export interface ProductIntelData {
   typeBreakdown: Record<string, number>;
 }
 
+export interface OutcomeWeekData {
+  meetingsPrepped: number;
+  followUpsDrafted: number;
+  tasksCompleted: number;
+  tasksCreated: number;
+  knowledgeQueries: number;
+  productSignals: number;
+}
+
+export interface OutcomeData {
+  timeSaved: {
+    hours: number;
+    minutes: number;
+    roiDollars: number;
+  };
+  thisWeek: OutcomeWeekData;
+  lastWeek: OutcomeWeekData;
+  wow: {
+    meetingsPrepped: number | null;
+    followUpsDrafted: number | null;
+    tasksCompleted: number | null;
+    knowledgeQueries: number | null;
+    productSignals: number | null;
+  };
+  taskManagement: {
+    totalCreated: number;
+    totalOpen: number;
+    totalCompleted: number;
+    completedThisMonth: number;
+    overduePreventedThisMonth: number;
+    completionRatePct: number;
+  };
+  callIntelligence: {
+    callsAnalyzedThisMonth: number;
+    followUpsDraftedThisMonth: number;
+    coachingSessionsThisMonth: number;
+    totalCallsAnalyzed: number;
+  };
+  knowledgeBase: {
+    queriesAnsweredThisMonth: number;
+    docsIngestedThisMonth: number;
+    knowledgeEntriesThisMonth: number;
+    sopsGeneratedThisMonth: number;
+    totalSops: number;
+    totalKnowledgeEntries: number;
+  };
+  productIntelligence: {
+    signalsCapturedThisMonth: number;
+    featureRequests: number;
+    bugReports: number;
+    churnReasons: number;
+    totalSignals: number;
+  };
+}
+
 export interface CoachingFlag {
   flag: string;
   severity: 'critical' | 'high' | 'medium' | 'low';
@@ -214,6 +269,7 @@ export const api = {
   salesDigest: () => fetchApi<DigestData>('/api/analytics/digest'),
   productSignals: () => fetchApi<ProductIntelData>('/api/analytics/product'),
   coaching: () => fetchApi<CoachingSnapshot[]>('/api/analytics/coaching'),
+  outcomes: () => fetchApi<OutcomeData>('/api/analytics/outcomes'),
   uploadDocument: (data: { title: string; type: string; content: string }) =>
     fetchApi<{ success: boolean; docId: string; chunkCount: number; entities: { people: number; companies: number } }>(
       '/api/knowledge/upload',

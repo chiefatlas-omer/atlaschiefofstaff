@@ -3,6 +3,7 @@ import React from 'react';
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/' },
   { label: 'Metrics', href: '/metrics' },
+  { label: 'Outcomes', href: '/outcomes' },
   { label: 'Knowledge', href: '/knowledge' },
   { label: 'SOPs', href: '/sops' },
   { label: 'Sales Intel', href: '/sales' },

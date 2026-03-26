@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Metrics from './pages/Metrics';
+import Outcomes from './pages/Outcomes';
 import Knowledge from './pages/Knowledge';
 import SOPs from './pages/SOPs';
 import SalesIntel from './pages/SalesIntel';
@@ -17,6 +18,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/metrics" element={<Metrics />} />
+          <Route path="/outcomes" element={<Outcomes />} />
           <Route path="/knowledge" element={<Knowledge />} />
           <Route path="/sops" element={<SOPs />} />
           <Route path="/sales" element={<SalesIntel />} />
