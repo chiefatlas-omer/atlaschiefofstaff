@@ -28,6 +28,10 @@ export async function processTranscript(
     ? '\n\nThe meeting host is: ' + hostContext.hostName + '. Any first-person statements like "I will..." or "I need to..." should be attributed to ' + hostContext.hostName + '.'
     : '';
 
+  const truncated = transcriptText.length > 30000
+    ? transcriptText.substring(0, 30000) + '\n[...transcript truncated for processing]'
+    : transcriptText;
+
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -35,7 +39,7 @@ export async function processTranscript(
       messages: [
         {
           role: 'user',
-          content: TRANSCRIPT_PROCESSING_PROMPT + mappingInfo + hostInfo + '\n\nTranscript:\n' + transcriptText,
+          content: TRANSCRIPT_PROCESSING_PROMPT + mappingInfo + hostInfo + '\n\nTranscript:\n' + truncated,
         },
       ],
     });

@@ -230,6 +230,73 @@ sqlite.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_qa_asked_by ON qa_interactions(asked_by);
   CREATE INDEX IF NOT EXISTS idx_qa_was_correct ON qa_interactions(was_correct);
+
+  CREATE TABLE IF NOT EXISTS call_analyses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    meeting_id TEXT,
+    zoom_meeting_id TEXT,
+    title TEXT,
+    date INTEGER,
+    duration INTEGER,
+    rep_slack_id TEXT,
+    rep_name TEXT,
+    business_name TEXT,
+    business_type TEXT,
+    business_stage TEXT,
+    estimated_revenue TEXT,
+    employee_count TEXT,
+    objections TEXT,
+    pains TEXT,
+    desires TEXT,
+    awareness_level TEXT,
+    talk_listen_ratio INTEGER,
+    question_count INTEGER,
+    open_question_count INTEGER,
+    next_steps TEXT,
+    outcome TEXT,
+    risk_flags TEXT,
+    summary TEXT,
+    raw_analysis TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_call_analyses_rep_slack_id ON call_analyses(rep_slack_id);
+  CREATE INDEX IF NOT EXISTS idx_call_analyses_date ON call_analyses(date);
+  CREATE INDEX IF NOT EXISTS idx_call_analyses_outcome ON call_analyses(outcome);
+
+  CREATE TABLE IF NOT EXISTS product_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT,
+    severity TEXT,
+    verbatim_quote TEXT,
+    business_name TEXT,
+    business_revenue TEXT,
+    call_analysis_id INTEGER,
+    meeting_id TEXT,
+    reported_by TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_product_signals_type ON product_signals(type);
+  CREATE INDEX IF NOT EXISTS idx_product_signals_category ON product_signals(category);
+  CREATE INDEX IF NOT EXISTS idx_product_signals_severity ON product_signals(severity);
+
+  CREATE TABLE IF NOT EXISTS coaching_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rep_slack_id TEXT NOT NULL,
+    rep_name TEXT,
+    week_start INTEGER,
+    call_count INTEGER,
+    avg_talk_ratio INTEGER,
+    avg_question_count INTEGER,
+    avg_open_question_ratio INTEGER,
+    top_objections TEXT,
+    outcome_breakdown TEXT,
+    coaching_flags TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_coaching_snapshots_rep_slack_id ON coaching_snapshots(rep_slack_id);
+  CREATE INDEX IF NOT EXISTS idx_coaching_snapshots_week_start ON coaching_snapshots(week_start);
 `);
 
 console.log('Database initialized.');
