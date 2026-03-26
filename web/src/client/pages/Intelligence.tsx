@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, DigestData, ProductIntelData, CoachingSnapshot, EmailDraft } from '../lib/api';
+import { api, DigestData, ProductIntelData, CoachingSnapshot, EmailDraft, SOP } from '../lib/api';
 import MetricCard from '../components/MetricCard';
 
 // ─── Shared badge helpers ────────────────────────────────────────────────────
@@ -68,13 +68,14 @@ function formatDate(unixSeconds: number | null): string {
 
 // ─── Tab definitions ─────────────────────────────────────────────────────────
 
-type TabId = 'calls' | 'product' | 'coaching' | 'email_drafts';
+type TabId = 'calls' | 'product' | 'coaching' | 'email_drafts' | 'sops';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'calls', label: 'Calls' },
   { id: 'product', label: 'Product Signals' },
   { id: 'coaching', label: 'Coaching' },
   { id: 'email_drafts', label: 'Email Drafts' },
+  { id: 'sops', label: 'SOPs' },
 ];
 
 // ─── Calls Tab Content ──────────────────────────────────────────────────────
@@ -632,6 +633,83 @@ function EmailDraftsTab() {
   );
 }
 
+// ─── SOPs Tab Content ───────────────────────────────────────────────────────
+
+function SOPsTab() {
+  const [sops, setSops] = useState<SOP[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .sops()
+      .then(setSops)
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-gray-400">
+        Loading SOPs...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700">
+        Failed to load SOPs: {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {sops.length === 0 ? (
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
+          <p className="text-gray-400 text-sm">No SOPs generated yet.</p>
+          <p className="text-gray-400 text-xs mt-1">
+            SOPs are automatically created when topics appear 5+ times in calls and messages.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                <th className="text-left px-4 py-3 font-medium">Title</th>
+                <th className="text-left px-4 py-3 font-medium">Status</th>
+                <th className="text-left px-4 py-3 font-medium">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {sops.map((sop) => (
+                <tr key={sop.id} className="hover:bg-purple-50/50 transition-colors">
+                  <td className="px-4 py-3 text-gray-700 font-medium">{sop.title}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={[
+                        'text-xs px-2 py-0.5 rounded border font-medium',
+                        sop.status === 'published'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200',
+                      ].join(' ')}
+                    >
+                      {sop.status ?? 'draft'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">{formatDate(sop.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Intelligence Page ─────────────────────────────────────────────────
 
 export default function Intelligence() {
@@ -670,6 +748,7 @@ export default function Intelligence() {
       {activeTab === 'product' && <ProductSignalsTab />}
       {activeTab === 'coaching' && <CoachingTab />}
       {activeTab === 'email_drafts' && <EmailDraftsTab />}
+      {activeTab === 'sops' && <SOPsTab />}
     </div>
   );
 }

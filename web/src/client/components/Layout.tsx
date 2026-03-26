@@ -6,7 +6,6 @@ const NAV_ITEMS = [
   { label: 'Command Center', href: '/' },
   { label: 'Intelligence', href: '/intelligence' },
   { label: 'Tasks', href: '/tasks' },
-  { label: 'Knowledge', href: '/knowledge' },
   { label: 'Outcomes', href: '/outcomes' },
 ];
 
@@ -49,7 +48,7 @@ export default function Layout({ children }: LayoutProps) {
               <circle cx="50" cy="50" r="42" stroke="#4F3588" strokeWidth="8" fill="none"/>
               <path d="M55 20L35 52H48L42 80L68 45H53L55 20Z" fill="#4F3588"/>
             </svg>
-            <span className="text-[#4F3588] font-bold text-lg tracking-tight">Atlas CoS</span>
+            <span className="text-[#4F3588] font-bold text-lg tracking-tight">Atlas Chief</span>
           </div>
           <p className="text-gray-400 text-xs mt-0.5 ml-9">Command Center</p>
         </div>

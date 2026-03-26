@@ -111,7 +111,7 @@ export default function Outcomes() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Outcomes</h1>
         <p className="text-gray-500 text-sm mt-1">
-          What Atlas CoS actually accomplished — measured in impact, not activity
+          What Atlas Chief actually accomplished — measured in impact, not activity
         </p>
       </div>
 
@@ -229,7 +229,7 @@ export default function Outcomes() {
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-2">ROI Summary</h2>
           <p className="text-gray-700 text-sm leading-relaxed">
-            Atlas CoS has saved your team approximately{' '}
+            Atlas Chief has saved your team approximately{' '}
             <span className="text-emerald-600 font-bold">{timeSaved.hours} hours</span> this month,
             equivalent to{' '}
             <span className="text-[#4F3588] font-bold">
