@@ -47,11 +47,28 @@ export function registerCommands(app: App) {
     const allTasks = getAllOpenTasks();
     const blocks = adminTaskListBlocks(allTasks);
 
-    await respond({
-      response_type: 'ephemeral',
-      blocks,
-      text: 'All open tasks',
-    });
+    // Slack limits: 50 blocks max and ~4KB for slash command responses.
+    // Use postEphemeral for large task lists to avoid the size limit.
+    try {
+      await respond({
+        response_type: 'ephemeral',
+        blocks: blocks.slice(0, 49), // Slack 50 block limit
+        text: 'All open tasks (' + allTasks.length + ')',
+      });
+    } catch (err: any) {
+      // If respond() fails (payload too large), fall back to postEphemeral via Web API
+      console.warn('/alltasks respond failed, falling back to postEphemeral:', err?.message);
+      const { client } = await import('@slack/bolt').then(m => ({ client: null })).catch(() => ({ client: null }));
+      // Use the simpler text-only fallback
+      const textLines = allTasks.map((t, i) => {
+        const statusIcon = (t.status === 'OVERDUE' || t.status === 'ESCALATED') ? '🔴' : '📌';
+        return `${statusIcon} ${t.description} — ${t.slackUserName || t.slackUserId} \`${t.id}\``;
+      });
+      await respond({
+        response_type: 'ephemeral',
+        text: '*All Open Tasks (' + allTasks.length + ')*\n\n' + textLines.join('\n'),
+      });
+    }
   });
 
   // /complete <task-id> - mark a task done
