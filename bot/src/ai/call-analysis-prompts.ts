@@ -101,6 +101,50 @@ Rules:
 
 Return only the JSON, no other text.`;
 
+// ─── INTERNAL PRODUCT SIGNALS PROMPT ─────────────────────
+// Lighter prompt for internal team meetings — extracts ONLY product signals
+// (feature requests, bugs, churn reasons, UX friction, praise) from
+// internal discussions where team members relay customer feedback.
+
+export const INTERNAL_PRODUCT_SIGNALS_PROMPT = `You are a product intelligence analyst. Analyze this INTERNAL team meeting transcript and extract product signals.
+
+This is an internal meeting — team members are discussing customer feedback, bugs, feature ideas, product issues, or praising things that work well. Look for patterns like:
+- "Customers keep asking for X"
+- "We need to fix Y"
+- "The onboarding flow is broken"
+- "Three clients complained about Z this week"
+- "The new dashboard is getting great feedback"
+- "We're losing deals because of X"
+- "Support tickets keep coming in about Y"
+
+Extract product signals and return ONLY valid JSON (no markdown, no code fences):
+
+{
+  "product_signals": [
+    {
+      "type": "feature_request | bug | churn_reason | ux_friction | praise",
+      "description": "Clear description of what was discussed",
+      "category": "pricing | onboarding | integrations | features | support | billing | performance | ux",
+      "severity": "critical | high | medium | low",
+      "verbatim_quote": "Exact words from the transcript if available, or null",
+      "source": "internal discussion"
+    }
+  ]
+}
+
+Rules:
+- ONLY extract product signals. Do NOT analyze sales performance, coaching, or business metadata.
+- type: feature_request = something customers or team wants built. bug = something broken. churn_reason = why customers leave or might leave. ux_friction = confusing or frustrating user experience. praise = positive feedback about something working well.
+- category: classify into the most relevant product area.
+- severity: critical = blocking revenue or causing churn. high = frequently mentioned or significant impact. medium = notable but not urgent. low = minor or nice-to-have.
+- verbatim_quote: include the exact words from the transcript when possible, otherwise null.
+- If no product signals are found, return {"product_signals": []}.
+- Do NOT invent signals not discussed in the transcript.
+- source should always be "internal discussion".
+
+Transcript:
+{{TRANSCRIPT}}`;
+
 // ─── CS COACHING PROMPT ──────────────────────────────────────────────
 // Methodology: Lincoln Murphy (customer success), Gainsight best practices,
 // TSIA frameworks, Nick Mehta's principles

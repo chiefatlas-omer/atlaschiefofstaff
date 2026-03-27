@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/connection';
 import { callAnalyses, productSignals } from '../db/schema';
 import { anthropic } from '../ai/client';
-import { CALL_ANALYSIS_PROMPT } from '../ai/call-analysis-prompts';
+import { CALL_ANALYSIS_PROMPT, INTERNAL_PRODUCT_SIGNALS_PROMPT } from '../ai/call-analysis-prompts';
 
 const MODEL = 'claude-sonnet-4-20250514';
 const MAX_TOKENS = 4096;
@@ -171,4 +171,101 @@ export async function analyzeCall(input: AnalyzeCallInput): Promise<AnalyzeCallR
     outcome: analysis.outcome ?? null,
     awarenessLevel: analysis.awarenessLevel ?? null,
   };
+}
+
+// ─── Internal Product Signal Extraction ─────────────────────────────
+// Lighter analysis for internal team meetings — extracts product signals only
+// (no call_analyses row, no sales intelligence, no coaching)
+
+export interface ExtractInternalProductSignalsInput {
+  meetingId?: string;
+  zoomMeetingId: string;
+  title?: string;
+  transcriptText: string;
+}
+
+export interface ExtractInternalProductSignalsResult {
+  productSignalCount: number;
+}
+
+interface InternalProductSignalJson {
+  type: string;
+  description: string;
+  category?: string;
+  severity?: string;
+  verbatim_quote?: string;
+  source?: string;
+}
+
+interface InternalProductSignalsResponse {
+  product_signals?: InternalProductSignalJson[];
+}
+
+export async function extractInternalProductSignals(
+  input: ExtractInternalProductSignalsInput,
+): Promise<ExtractInternalProductSignalsResult> {
+  // Dedup: check if we already extracted internal signals for this zoom meeting
+  const existing = db
+    .select({ id: productSignals.id })
+    .from(productSignals)
+    .where(eq(productSignals.meetingId, input.zoomMeetingId))
+    .all();
+
+  if (existing.length > 0) {
+    console.log(`[call-analyzer] Already extracted internal signals for zoomMeetingId=${input.zoomMeetingId}, skipping.`);
+    return { productSignalCount: existing.length };
+  }
+
+  // Truncate transcript
+  const truncatedTranscript = input.transcriptText.slice(0, MAX_TRANSCRIPT_CHARS);
+  const prompt = INTERNAL_PRODUCT_SIGNALS_PROMPT.replace('{{TRANSCRIPT}}', truncatedTranscript);
+
+  console.log(`[call-analyzer] Extracting internal product signals for zoomMeetingId=${input.zoomMeetingId}`);
+
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const rawText = message.content
+    .filter((c) => c.type === 'text')
+    .map((c) => (c as { type: 'text'; text: string }).text)
+    .join('');
+
+  let parsed: InternalProductSignalsResponse = {};
+  try {
+    parsed = JSON.parse(rawText) as InternalProductSignalsResponse;
+  } catch (err) {
+    console.error('[call-analyzer] Failed to parse internal signals response as JSON:', err);
+    console.error('[call-analyzer] Raw response:', rawText.slice(0, 500));
+    parsed = {};
+  }
+
+  const signals: InternalProductSignalJson[] = parsed.product_signals ?? [];
+  const now = Math.floor(Date.now() / 1000);
+
+  for (const signal of signals) {
+    db.insert(productSignals)
+      .values({
+        type: signal.type,
+        description: signal.description,
+        category: signal.category ?? null,
+        severity: signal.severity ?? null,
+        verbatimQuote: signal.verbatim_quote ?? null,
+        businessName: null,
+        businessRevenue: null,
+        callAnalysisId: null,
+        meetingId: input.zoomMeetingId,
+        reportedBy: 'internal',
+        createdAt: now,
+      })
+      .run();
+  }
+
+  console.log(
+    `[call-analyzer] Stored ${signals.length} internal product signals for zoomMeetingId=${input.zoomMeetingId}`,
+  );
+
+  return { productSignalCount: signals.length };
 }

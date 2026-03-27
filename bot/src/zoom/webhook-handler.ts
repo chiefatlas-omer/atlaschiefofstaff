@@ -6,7 +6,7 @@ import { db, sqlite } from '../db/connection';
 import { zoomUserMappings } from '../db/schema';
 import { extractParticipantsFromVtt } from './transcript-fetcher';
 
-import { analyzeCall } from '../services/call-analyzer';
+import { analyzeCall, extractInternalProductSignals } from '../services/call-analyzer';
 import { generateCoachingSnapshot, formatCoachingForSlack, formatCoachingForRep } from '../services/coaching-engine';
 
 type MeetingType = 'private' | 'external' | 'team';
@@ -593,27 +593,50 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
     // Knowledge base is only fed by: manual document uploads, auto-generated SOPs, user corrections.
     // Zoom calls feed: call_analyses (sales intelligence), task detection, coaching, email drafts.
 
-    // ─── Sales Call Analysis ───────────────────────────────────
+    // ─── Call Analysis: External vs Internal ────────────────────
+    // External calls get full sales intelligence analysis.
+    // Internal calls get lightweight product signal extraction only.
+    const EXTERNAL_KEYWORDS = /onboarding|demo|sales|discovery|prospect|customer|client|deal|pricing|proposal|pitch|intro call|kick.?off/i;
+    const isExternalCall = meetingInfo.type === 'external' || EXTERNAL_KEYWORDS.test(meetingTopic);
+
     let callAnalysisId: number | undefined;
-    try {
-      const analysisResult = await analyzeCall({
-        transcript: transcriptText,
-        zoomMeetingId: meetingUuid,
-        meetingId: recording.id?.toString(),
-        title: meetingTopic,
-        date: recording.start_time ? Math.floor(new Date(recording.start_time).getTime() / 1000) : undefined,
-        duration: recording.duration,
-        repSlackId: host?.slackId,
-        repName: host?.name,
-      });
-      callAnalysisId = analysisResult.analysisId;
-      console.log(
-        '[zoom] Call analysis complete: id=' + analysisResult.analysisId +
-        ', outcome=' + analysisResult.outcome +
-        ', signals=' + analysisResult.productSignalCount,
-      );
-    } catch (err) {
-      console.error('[zoom] Call analysis failed (non-fatal):', err);
+    if (isExternalCall) {
+      // ─── Full Sales Call Analysis (external calls) ──────────
+      try {
+        const analysisResult = await analyzeCall({
+          transcript: transcriptText,
+          zoomMeetingId: meetingUuid,
+          meetingId: recording.id?.toString(),
+          title: meetingTopic,
+          date: recording.start_time ? Math.floor(new Date(recording.start_time).getTime() / 1000) : undefined,
+          duration: recording.duration,
+          repSlackId: host?.slackId,
+          repName: host?.name,
+        });
+        callAnalysisId = analysisResult.analysisId;
+        console.log(
+          '[zoom] Call analysis complete: id=' + analysisResult.analysisId +
+          ', outcome=' + analysisResult.outcome +
+          ', signals=' + analysisResult.productSignalCount,
+        );
+      } catch (err) {
+        console.error('[zoom] Call analysis failed (non-fatal):', err);
+      }
+    } else {
+      // ─── Internal Product Signal Extraction ─────────────────
+      try {
+        const signalResult = await extractInternalProductSignals({
+          meetingId: recording.id?.toString(),
+          zoomMeetingId: meetingUuid,
+          title: meetingTopic,
+          transcriptText,
+        });
+        console.log(
+          '[zoom] Internal product signal extraction complete: signals=' + signalResult.productSignalCount,
+        );
+      } catch (err) {
+        console.error('[zoom] Internal product signal extraction failed (non-fatal):', err);
+      }
     }
 
     // ─── Follow-Up Email Drafts (external meetings only) ──────
