@@ -194,10 +194,31 @@ Rules for dictation output:
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
+// Whisper hallucination phrases — these appear when audio is silent or very short
+const WHISPER_HALLUCINATIONS = [
+  /^\s*thank you for watching\.?\s*$/i,
+  /^\s*thanks for watching\.?\s*$/i,
+  /^\s*please subscribe\.?\s*$/i,
+  /^\s*thank you\.?\s*$/i,
+  /^\s*bye\.?\s*$/i,
+  /^\s*goodbye\.?\s*$/i,
+  /^\s*you$/i,
+  /^\s*\.+\s*$/,
+];
+
 export function postProcess(text: string, options: PostProcessOptions = {}): string {
   if (!text || text.trim().length === 0) return text;
 
   let out = text;
+
+  // Step 0a: Strip backslash characters (from hotkey leaking into transcription)
+  out = out.replace(/\\/g, '');
+
+  // Step 0b: Filter Whisper hallucinations (common artifacts on silence/short audio)
+  if (WHISPER_HALLUCINATIONS.some(p => p.test(out.trim()))) {
+    console.log('[POST-PROCESS] Filtered Whisper hallucination:', out.trim());
+    return '';
+  }
 
   // Step 1: Apply misheard corrections first (before we change casing)
   for (const [pattern, replacement] of MISHEAR_CORRECTIONS) {

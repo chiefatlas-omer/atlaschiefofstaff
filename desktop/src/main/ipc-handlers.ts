@@ -41,6 +41,13 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       const transcript = postProcess(rawTranscript, { stripFillers: false });
       console.log('[AUDIO] Post-processed:', transcript);
 
+      // If post-processing filtered the text (e.g. Whisper hallucination), ignore it
+      if (!transcript || transcript.trim().length === 0) {
+        console.log('[AUDIO] Empty after post-processing (filtered hallucination), ignoring.');
+        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
+        return;
+      }
+
       // Update rolling context window
       transcriptionContext = transcript.slice(-200);
 
