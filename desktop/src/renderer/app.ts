@@ -21,6 +21,11 @@ declare global {
       copyFollowUp: (text: string) => void;
       dismissFollowUp: () => void;
       setIgnoreMouseEvents: (ignore: boolean) => void;
+      // Bot API
+      onBotTasks: (cb: (tasks: any[]) => void) => void;
+      onBotEmail: (cb: (response: any) => void) => void;
+      onBotKnowledge: (cb: (answer: string) => void) => void;
+      botCopy: (text: string) => void;
     };
   }
 }
@@ -417,6 +422,102 @@ let knowledgeAutoHideTimer: ReturnType<typeof setTimeout> | null = null;
 window.chiefOfStaff.onKnowledgeResponse((answer: string) => {
   knowledgeText.textContent = answer;
   knowledgePanel.classList.remove('hidden');
+
+  if (knowledgeAutoHideTimer) clearTimeout(knowledgeAutoHideTimer);
+  knowledgeAutoHideTimer = setTimeout(() => {
+    knowledgePanel.classList.add('hidden');
+  }, 15000);
+});
+
+// ── Bot API: Tasks from live bot ──
+window.chiefOfStaff.onBotTasks((tasks: any[]) => {
+  taskPanel.classList.remove('hidden');
+  updateClickThrough();
+  taskList.innerHTML = '';
+
+  if (!tasks || tasks.length === 0) {
+    const emptyItem = document.createElement('div');
+    emptyItem.className = 'task-item';
+    const emptyDesc = document.createElement('div');
+    emptyDesc.className = 'task-description';
+    emptyDesc.style.color = 'rgba(255,255,255,0.5)';
+    emptyDesc.textContent = 'No open tasks';
+    emptyItem.appendChild(emptyDesc);
+    taskList.appendChild(emptyItem);
+  } else {
+    tasks.forEach((task: any) => {
+      const isOverdue = task.status === 'OVERDUE' || task.status === 'ESCALATED';
+      const div = document.createElement('div');
+      div.className = `task-item ${isOverdue ? 'task-status-overdue' : 'task-status-confirmed'}`;
+      const descDiv = document.createElement('div');
+      descDiv.className = 'task-description';
+      descDiv.textContent = task.description;
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'task-meta';
+      const deadline = task.deadlineText || task.deadline || 'No deadline';
+      const owner = task.owner ? ` \u00B7 ${task.owner}` : '';
+      metaDiv.textContent = `${task.status}${owner} \u00B7 ${deadline}`;
+      div.appendChild(descDiv);
+      div.appendChild(metaDiv);
+      taskList.appendChild(div);
+    });
+  }
+
+  // Auto-hide after 10 seconds
+  setTimeout(() => {
+    taskPanel.classList.add('hidden');
+    updateClickThrough();
+  }, 10000);
+});
+
+// ── Bot API: Email draft ──
+window.chiefOfStaff.onBotEmail((response: any) => {
+  const emailText = response.email
+    ? `Subject: ${response.email.subject}\n\n${response.email.body}`
+    : response.answer || 'No email generated.';
+
+  // Reuse the knowledge panel to display the email with a copy button
+  knowledgeText.textContent = emailText;
+  knowledgePanel.classList.remove('hidden');
+
+  // Add a copy button if not already present
+  let copyBtn = document.getElementById('bot-email-copy-btn');
+  if (!copyBtn) {
+    copyBtn = document.createElement('button');
+    copyBtn.id = 'bot-email-copy-btn';
+    copyBtn.textContent = 'Copy to Clipboard';
+    copyBtn.style.cssText = 'margin-top:8px;padding:6px 12px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;cursor:pointer;font-size:12px;';
+    copyBtn.addEventListener('click', () => {
+      window.chiefOfStaff.botCopy(emailText);
+      copyBtn!.textContent = 'Copied!';
+      setTimeout(() => { copyBtn!.textContent = 'Copy to Clipboard'; }, 2000);
+    });
+    knowledgePanel.appendChild(copyBtn);
+  } else {
+    // Update the click handler for the new email text
+    const newBtn = copyBtn.cloneNode(true) as HTMLElement;
+    newBtn.addEventListener('click', () => {
+      window.chiefOfStaff.botCopy(emailText);
+      newBtn.textContent = 'Copied!';
+      setTimeout(() => { newBtn.textContent = 'Copy to Clipboard'; }, 2000);
+    });
+    copyBtn.replaceWith(newBtn);
+  }
+
+  if (knowledgeAutoHideTimer) clearTimeout(knowledgeAutoHideTimer);
+  knowledgeAutoHideTimer = setTimeout(() => {
+    knowledgePanel.classList.add('hidden');
+  }, 30000); // longer timeout for email drafts
+});
+
+// ── Bot API: Knowledge response ──
+window.chiefOfStaff.onBotKnowledge((answer: string) => {
+  knowledgeText.textContent = answer;
+  knowledgePanel.classList.remove('hidden');
+
+  // Remove email copy button if present (this is a plain knowledge response)
+  const copyBtn = document.getElementById('bot-email-copy-btn');
+  if (copyBtn) copyBtn.style.display = 'none';
 
   if (knowledgeAutoHideTimer) clearTimeout(knowledgeAutoHideTimer);
   knowledgeAutoHideTimer = setTimeout(() => {

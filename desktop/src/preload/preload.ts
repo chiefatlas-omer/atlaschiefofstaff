@@ -22,6 +22,11 @@ const IPC = {
   SET_IGNORE_MOUSE: 'window:set-ignore-mouse',
   // Dictation completed
   DICTATION_DONE: 'voice:dictation-done',
+  // Bot API
+  BOT_TASKS: 'bot:tasks',
+  BOT_EMAIL: 'bot:email',
+  BOT_KNOWLEDGE: 'bot:knowledge',
+  BOT_COPY: 'bot:copy',
 } as const;
 
 contextBridge.exposeInMainWorld('chiefOfStaff', {
@@ -72,4 +77,16 @@ contextBridge.exposeInMainWorld('chiefOfStaff', {
   setIgnoreMouseEvents: (ignore: boolean) => {
     ipcRenderer.invoke(IPC.SET_IGNORE_MOUSE, ignore);
   },
+
+  // Bot API events
+  onBotTasks: (cb: (tasks: any[]) => void) => {
+    ipcRenderer.on(IPC.BOT_TASKS, (_event, tasks) => cb(tasks));
+  },
+  onBotEmail: (cb: (response: any) => void) => {
+    ipcRenderer.on(IPC.BOT_EMAIL, (_event, response) => cb(response));
+  },
+  onBotKnowledge: (cb: (answer: string) => void) => {
+    ipcRenderer.on(IPC.BOT_KNOWLEDGE, (_event, answer) => cb(answer));
+  },
+  botCopy: (text: string) => ipcRenderer.invoke(IPC.BOT_COPY, text),
 });

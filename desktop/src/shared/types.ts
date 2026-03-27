@@ -39,6 +39,11 @@ export const IPC = {
   SET_IGNORE_MOUSE: 'window:set-ignore-mouse',
   // Dictation completed — skip text preview, just flash confirmation
   DICTATION_DONE: 'voice:dictation-done',
+  // Bot API — command results from live bot
+  BOT_TASKS: 'bot:tasks',
+  BOT_EMAIL: 'bot:email',
+  BOT_KNOWLEDGE: 'bot:knowledge',
+  BOT_COPY: 'bot:copy',
 } as const;
 
 export interface MeetingBrief {

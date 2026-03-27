@@ -52,4 +52,7 @@ export const config = {
     minutesBefore: parseInt(optionalEnv('MEETING_PREP_MINUTES', '15'), 10),
     pollIntervalMs: parseInt(optionalEnv('MEETING_POLL_INTERVAL_MS', '60000'), 10),
   },
+  botApi: {
+    url: optionalEnv('BOT_API_URL', 'https://atlaschief-bot.fly.dev'),
+  },
 };

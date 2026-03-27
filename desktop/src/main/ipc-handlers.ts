@@ -6,6 +6,7 @@ import { getMyTasks } from './db/task-bridge';
 import { logVoiceInteraction } from './db/voice-logger';
 import { sqlite } from './db/connection';
 import { getVoiceMode } from './hotkey';
+import { fetchTasks, askKnowledgeBot } from './bot-api';
 
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
   // Rolling context window for continuity across consecutive transcription chunks.
@@ -104,12 +105,37 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       } else if (mode === 'command') {
         // ── Command flow: detect intent via regex fast-path, then route ──
         const result = await smartProcess(transcript);
-        const intent = result.intent || 'GENERAL';
+        let intent = result.intent || 'GENERAL';
         mainWindow.webContents.send(IPC.TRANSCRIPT, transcript);
 
+        // Check for email/draft intent (override general if detected)
+        const emailPattern = /\b(email|draft|write|compose|send a message|write up)\b/i;
+        const isEmailRequest = emailPattern.test(transcript.toLowerCase());
+        if (isEmailRequest && intent !== 'TASK_QUERY' && intent !== 'MEETING_PREP') {
+          intent = 'EMAIL_DRAFT';
+        }
+
         if (intent === 'TASK_QUERY') {
-          const tasks = getMyTasks();
-          mainWindow.webContents.send(IPC.TASKS_UPDATE, tasks);
+          // ── Tasks: try live bot API first, fall back to local DB ──
+          mainWindow.webContents.send(IPC.TRANSCRIPT, 'Fetching tasks...');
+          try {
+            const botTasks = await fetchTasks();
+            mainWindow.webContents.send(IPC.BOT_TASKS, botTasks);
+          } catch (botErr: any) {
+            console.warn('[COMMAND] Bot API tasks failed, falling back to local DB:', botErr.message);
+            const tasks = getMyTasks();
+            mainWindow.webContents.send(IPC.TASKS_UPDATE, tasks);
+          }
+        } else if (intent === 'EMAIL_DRAFT') {
+          // ── Email draft: ask knowledge bot with generateEmail=true ──
+          mainWindow.webContents.send(IPC.TRANSCRIPT, 'Drafting email...');
+          try {
+            const response = await askKnowledgeBot(transcript, true);
+            mainWindow.webContents.send(IPC.BOT_EMAIL, response);
+          } catch (err: any) {
+            mainWindow.webContents.send(IPC.ERROR, 'Email draft failed: ' + err.message);
+          }
+          mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
         } else if (intent === 'MEETING_PREP') {
           mainWindow.webContents.send(IPC.TRANSCRIPT, 'Checking your calendar...');
           try {
@@ -133,30 +159,39 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
             mainWindow.webContents.send(IPC.ERROR, 'Meeting prep failed: ' + err.message);
           }
           mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-        } else if (intent === 'KNOWLEDGE_QUERY') {
-          mainWindow.webContents.send(IPC.TRANSCRIPT, 'Searching knowledge base...');
+        } else {
+          // ── Knowledge / General: ask bot API, fall back to local knowledge ──
+          mainWindow.webContents.send(IPC.TRANSCRIPT, 'Thinking...');
           try {
-            const rows = sqlite.prepare(
-              'SELECT content, source_type FROM knowledge_entries WHERE embedding IS NOT NULL ORDER BY created_at DESC LIMIT 20'
-            ).all() as Array<{ content: string; source_type: string }>;
+            const response = await askKnowledgeBot(transcript);
+            const answer = (response as any).answer || JSON.stringify(response);
+            mainWindow.webContents.send(IPC.BOT_KNOWLEDGE, answer);
+          } catch (botErr: any) {
+            console.warn('[COMMAND] Bot API ask failed, falling back to local knowledge:', botErr.message);
+            // Local fallback: query local knowledge DB
+            try {
+              const rows = sqlite.prepare(
+                'SELECT content, source_type FROM knowledge_entries WHERE embedding IS NOT NULL ORDER BY created_at DESC LIMIT 20'
+              ).all() as Array<{ content: string; source_type: string }>;
 
-            if (rows.length === 0) {
-              mainWindow.webContents.send(IPC.TRANSCRIPT, "I don't have enough information to answer that yet.");
-            } else {
-              const context = rows.map((r, i) => `[${i + 1}] (${r.source_type}) ${r.content}`).join('\n\n');
-              const Anthropic = require('@anthropic-ai/sdk');
-              const ai = new Anthropic.default();
-              const aiResponse = await ai.messages.create({
-                model: 'claude-sonnet-4-20250514',
-                max_tokens: 512,
-                system: 'Answer based ONLY on context. Be concise \u2014 voice response. Cite as [N].',
-                messages: [{ role: 'user', content: `Context:\n${context}\n\nQuestion: ${transcript}` }],
-              });
-              const answer = (aiResponse.content[0] as any).text?.trim() || 'No answer found.';
-              mainWindow.webContents.send(IPC.KNOWLEDGE_RESPONSE, answer);
+              if (rows.length === 0) {
+                mainWindow.webContents.send(IPC.TRANSCRIPT, "I don't have enough information to answer that yet.");
+              } else {
+                const context = rows.map((r, i) => `[${i + 1}] (${r.source_type}) ${r.content}`).join('\n\n');
+                const Anthropic = require('@anthropic-ai/sdk');
+                const ai = new Anthropic.default();
+                const aiResponse = await ai.messages.create({
+                  model: 'claude-sonnet-4-20250514',
+                  max_tokens: 512,
+                  system: 'Answer based ONLY on context. Be concise \u2014 voice response. Cite as [N].',
+                  messages: [{ role: 'user', content: `Context:\n${context}\n\nQuestion: ${transcript}` }],
+                });
+                const answer = (aiResponse.content[0] as any).text?.trim() || 'No answer found.';
+                mainWindow.webContents.send(IPC.KNOWLEDGE_RESPONSE, answer);
+              }
+            } catch (localErr: any) {
+              mainWindow.webContents.send(IPC.ERROR, 'Knowledge query failed: ' + localErr.message);
             }
-          } catch (err: any) {
-            mainWindow.webContents.send(IPC.ERROR, 'Knowledge query failed: ' + err.message);
           }
           mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
         }
@@ -164,7 +199,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         // Log voice interaction to knowledge graph (non-blocking)
         logVoiceInteraction({
           transcript,
-          response: intent === 'TASK_QUERY' ? 'Showed task panel' : intent === 'MEETING_PREP' ? 'Showed meeting briefing' : intent === 'KNOWLEDGE_QUERY' ? 'Showed knowledge response' : transcript,
+          response: intent === 'TASK_QUERY' ? 'Showed task panel (bot API)' : intent === 'MEETING_PREP' ? 'Showed meeting briefing' : intent === 'EMAIL_DRAFT' ? 'Drafted email via bot API' : 'Bot API knowledge response',
           intent,
           userId: process.env.SLACK_USER_ID,
         });
@@ -191,6 +226,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       console.error('Failed to get tasks:', err);
       return [];
     }
+  });
+
+  // Bot: Copy text to clipboard
+  ipcMain.handle(IPC.BOT_COPY, async (_event, text: string) => {
+    clipboard.writeText(text);
   });
 
   // Follow-up: Send email via Gmail
