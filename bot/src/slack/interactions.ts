@@ -26,20 +26,62 @@ export function registerInteractionHandlers(app: App) {
 
     completeTask(taskId);
 
-    // Update the message to show completion
+    // Update the message — preserve other tasks, only replace the completed one's blocks
     if ('channel' in body && body.channel && 'message' in body && body.message) {
-      await client.chat.update({
-        channel: (body as any).channel.id,
-        ts: (body as any).message.ts,
-        blocks: [
-          {
+      const existingBlocks: any[] = (body as any).message.blocks || [];
+
+      // Find and replace the blocks for this specific task
+      // Each task typically has a section block + an actions block with the task's buttons
+      const updatedBlocks: any[] = [];
+      let skipNextActions = false;
+
+      for (const block of existingBlocks) {
+        // Check if this is the section block for the completed task
+        if (block.type === 'section' && block.text?.text?.includes(taskId)) {
+          // Replace with completion message
+          updatedBlocks.push({
             type: 'section',
             text: {
               type: 'mrkdwn',
-              text: ':white_check_mark: *Done!* ' + task.description + ' -- marked complete by <@' + (body.user?.id || 'someone') + '>.',
+              text: ':white_check_mark: ~' + task.description + '~ — done by <@' + (body.user?.id || 'someone') + '>',
             },
+          });
+          skipNextActions = true; // skip the actions block that follows
+          continue;
+        }
+
+        // Check if this actions block has a button with this task's ID
+        if (block.type === 'actions' && block.elements?.some((e: any) => e.value === taskId)) {
+          // Skip the actions block for the completed task (buttons no longer needed)
+          skipNextActions = false;
+          continue;
+        }
+
+        // Skip actions block if it immediately follows the completed task's section
+        if (skipNextActions && block.type === 'actions') {
+          skipNextActions = false;
+          continue;
+        }
+
+        skipNextActions = false;
+        updatedBlocks.push(block);
+      }
+
+      // If we couldn't find the task in blocks (fallback), just add completion at the top
+      if (updatedBlocks.length === existingBlocks.length) {
+        updatedBlocks.unshift({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: ':white_check_mark: ~' + task.description + '~ — done!',
           },
-        ],
+        });
+      }
+
+      await client.chat.update({
+        channel: (body as any).channel.id,
+        ts: (body as any).message.ts,
+        blocks: updatedBlocks,
         text: 'Task completed: ' + task.description,
       });
     }
