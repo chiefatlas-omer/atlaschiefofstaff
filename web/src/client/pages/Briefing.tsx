@@ -423,24 +423,28 @@ export default function Briefing() {
                 &nbsp;&nbsp;<strong>Delete</strong> = Command &mdash; talk to Atlas Chief, get answers and actions.
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-3 flex-shrink-0">
               <a
                 href="/downloads/atlas-voice-win.exe"
-                className="inline-flex items-center gap-1.5 bg-white text-[#4F3588] text-xs font-semibold px-3.5 py-2 rounded-lg hover:bg-white/90 transition-colors"
+                className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
+                style={{ animationName: 'pulse-glow' }}
               >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <span className="text-base leading-none">{'\u2B07'}</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M0 2.3l6.5-.9v6.3H0V2.3zm7.3-1l8.7-1.2v7.6H7.3V1.3zM16 8.8v7.5l-8.7-1.2V8.8H16zM6.5 15.4L0 14.5V8.8h6.5v6.6z"/>
                 </svg>
-                Windows
+                Download for Windows
               </a>
               <a
                 href="/downloads/atlas-voice-mac.dmg"
-                className="inline-flex items-center gap-1.5 bg-white/15 text-white text-xs font-semibold px-3.5 py-2 rounded-lg border border-white/20 hover:bg-white/25 transition-colors"
+                className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
+                style={{ animationName: 'pulse-glow', animationDelay: '0.3s' }}
               >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                <span className="text-base leading-none">{'\u2B07'}</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M12.2 8.4c0-1.6 1.3-2.4 1.4-2.5-.8-1.1-2-1.3-2.4-1.3-1-.1-2 .6-2.5.6s-1.3-.6-2.2-.6c-1.1 0-2.2.7-2.8 1.7-1.2 2.1-.3 5.1.8 6.8.6.8 1.2 1.7 2.1 1.7.8 0 1.2-.5 2.2-.5s1.3.5 2.2.5c.9 0 1.5-.8 2-1.7.6-1.2.9-2.3.9-2.3 0 0-1.7-.7-1.7-2.4zM10.6 3.4c.5-.6.8-1.3.7-2.1-.7 0-1.5.5-2 1.1-.4.5-.8 1.4-.7 2.1.8.1 1.5-.4 2-1.1z"/>
                 </svg>
-                Mac
+                Download for Mac
               </a>
             </div>
           </div>

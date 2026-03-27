@@ -88,7 +88,22 @@ export default function Layout({ children }: LayoutProps) {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 p-8 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-auto">
+        {/* Sticky command bar trigger */}
+        <div className="sticky top-0 z-40 bg-[#FAFAFA]/80 backdrop-blur-sm border-b border-gray-200/50">
+          <div className="max-w-5xl mx-auto px-8 py-2 flex items-center justify-end">
+            <button
+              onClick={() => setCommandBarOpen(true)}
+              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm hover:shadow transition-all"
+            >
+              <span className="text-gray-300">{'\uD83D\uDD0D'}</span>
+              <span>Search anything...</span>
+              <kbd className="ml-2 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">Ctrl+K</kbd>
+            </button>
+          </div>
+        </div>
+        <div className="p-8">{children}</div>
+      </main>
 
       {/* Command Bar */}
       <CommandBar

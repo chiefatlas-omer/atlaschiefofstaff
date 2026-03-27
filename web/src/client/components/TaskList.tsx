@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Task, api } from '../lib/api';
 
 const STATUS_COLORS: Record<Task['status'], string> = {
@@ -9,6 +9,63 @@ const STATUS_COLORS: Record<Task['status'], string> = {
   COMPLETED: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   DISMISSED: 'bg-gray-50 text-gray-500 border border-gray-200',
 };
+
+const PUSH_PRESETS = [
+  { label: '+1 day', days: 1 },
+  { label: '+3 days', days: 3 },
+  { label: '+7 days', days: 7 },
+  { label: '+14 days', days: 14 },
+];
+
+function getSlackPermalink(task: Task): string | null {
+  // Build Slack permalink from channel + message timestamp
+  if (task.sourceChannelId && task.sourceMessageTs) {
+    const tsFormatted = task.sourceMessageTs.replace('.', '');
+    return `https://slack.com/archives/${task.sourceChannelId}/p${tsFormatted}`;
+  }
+  return null;
+}
+
+function PushDropdown({ taskId, onAction }: { taskId: string; onAction?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [pushing, setPushing] = useState(false);
+
+  const handlePush = async (days: number) => {
+    setPushing(true);
+    try {
+      await api.pushTask(taskId, days);
+      onAction?.();
+    } catch { /* ignore */ }
+    setPushing(false);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        disabled={pushing}
+        className="text-xs font-medium px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors"
+        title="Push deadline"
+      >
+        {pushing ? '...' : 'Push \u25BE'}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 min-w-[100px]">
+          {PUSH_PRESETS.map(({ label, days }) => (
+            <button
+              key={days}
+              onClick={() => handlePush(days)}
+              className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-purple-50 hover:text-[#4F3588] transition-colors"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatDeadline(deadline: string | null): string {
   if (!deadline) return '\u2014';
@@ -52,13 +109,6 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
     } catch { /* ignore */ }
   };
 
-  const handlePush = async (id: string) => {
-    try {
-      await api.pushTask(id, 1);
-      onTaskAction?.();
-    } catch { /* ignore */ }
-  };
-
   const handleDismiss = async (id: string) => {
     try {
       await api.dismissTask(id);
@@ -88,6 +138,19 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
                 <span className="text-gray-700 truncate block" title={task.description}>
                   {task.description}
                 </span>
+                {(() => {
+                  const link = getSlackPermalink(task);
+                  return link ? (
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-[#4F3588] hover:underline mt-0.5 inline-block"
+                    >
+                      View in Slack {'\u2197'}
+                    </a>
+                  ) : null;
+                })()}
               </td>
               <td className="py-3 pr-4 text-gray-500 whitespace-nowrap">
                 {task.slackUserName ?? '\u2014'}
@@ -115,13 +178,7 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
                     >
                       Complete
                     </button>
-                    <button
-                      onClick={() => handlePush(task.id)}
-                      className="text-xs font-medium px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition-colors"
-                      title="Push 1 day"
-                    >
-                      Push
-                    </button>
+                    <PushDropdown taskId={task.id} onAction={onTaskAction} />
                     <button
                       onClick={() => handleDismiss(task.id)}
                       className="text-xs font-medium px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"

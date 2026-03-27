@@ -11,14 +11,16 @@ export interface SearchResult {
 }
 
 const TYPE_ICON: Record<string, string> = {
-  call: '📞',
-  task: '📋',
-  person: '👤',
-  company: '🏢',
-  document: '📄',
-  meeting: '📅',
-  coaching: '🎯',
+  call: '\uD83D\uDCDE',
+  task: '\uD83D\uDCCB',
+  person: '\uD83D\uDC64',
+  company: '\uD83C\uDFE2',
+  document: '\uD83D\uDCC4',
+  meeting: '\uD83D\uDCC5',
+  coaching: '\uD83C\uDFAF',
 };
+
+const EMAIL_PATTERNS = ['generate email', 'draft email', 'write email', 'email to', 'compose email', 'draft a', 'write a follow', 'follow up email', 'follow-up email'];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -33,8 +35,40 @@ export default function CommandBar({ open, onClose, onNavigate }: CommandBarProp
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [emailResult, setEmailResult] = useState<string | null>(null);
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function isEmailQuery(q: string): boolean {
+    const lower = q.toLowerCase();
+    return EMAIL_PATTERNS.some(p => lower.includes(p));
+  }
+
+  async function handleEmailGeneration(q: string) {
+    setEmailLoading(true);
+    setEmailResult(null);
+    try {
+      const res = await fetchApi<{ answer: string; isEmail?: boolean }>('/api/ask', {
+        method: 'POST',
+        body: JSON.stringify({ question: q, generateEmail: true }),
+      });
+      setEmailResult(res.answer);
+    } catch {
+      setEmailResult('Failed to generate email. Please try again.');
+    } finally {
+      setEmailLoading(false);
+    }
+  }
+
+  function handleCopyEmail() {
+    if (emailResult) {
+      navigator.clipboard.writeText(emailResult);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
 
   // Focus input when opened
   useEffect(() => {
@@ -42,6 +76,9 @@ export default function CommandBar({ open, onClose, onNavigate }: CommandBarProp
       setQuery('');
       setResults([]);
       setSelectedIndex(0);
+      setEmailResult(null);
+      setEmailLoading(false);
+      setCopied(false);
       setTimeout(() => inputRef.current?.focus(), 50);
       // Load default results (recent items)
       fetchResults('');
@@ -128,7 +165,11 @@ export default function CommandBar({ open, onClose, onNavigate }: CommandBarProp
       setSelectedIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      handleSelect(selectedIndex);
+      if (isEmailQuery(query)) {
+        handleEmailGeneration(query);
+      } else {
+        handleSelect(selectedIndex);
+      }
     } else if (e.key === 'Escape') {
       onClose();
     }
@@ -217,10 +258,46 @@ export default function CommandBar({ open, onClose, onNavigate }: CommandBarProp
             </div>
           )}
 
+          {/* Email hint */}
+          {query.trim() !== '' && isEmailQuery(query) && !emailResult && !emailLoading && (
+            <div className="px-5 py-3 bg-purple-50 border-b border-purple-100">
+              <p className="text-xs text-[#4F3588] font-medium">
+                {'\u2709\uFE0F'} Press Enter to generate an email draft
+              </p>
+            </div>
+          )}
+
+          {/* Email loading */}
+          {emailLoading && (
+            <div className="px-5 py-6 text-center text-gray-400 text-sm animate-pulse">
+              Generating email draft...
+            </div>
+          )}
+
+          {/* Email result */}
+          {emailResult && !emailLoading && (
+            <div className="px-5 py-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-[#4F3588] uppercase tracking-wide">
+                  {'\u2709\uFE0F'} Generated Email
+                </p>
+                <button
+                  onClick={handleCopyEmail}
+                  className="text-xs font-medium px-3 py-1 rounded-lg bg-[#4F3588] text-white hover:bg-[#3d2a6a] transition-colors"
+                >
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap max-h-[250px] overflow-y-auto">
+                {emailResult}
+              </div>
+            </div>
+          )}
+
           {/* No results */}
-          {query.trim() !== '' && results.length === 0 && !loading && (
+          {query.trim() !== '' && results.length === 0 && !loading && !emailResult && !emailLoading && !isEmailQuery(query) && (
             <div className="px-5 py-8 text-center text-gray-400 text-sm">
-              No results found for "{query}"
+              No results found for &ldquo;{query}&rdquo;
             </div>
           )}
         </div>
