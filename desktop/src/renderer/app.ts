@@ -7,6 +7,7 @@ declare global {
       onTranscript: (cb: (text: string) => void) => void;
       onTasksUpdate: (cb: (tasks: any[]) => void) => void;
       onError: (cb: (message: string) => void) => void;
+      onDictationDone: (cb: () => void) => void;
       sendAudioData: (buffer: ArrayBuffer) => void;
       getTasks: () => Promise<any[]>;
       // Knowledge
@@ -227,7 +228,7 @@ window.chiefOfStaff.onStatusChange(async (state: string) => {
   }
 });
 
-// Listen for transcripts
+// Listen for transcripts (command mode only — dictation skips this)
 window.chiefOfStaff.onTranscript((text) => {
   transcriptText.textContent = text;
   transcriptBubble.classList.remove('hidden');
@@ -236,6 +237,18 @@ window.chiefOfStaff.onTranscript((text) => {
   setTimeout(() => {
     transcriptBubble.classList.add('hidden');
   }, 5000);
+});
+
+// Dictation done — brief checkmark flash, then auto-hide overlay
+window.chiefOfStaff.onDictationDone(() => {
+  waveformContainer.classList.add('hidden');
+  transcriptText.textContent = '\u2713';
+  transcriptBubble.classList.remove('hidden');
+
+  setTimeout(() => {
+    transcriptBubble.classList.add('hidden');
+    setState('idle');
+  }, 500);
 });
 
 // Listen for errors

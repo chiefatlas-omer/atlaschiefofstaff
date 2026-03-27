@@ -60,7 +60,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         // ── Dictation flow: format and paste text into active app ──
         const finalText = formatDictation(transcript);
         console.log('[DICTATION] Formatted output:', finalText.substring(0, 100));
-        mainWindow.webContents.send(IPC.TRANSCRIPT, finalText);
+
+        // Skip overlay text preview — paste directly to cursor for instant feel
 
         // Save current clipboard, paste transcript, restore clipboard
         const savedClipboard = clipboard.readText();
@@ -90,7 +91,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
           console.log('[DICTATION] Pasted via PowerShell SendKeys');
         } catch (psErr) {
           console.error('[DICTATION] Paste failed, text is in clipboard:', psErr);
-          mainWindow.webContents.send(IPC.TRANSCRIPT, 'Copied to clipboard \u2014 Ctrl+V to paste');
+          mainWindow.webContents.send(IPC.ERROR, 'Paste failed \u2014 text is in clipboard, Ctrl+V to paste');
         }
 
         // Restore original clipboard after a brief delay
@@ -98,7 +99,8 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
           clipboard.writeText(savedClipboard);
         }, 500);
 
-        mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
+        // Signal renderer to flash checkmark and auto-hide (no text preview)
+        mainWindow.webContents.send(IPC.DICTATION_DONE);
       } else if (mode === 'command') {
         // ── Command flow: detect intent via regex fast-path, then route ──
         const result = await smartProcess(transcript);

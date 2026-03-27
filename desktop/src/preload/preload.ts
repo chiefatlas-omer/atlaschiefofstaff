@@ -20,6 +20,8 @@ const IPC = {
   FOLLOWUP_DISMISS: 'followup:dismiss',
   // Window control
   SET_IGNORE_MOUSE: 'window:set-ignore-mouse',
+  // Dictation completed
+  DICTATION_DONE: 'voice:dictation-done',
 } as const;
 
 contextBridge.exposeInMainWorld('chiefOfStaff', {
@@ -35,6 +37,9 @@ contextBridge.exposeInMainWorld('chiefOfStaff', {
   },
   onError: (cb: (message: string) => void) => {
     ipcRenderer.on(IPC.ERROR, (_event, message) => cb(message));
+  },
+  onDictationDone: (cb: () => void) => {
+    ipcRenderer.on(IPC.DICTATION_DONE, () => cb());
   },
 
   // Renderer -> Main commands
