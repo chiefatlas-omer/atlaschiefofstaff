@@ -32,7 +32,7 @@ export interface AccuracyStats {
 export function recordQA(input: RecordQAInput): number {
   const now = Math.floor(Date.now() / 1000);
 
-  db.insert(qaInteractions)
+  const result = db.insert(qaInteractions)
     .values({
       question: input.question,
       answer: input.answer,
@@ -46,15 +46,8 @@ export function recordQA(input: RecordQAInput): number {
     })
     .run();
 
-  // Retrieve the inserted row to get its auto-incremented ID
-  const inserted = db
-    .select()
-    .from(qaInteractions)
-    .where(eq(qaInteractions.createdAt, now))
-    .all()
-    .pop();
-
-  return inserted?.id ?? 0;
+  const qaId = Number(result.lastInsertRowid);
+  return qaId;
 }
 
 // --- Record a Correction ---

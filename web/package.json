@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "tsx src/server/index.ts",
     "dev:server": "npx tsx watch src/server/index.ts",
     "dev:client": "npx vite",
     "build": "vite build"

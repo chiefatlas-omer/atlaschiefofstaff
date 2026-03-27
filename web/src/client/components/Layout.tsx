@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import CommandBar from './CommandBar';
 
 const NAV_ITEMS = [
@@ -14,7 +14,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ children }: LayoutProps) {
-  const currentPath = window.location.pathname;
+  const { pathname: currentPath } = useLocation();
   const [commandBarOpen, setCommandBarOpen] = useState(false);
   const navigate = useNavigate();
 

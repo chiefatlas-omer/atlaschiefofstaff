@@ -20,7 +20,7 @@ app.get('/api/email-drafts', (_req, res) => {
   try {
     const Database = require('better-sqlite3');
     const path = require('path');
-    const dbPath = path.resolve(process.env.DATABASE_PATH || '../bot/data/chiefofstaff.db');
+    const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
     const sqlite = new Database(dbPath, { readonly: true });
     const drafts = sqlite.prepare('SELECT * FROM email_drafts ORDER BY created_at DESC LIMIT 20').all();
     sqlite.close();
@@ -41,7 +41,7 @@ app.post('/api/email-drafts/:id/status', (req, res) => {
     }
     const Database = require('better-sqlite3');
     const path = require('path');
-    const dbPath = path.resolve(process.env.DATABASE_PATH || '../bot/data/chiefofstaff.db');
+    const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
     const sqlite = new Database(dbPath);
     sqlite.prepare('UPDATE email_drafts SET status = ? WHERE id = ?').run(status, id);
     sqlite.close();

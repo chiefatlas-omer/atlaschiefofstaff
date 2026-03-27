@@ -76,40 +76,53 @@ export interface SOP {
 }
 
 export interface Person {
-  id: number;
+  id: string;
   name: string;
-  slackId: string | null;
+  slackUserId: string | null;
   email: string | null;
+  phone: string | null;
   role: string | null;
-  company: string | null;
+  companyId: string | null;
+  source: string;
   createdAt: number;
+  updatedAt: number;
 }
 
 export interface Company {
-  id: number;
+  id: string;
   name: string;
-  domain: string | null;
   industry: string | null;
+  status: string;
+  revenue: number | null;
+  employeeCount: number | null;
+  website: string | null;
   createdAt: number;
+  updatedAt: number;
 }
 
 export interface Meeting {
-  id: number;
+  id: string;
   title: string;
-  date: number;
-  attendees: string | null;
+  date: number | null;
+  duration: number | null;
+  source: string;
+  zoomMeetingId: string | null;
+  calendarEventId: string | null;
+  transcriptText: string | null;
   summary: string | null;
-  decisions: string | null;
-  followUps: string | null;
+  meetingType: string | null;
   createdAt: number;
+  updatedAt: number;
 }
 
 export interface Decision {
-  id: number;
-  description: string;
-  owner: string | null;
+  id: string;
+  what: string;
   context: string | null;
-  outcome: string | null;
+  decidedBy: string | null;
+  meetingId: string | null;
+  sourceType: string;
+  sourceRef: string | null;
   createdAt: number;
 }
 

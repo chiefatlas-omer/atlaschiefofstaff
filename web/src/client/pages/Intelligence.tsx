@@ -243,7 +243,7 @@ function CallsTab() {
                       </span>
                     )}
                     {risks.map((flag, i) => (
-                      <span key={i} className="text-xs px-2 py-0.5 rounded border font-medium bg-red-50 text-red-700 border-red-200">
+                      <span key={`risk-${flag}-${i}`} className="text-xs px-2 py-0.5 rounded border font-medium bg-red-50 text-red-700 border-red-200">
                         {flag}
                       </span>
                     ))}
@@ -488,7 +488,7 @@ function CoachingTab() {
                     Coaching Flags ({sortedFlags.length})
                   </p>
                   {sortedFlags.map((flag, i) => (
-                    <div key={i} className="bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-1">
+                    <div key={`flag-${flag.flag}-${flag.severity}-${i}`} className="bg-gray-50 rounded-lg border border-gray-200 p-3 space-y-1">
                       <div className="flex items-center gap-2">
                         <span className={[
                           'text-xs px-2 py-0.5 rounded font-medium',

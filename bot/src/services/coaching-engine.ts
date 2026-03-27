@@ -214,17 +214,6 @@ export async function generateCoachingSnapshot(repSlackId: string): Promise<Coac
     }
   }
 
-  // Store in coachingSnapshots — coachingFlags JSON field holds the full coaching result
-  const fullCoachingResult = {
-    role,
-    overall_grade: overallGrade,
-    grade_reasoning: gradeReasoning,
-    top_strength: topStrength,
-    coaching_flags: coachingFlags,
-    this_week_focus: thisWeekFocus,
-    script_suggestion: scriptSuggestion,
-  };
-
   const weekStart = weekAgo;
   const inserted = db
     .insert(coachingSnapshots)
@@ -238,7 +227,7 @@ export async function generateCoachingSnapshot(repSlackId: string): Promise<Coac
       avgOpenQuestionRatio: avgOpenQuestionRatio ?? null,
       topObjections,
       outcomeBreakdown,
-      coachingFlags: fullCoachingResult,
+      coachingFlags: coachingFlags,
       createdAt: now,
     })
     .returning({ id: coachingSnapshots.id })

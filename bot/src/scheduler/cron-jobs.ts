@@ -50,8 +50,9 @@ export function startCronJobs(client: any) {
     }
   }, { timezone: 'America/Chicago' });
 
-  // Friday digest: Friday at 9:00 AM CT
-  cron.schedule('0 9 * * 5', async () => {
+  // Friday digest: Friday at 9:15 AM CT
+  // NOTE: Staggered to 9:15 AM (not 9:00) to avoid colliding with the escalation cron that runs at 9:00 AM.
+  cron.schedule('15 9 * * 5', async () => {
     console.log('Generating Friday digest...');
     try {
       await generateDigest(client);
@@ -200,10 +201,11 @@ export function startCronJobs(client: any) {
     }
   }, { timezone: 'America/Chicago' });
 
-  // Monday 9 AM CT: Weekly coaching summary — DM to reps (motivational) + leadership (detailed)
+  // Monday 9:15 AM CT: Weekly coaching summary — DM to reps (motivational) + leadership (detailed)
+  // NOTE: Staggered to 9:15 AM (not 9:00) to avoid colliding with the escalation cron that runs at 9:00 AM.
   // Note: Individual post-call coaching is sent immediately after each call in webhook-handler.ts
-  cron.schedule('0 9 * * 1', async () => {
-    console.log('Generating weekly coaching summary (Monday 9 AM CT)...');
+  cron.schedule('15 9 * * 1', async () => {
+    console.log('Generating weekly coaching summary (Monday 9:15 AM CT)...');
     try {
       const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
 
@@ -273,8 +275,9 @@ export function startCronJobs(client: any) {
     }
   }, { timezone: 'America/Chicago' });
 
-  // Daily 8:00 AM CT — Personalized morning briefing DM to each team member with open tasks
-  cron.schedule('0 8 * * 1-5', async () => {
+  // Daily 8:05 AM CT — Personalized morning briefing DM to each team member with open tasks
+  // NOTE: Staggered to 8:05 AM (not 8:00) to avoid colliding with the reminder cron that also runs at 8:00 AM.
+  cron.schedule('5 8 * * 1-5', async () => {
     console.log('[cron] Sending personalized morning briefings...');
     try {
       const allOpenTasks = db
@@ -353,11 +356,11 @@ export function startCronJobs(client: any) {
 
   console.log('Cron jobs started (timezone: America/Chicago)');
   console.log('  - Reminders: 8:00 AM + 4:00 PM CT, Mon-Fri (DM to each person)');
-  console.log('  - Escalation: 9:00 AM + 5:00 PM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
-  console.log('  - Friday digest: Fridays at 9:00 AM CT');
-  console.log('  - SOP review: Wednesdays at 10:00 AM CT');
+  console.log('  - Morning briefing: 8:05 AM CT, Mon-Fri (personalized DM to each member) [staggered from reminders]');
   console.log('  - Proactive alerts: 8:30 AM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
+  console.log('  - Escalation: 9:00 AM + 5:00 PM CT, Mon-Fri (DM to Omer, Mark, Ehsan)');
+  console.log('  - Friday digest: Fridays at 9:15 AM CT [staggered from escalation]');
+  console.log('  - Coaching weekly summary: Mondays at 9:15 AM CT (DM to reps + leadership) [staggered from escalation]');
   console.log('  - Sales digest: Fridays at 10:00 AM CT (leadership channel + DMs)');
-  console.log('  - Coaching weekly summary: Mondays at 9:00 AM CT (DM to reps + leadership)');
-  console.log('  - Morning briefing: 8:00 AM CT, Mon-Fri (personalized DM to each member)');
+  console.log('  - SOP review: Wednesdays at 10:00 AM CT');
 }

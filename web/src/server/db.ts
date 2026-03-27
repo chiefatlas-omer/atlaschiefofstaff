@@ -3,7 +3,9 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import path from 'path';
 
-const dbPath = path.resolve(process.env.DATABASE_PATH || '../bot/data/chiefofstaff.db');
+// NOTE: DATABASE_PATH env var should be set to an absolute path in production.
+// The fallback resolves relative to this compiled file's directory (__dirname = web/src/server).
+const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
 const sqlite = new Database(dbPath, { readonly: false });
 sqlite.pragma('journal_mode = WAL');
 sqlite.pragma('busy_timeout = 5000');

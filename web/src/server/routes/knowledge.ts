@@ -15,7 +15,13 @@ router.get('/sops', (_req, res) => {
       .where(eq(documents.type, 'sop'))
       .orderBy(desc(documents.updatedAt))
       .all();
-    res.json(rows);
+    // Extract summary and format from the metadata JSON column
+    const enriched = rows.map((d) => ({
+      ...d,
+      summary: (d.metadata as any)?.summary || null,
+      format: (d.metadata as any)?.format || null,
+    }));
+    res.json(enriched);
   } catch (err) {
     console.error('[knowledge] GET /sops error:', err);
     res.status(500).json({ error: 'Failed to fetch SOPs' });

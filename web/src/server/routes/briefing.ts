@@ -174,6 +174,7 @@ router.get('/briefing', (_req, res) => {
 
     // ── Streaks ─────────────────────────────────────────────
     // Task streak: consecutive days with at least 1 task completed ending at today
+    // If it's before noon and today has 0 activity, start from yesterday to avoid resetting a live streak.
     const allCompletedTasks = allTasks.filter((t) => t.status === 'COMPLETED' && t.completedAt);
     let taskStreak = 0;
     {
@@ -187,7 +188,12 @@ router.get('/briefing', (_req, res) => {
         }
       }
       const today = new Date();
-      for (let i = 0; ; i++) {
+      const todayKey = today.toISOString().slice(0, 10);
+      const todayActivity = completedDates.has(todayKey) ? 1 : 0;
+      const currentHour = new Date().getHours();
+      // Start from yesterday if it's morning and no tasks completed yet today
+      const startDay = (todayActivity === 0 && currentHour < 12) ? 1 : 0;
+      for (let i = startDay; ; i++) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         const key = d.toISOString().slice(0, 10);
@@ -200,6 +206,7 @@ router.get('/briefing', (_req, res) => {
     }
 
     // Call streak: consecutive business days (Mon-Fri) with at least 1 call analyzed
+    // If it's before noon and today has 0 calls, start from yesterday to avoid resetting a live streak.
     let callStreak = 0;
     {
       const callDates = new Set<string>();
@@ -210,8 +217,14 @@ router.get('/briefing', (_req, res) => {
         }
       }
       const today = new Date();
-      // Walk backwards through business days
+      const todayCallKey = today.toISOString().slice(0, 10);
+      const todayCallActivity = callDates.has(todayCallKey) ? 1 : 0;
+      const callHour = new Date().getHours();
+      // Walk backwards through business days, optionally skipping today if morning with no calls
       const d = new Date(today);
+      if (todayCallActivity === 0 && callHour < 12) {
+        d.setDate(d.getDate() - 1);
+      }
       for (;;) {
         const day = d.getDay();
         // Skip weekends
@@ -230,6 +243,7 @@ router.get('/briefing', (_req, res) => {
     }
 
     // System streak: consecutive days with ANY activity
+    // If it's before noon and today has 0 activity, start from yesterday to avoid resetting a live streak.
     let systemStreak = 0;
     {
       const activityDates = new Set<string>();
@@ -251,7 +265,12 @@ router.get('/briefing', (_req, res) => {
         if (ts > 0) activityDates.add(new Date(ts).toISOString().slice(0, 10));
       }
       const today = new Date();
-      for (let i = 0; ; i++) {
+      const todaySysKey = today.toISOString().slice(0, 10);
+      const todaySysActivity = activityDates.has(todaySysKey) ? 1 : 0;
+      const sysHour = new Date().getHours();
+      // Start from yesterday if it's morning and no activity yet today
+      const sysStartDay = (todaySysActivity === 0 && sysHour < 12) ? 1 : 0;
+      for (let i = sysStartDay; ; i++) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         const key = d.toISOString().slice(0, 10);

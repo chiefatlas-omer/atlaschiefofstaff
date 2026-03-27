@@ -40,7 +40,7 @@ export default function ActivityFeed({ items, maxItems = 10 }: ActivityFeedProps
   return (
     <div className="space-y-3">
       {visible.map((item, i) => (
-        <div key={i} className="flex items-start gap-3">
+        <div key={`${item.type}-${item.timestamp}-${i}`} className="flex items-start gap-3">
           <span className="text-base mt-0.5 shrink-0">
             {ACTIVITY_ICON[item.type] ?? '\u{1F4CC}'}
           </span>

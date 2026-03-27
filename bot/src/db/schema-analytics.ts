@@ -1,3 +1,6 @@
+// NOTE: Analytics tables use plain integer() for timestamps (Unix seconds).
+// The tasks table in schema.ts uses integer('...', { mode: 'timestamp' }) which returns Date objects.
+// When reading from these tables, always check: value instanceof Date ? value.getTime()/1000 : value
 import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
 
 // ─── Call Analyses (per-call sales intelligence) ──────────

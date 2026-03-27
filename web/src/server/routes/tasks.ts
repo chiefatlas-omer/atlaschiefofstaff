@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { db } from '../db';
 import { tasks } from '../../../../bot/src/db/schema';
-import { eq, ne, and, lt, count } from 'drizzle-orm';
+import { eq, ne, and, lt, count, desc } from 'drizzle-orm';
 
 const router = Router();
 
@@ -12,7 +12,7 @@ router.get('/tasks', (_req, res) => {
       .select()
       .from(tasks)
       .where(and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')))
-      .orderBy(tasks.createdAt)
+      .orderBy(desc(tasks.createdAt))
       .all();
     res.json(openTasks);
   } catch (err) {
