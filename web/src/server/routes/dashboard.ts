@@ -344,7 +344,7 @@ router.get('/analytics/outcomes', (_req, res) => {
     const signalsLastWeek = allSignals.filter(s => (s.createdAt ?? 0) >= twoWeeksAgo && (s.createdAt ?? 0) < weekAgo);
     const signalsThisMonth = allSignals.filter(s => (s.createdAt ?? 0) >= monthAgo);
     const featureRequests = signalsThisMonth.filter(s => s.type === 'feature_request').length;
-    const bugReports = signalsThisMonth.filter(s => s.type === 'bug').length;
+    const bugReports = signalsThisMonth.filter(s => s.type === 'bug_report').length;
     const churnReasons = signalsThisMonth.filter(s => s.type === 'churn_reason').length;
 
     // ── Documents / SOPs ──────────────────────────────────────

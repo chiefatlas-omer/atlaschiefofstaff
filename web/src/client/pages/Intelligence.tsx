@@ -8,8 +8,9 @@ const OUTCOME_COLOR: Record<string, string> = {
   closed_won: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   demo_scheduled: 'bg-blue-50 text-blue-700 border-blue-200',
   follow_up: 'bg-amber-50 text-amber-700 border-amber-200',
-  no_decision: 'bg-gray-50 text-gray-500 border-gray-200',
-  churned: 'bg-red-50 text-red-700 border-red-200',
+  closed_lost: 'bg-red-50 text-red-700 border-red-200',
+  no_show: 'bg-gray-50 text-gray-500 border-gray-200',
+  disqualified: 'bg-orange-50 text-orange-700 border-orange-200',
   unknown: 'bg-gray-50 text-gray-400 border-gray-200',
 };
 
@@ -24,9 +25,9 @@ const AWARENESS_COLOR: Record<string, string> = {
 
 const TYPE_EMOJI: Record<string, string> = {
   feature_request: '✨',
-  bug: '🐛',
-  churn_risk: '⚠️',
-  pricing_concern: '💰',
+  bug_report: '🐛',
+  churn_reason: '⚠️',
+  pricing_feedback: '💰',
   competitor_mention: '🔄',
   integration_request: '🔗',
   performance_issue: '⚡',
@@ -290,8 +291,8 @@ function ProductSignalsTab() {
   }
 
   const featureRequests = data.typeBreakdown['feature_request'] ?? 0;
-  const bugs = data.typeBreakdown['bug'] ?? 0;
-  const churnRisks = data.typeBreakdown['churn_risk'] ?? 0;
+  const bugs = data.typeBreakdown['bug_report'] ?? 0;
+  const churnRisks = data.typeBreakdown['churn_reason'] ?? 0;
 
   return (
     <div className="space-y-8">

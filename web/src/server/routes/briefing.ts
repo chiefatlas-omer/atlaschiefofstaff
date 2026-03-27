@@ -548,7 +548,7 @@ router.get('/search', (req, res) => {
           type: 'person',
           id: p.id,
           title: p.name,
-          subtitle: p.role ?? p.company ?? undefined,
+          subtitle: p.role ?? p.companyId ?? undefined,
         });
       }
 

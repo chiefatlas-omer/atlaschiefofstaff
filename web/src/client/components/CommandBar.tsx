@@ -70,8 +70,8 @@ export default function CommandBar({ open, onClose, onNavigate }: CommandBarProp
 
   // Quick actions (shown when no query)
   const quickActions = [
-    { label: 'Upload document', icon: '📄', path: '/knowledge' },
-    { label: 'Search knowledge base', icon: '🔍', path: '/knowledge' },
+    { label: 'Upload document', icon: '📄', path: '/' },
+    { label: 'Search knowledge base', icon: '🔍', path: '/' },
     { label: 'View outcomes', icon: '📊', path: '/outcomes' },
   ];
 
@@ -105,7 +105,7 @@ export default function CommandBar({ open, onClose, onNavigate }: CommandBarProp
         onNavigate('/');
         break;
       case 'document':
-        onNavigate('/knowledge');
+        onNavigate('/');
         break;
       default:
         onNavigate('/');
