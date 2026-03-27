@@ -403,18 +403,48 @@ export default function Briefing() {
         </div>
       </section>
 
-      {/* ── Voice Assistant Hint ──────────────────────────────── */}
-      <a
-        href="#voice-assistant"
-        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#4F3588] transition-colors -mt-4"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" fill="currentColor"/>
-          <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          <path d="M12 19v4M8 23h8" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-        </svg>
-        Press \ to talk to Atlas Chief — dictate, ask questions, or give commands by voice.
-      </a>
+      {/* ── Voice Assistant Download (prominent, near top) ───── */}
+      <section id="voice-assistant" className="-mt-2">
+        <div className="bg-gradient-to-r from-[#4F3588] to-[#6B4DAA] rounded-xl shadow-sm p-5 text-white">
+          <div className="flex items-center gap-4">
+            <div className="flex-shrink-0 w-11 h-11 rounded-lg bg-white/15 flex items-center justify-center">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" fill="white"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M12 19v4M8 23h8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold mb-0.5">
+                Atlas Voice &mdash; Press \ and talk
+              </h3>
+              <p className="text-xs text-white/70">
+                Dictate, ask questions, draft emails, or give commands. One key does everything.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <a
+                href="/downloads/atlas-voice-win.exe"
+                className="inline-flex items-center gap-1.5 bg-white text-[#4F3588] text-xs font-semibold px-3.5 py-2 rounded-lg hover:bg-white/90 transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M0 2.3l6.5-.9v6.3H0V2.3zm7.3-1l8.7-1.2v7.6H7.3V1.3zM16 8.8v7.5l-8.7-1.2V8.8H16zM6.5 15.4L0 14.5V8.8h6.5v6.6z"/>
+                </svg>
+                Windows
+              </a>
+              <a
+                href="/downloads/atlas-voice-mac.dmg"
+                className="inline-flex items-center gap-1.5 bg-white/15 text-white text-xs font-semibold px-3.5 py-2 rounded-lg border border-white/20 hover:bg-white/25 transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M12.2 8.4c0-1.6 1.3-2.4 1.4-2.5-.8-1.1-2-1.3-2.4-1.3-1-.1-2 .6-2.5.6s-1.3-.6-2.2-.6c-1.1 0-2.2.7-2.8 1.7-1.2 2.1-.3 5.1.8 6.8.6.8 1.2 1.7 2.1 1.7.8 0 1.2-.5 2.2-.5s1.3.5 2.2.5c.9 0 1.5-.8 2-1.7.6-1.2.9-2.3.9-2.3 0 0-1.7-.7-1.7-2.4zM10.6 3.4c.5-.6.8-1.3.7-2.1-.7 0-1.5.5-2 1.1-.4.5-.8 1.4-.7 2.1.8.1 1.5-.4 2-1.1z"/>
+                </svg>
+                Mac
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ── Quick-Ask Answer ─────────────────────────────────── */}
       {askLoading && (
@@ -640,60 +670,7 @@ export default function Briefing() {
         </section>
       </div>
 
-      {/* ── Voice Assistant Download ─────────────────────────── */}
-      <section id="voice-assistant">
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Voice Assistant
-          </h2>
-          <div className="flex-1 h-px bg-gray-200" />
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
-          <div className="flex items-start gap-5">
-            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-[#F3F1FC] flex items-center justify-center">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z" fill="#4F3588"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#4F3588" strokeWidth="2" strokeLinecap="round"/>
-                <path d="M12 19v4M8 23h8" stroke="#4F3588" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-semibold text-gray-900 mb-1">
-                Atlas Voice &mdash; One key, infinite power
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Press backslash (\) and talk. Atlas Chief understands whether you're giving a command
-                or dictating &mdash; no mode switching needed. Your words are cleaned, formatted, and
-                ready to send in Slack or email.
-              </p>
-              <div className="flex items-center gap-3">
-                <a
-                  href="/downloads/atlas-voice-win.exe"
-                  className="inline-flex items-center gap-2 bg-[#4F3588] text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-[#3d2a6a] transition-colors"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M0 2.3l6.5-.9v6.3H0V2.3zm7.3-1l8.7-1.2v7.6H7.3V1.3zM16 8.8v7.5l-8.7-1.2V8.8H16zM6.5 15.4L0 14.5V8.8h6.5v6.6z"/>
-                  </svg>
-                  Download for Windows
-                </a>
-                <a
-                  href="/downloads/atlas-voice-mac.dmg"
-                  className="inline-flex items-center gap-2 bg-white text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M12.2 8.4c0-1.6 1.3-2.4 1.4-2.5-.8-1.1-2-1.3-2.4-1.3-1-.1-2 .6-2.5.6s-1.3-.6-2.2-.6c-1.1 0-2.2.7-2.8 1.7-1.2 2.1-.3 5.1.8 6.8.6.8 1.2 1.7 2.1 1.7.8 0 1.2-.5 2.2-.5s1.3.5 2.2.5c.9 0 1.5-.8 2-1.7.6-1.2.9-2.3.9-2.3 0 0-1.7-.7-1.7-2.4zM10.6 3.4c.5-.6.8-1.3.7-2.1-.7 0-1.5.5-2 1.1-.4.5-.8 1.4-.7 2.1.8.1 1.5-.4 2-1.1z"/>
-                  </svg>
-                  Download for Mac
-                </a>
-              </div>
-              <p className="text-xs text-gray-400 mt-3">
-                Press \ (right above Enter) to activate. That's it.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Voice Assistant section moved to top of page */}
 
       {/* ── Upload Document ────────────────────────────────────── */}
       <section>
