@@ -41,7 +41,7 @@ export const config = {
   },
   slackUserId: requireEnv('SLACK_USER_ID'),
   db: {
-    path: optionalEnv('CHIEF_DB_PATH', path.resolve(__dirname, '..', '..', '..', 'bot', 'data', 'chiefofstaff.db')),
+    path: optionalEnv('CHIEF_DB_PATH', path.resolve(userHome, '.atlas-chief', 'chiefofstaff.db')),
   },
   google: {
     clientId: optionalEnv('GOOGLE_CLIENT_ID'),
