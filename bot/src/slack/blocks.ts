@@ -405,7 +405,7 @@ export function taskListBlocks(
 }
 
 export function adminTaskListBlocks(
-  allTasks: Array<{ id: string; description: string; status: string; deadline: Date | null; slackUserId: string; slackUserName: string | null; source: string | null }>,
+  allTasks: Array<{ id: string; description: string; status: string; deadline: Date | null; slackUserId: string; slackUserName: string | null; source: string | null; sourceChannelId: string | null; sourceMessageTs: string | null; sourceThreadTs: string | null }>,
 ): SlackBlock[] {
   if (allTasks.length === 0) {
     return [
@@ -448,11 +448,20 @@ export function adminTaskListBlocks(
       const statusIcon =
         t.status === 'OVERDUE' || t.status === 'ESCALATED' ? ':rotating_light:' :
         t.status === 'CONFIRMED' ? ':pushpin:' : ':question:';
-      const deadlineStr = t.deadline
-        ? t.deadline.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      const dl = t.deadline instanceof Date ? t.deadline : (t.deadline ? new Date(Number(t.deadline) * 1000) : null);
+      const deadlineStr = dl
+        ? dl.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
         : 'no deadline';
       const sourceTag = t.source === 'zoom' ? ' :video_camera:' : t.source === 'manual' ? ' :pencil:' : '';
-      return statusIcon + ' ' + t.description + ' — due ' + deadlineStr + sourceTag + '  `' + t.id + '`';
+
+      // Build thread link if we have channel + message timestamp
+      let threadLink = '';
+      if (t.sourceChannelId && (t.sourceThreadTs || t.sourceMessageTs)) {
+        const ts = (t.sourceThreadTs || t.sourceMessageTs)!.replace('.', '');
+        threadLink = '  <https://slack.com/archives/' + t.sourceChannelId + '/p' + ts + '|:link: view>';
+      }
+
+      return statusIcon + ' ' + t.description + ' — due ' + deadlineStr + sourceTag + threadLink + '  `' + t.id + '`';
     });
 
     blocks.push({
