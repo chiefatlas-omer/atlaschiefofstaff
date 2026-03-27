@@ -138,9 +138,33 @@ export type SmartProcessResult = {
  * classifies intent for commands, and polishes text for dictation.
  * Replaces both polishForCommunication and classifyIntent.
  */
+// Fast regex patterns that are DEFINITELY commands — skip Claude entirely
+const COMMAND_PATTERNS: Array<{ pattern: RegExp; intent: string }> = [
+  // Task queries
+  { pattern: /\b(my tasks|show.*tasks|what.*tasks|tasks.*today|open tasks|to.?do|what do i have)\b/i, intent: 'TASK_QUERY' },
+  { pattern: /\b(what('s| is) on my plate|what('s| is) pending|overdue)\b/i, intent: 'TASK_QUERY' },
+  // Meeting prep
+  { pattern: /\b(prep me|prepare me|next meeting|upcoming meeting|meeting prep|brief me|my meetings)\b/i, intent: 'MEETING_PREP' },
+  { pattern: /\b(what('s| is) my (schedule|calendar|day look))\b/i, intent: 'MEETING_PREP' },
+  // Knowledge queries
+  { pattern: /\b(what do we know|tell me about|what('s| is) our|how do we|search for|look up|find out)\b/i, intent: 'KNOWLEDGE_QUERY' },
+  { pattern: /\b(refund policy|pricing|onboarding|process for|SOP for)\b/i, intent: 'KNOWLEDGE_QUERY' },
+  // General commands
+  { pattern: /\b(help|what can you do|show me|give me a summary|wrap up|status update)\b/i, intent: 'GENERAL' },
+];
+
 export async function smartProcess(rawTranscript: string): Promise<SmartProcessResult> {
   if (!rawTranscript || rawTranscript.trim().length === 0) {
     return { type: 'dictation', output: rawTranscript };
+  }
+
+  // FAST PATH: Check regex patterns first — no AI call needed for obvious commands
+  const lower = rawTranscript.toLowerCase();
+  for (const { pattern, intent } of COMMAND_PATTERNS) {
+    if (pattern.test(lower)) {
+      console.log('[SMART_PROCESS] Fast-matched command:', intent, 'from:', rawTranscript.substring(0, 60));
+      return { type: 'command', intent, output: rawTranscript };
+    }
   }
 
   try {
@@ -152,8 +176,26 @@ export async function smartProcess(rawTranscript: string): Promise<SmartProcessR
       max_tokens: 1024,
       system: `You process voice transcriptions. Determine if this is a COMMAND (user talking TO the AI assistant) or DICTATION (user composing text for someone else — an email, slack message, document, etc.).
 
-COMMAND examples: "show my tasks", "prep me for my next meeting", "what's our refund policy", "what do we know about Greenscape"
-DICTATION examples: "Hey Tom comma quick note about the irrigation contract period...", "Send a message to the team about the new pricing update", any text that's clearly meant to be written/sent somewhere
+COMMAND = user is talking TO Atlas Chief, asking it to DO something or ANSWER something. Questions directed at "you" (the assistant) are ALWAYS commands.
+DICTATION = user is composing text meant for another PERSON — an email, slack message, document, note.
+
+COMMAND examples:
+- "what are my tasks for today" → TASK_QUERY
+- "show me my tasks" → TASK_QUERY
+- "what's on my plate" → TASK_QUERY
+- "prep me for my next meeting" → MEETING_PREP
+- "what do we know about Greenscape" → KNOWLEDGE_QUERY
+- "what's our refund policy" → KNOWLEDGE_QUERY
+- "help me with something" → GENERAL
+- "wrap up things for me" → GENERAL
+- "tell me about the things you can do" → GENERAL
+
+DICTATION examples:
+- "Hey Tom, quick note about the irrigation contract..." (addressing a specific person by name)
+- "Dear team, I wanted to update everyone on..." (composing a message)
+- "The proposal should include three sections..." (writing a document)
+
+KEY RULE: If the user says "my tasks", "my meetings", "tell me", "show me", "what are", "what's", "help me", "prep me" — it is ALWAYS a command. These are directed at the assistant.
 
 Return JSON only:
 {
