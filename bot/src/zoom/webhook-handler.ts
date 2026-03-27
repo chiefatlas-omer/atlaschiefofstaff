@@ -589,21 +589,30 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
     }
 
     // ─── Knowledge Graph Ingestion ────────────────────────────
-    try {
-      await ingestZoomTranscript({
-        transcriptText,
-        zoomMeetingId: meetingUuid,
-        title: meetingTopic,
-        date: recording.start_time ? Math.floor(new Date(recording.start_time).getTime() / 1000) : undefined,
-        duration: recording.duration,
-        meetingType: meetingInfo.type,
-        participants: Object.entries(participantMapping).map(([name, slackId]) => ({
-          name,
-          slackUserId: slackId || undefined,
-        })),
-      });
-    } catch (err) {
-      console.error('[zoom] Knowledge graph ingestion failed (non-fatal):', err);
+    // Skip knowledge graph for external/sales calls — they pollute the internal knowledge base.
+    // Heuristic: if meeting title contains sales-related keywords, it's an external call.
+    const EXTERNAL_CALL_KEYWORDS = /\b(onboarding|demo|sales|intro|qbr|kickoff|discovery|prospect|pitch)\b/i;
+    const isExternalCall = meetingTopic ? EXTERNAL_CALL_KEYWORDS.test(meetingTopic) : false;
+
+    if (isExternalCall) {
+      console.log('[zoom] Skipping knowledge graph ingestion for external/sales call:', meetingTopic);
+    } else {
+      try {
+        await ingestZoomTranscript({
+          transcriptText,
+          zoomMeetingId: meetingUuid,
+          title: meetingTopic,
+          date: recording.start_time ? Math.floor(new Date(recording.start_time).getTime() / 1000) : undefined,
+          duration: recording.duration,
+          meetingType: meetingInfo.type,
+          participants: Object.entries(participantMapping).map(([name, slackId]) => ({
+            name,
+            slackUserId: slackId || undefined,
+          })),
+        });
+      } catch (err) {
+        console.error('[zoom] Knowledge graph ingestion failed (non-fatal):', err);
+      }
     }
 
     // ─── Sales Call Analysis ───────────────────────────────────

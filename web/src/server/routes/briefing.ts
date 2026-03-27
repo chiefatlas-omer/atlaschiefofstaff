@@ -422,7 +422,7 @@ router.get('/briefing', (_req, res) => {
     }
 
     const scoreMilestones: AiScoreMilestone[] = [
-      { label: 'Zoom connected', completed: allCallsCount > 0, points: 15 },
+      { label: 'Zoom connected', completed: true, points: 15 },  // Always true — Zoom connected via Fly secrets
       { label: 'Slack connected', completed: allTasksCount > 0, points: 15 },
       { label: 'Knowledge uploaded', completed: documentCount > 0, points: 10 },
       { label: 'Voice app installed', completed: false, points: 10 },

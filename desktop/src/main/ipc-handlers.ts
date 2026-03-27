@@ -67,7 +67,22 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         clipboard.writeText(finalText);
 
         // Simulate Ctrl+V to paste into focused app
+        // First, send a Backspace to eat any lingering '\' from the stop-recording keypress.
+        // The hotkey handler's eatBackslash() may race with OS key delivery, so this is a safety net.
         await new Promise(r => setTimeout(r, 200));
+
+        try {
+          const { execSync: execSyncBs } = require('child_process');
+          execSyncBs(
+            `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{BACKSPACE}')"`,
+            { timeout: 2000 },
+          );
+          console.log('[DICTATION] Safety backspace sent before paste');
+        } catch (_bsErr) {
+          // Non-fatal — the hotkey handler's eatBackslash may have already handled it
+        }
+
+        await new Promise(r => setTimeout(r, 50));
 
         try {
           const { execSync } = require('child_process');

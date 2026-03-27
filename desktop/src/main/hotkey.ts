@@ -56,7 +56,7 @@ export function initHotkeys(window: BrowserWindow) {
     uIOhook.on('keydown', (e: any) => {
       if (e.keycode === BACKSLASH_KEYCODE) {
         console.log('[HOTKEY] Backslash pressed → DICTATION mode, isListening:', isListening);
-        eatBackslash(); // Remove the '\' that leaked to the focused app
+        eatBackslash(); // Remove the '\' that leaked to the focused app (both on start AND stop)
         toggleRecording('dictation');
       }
     });
