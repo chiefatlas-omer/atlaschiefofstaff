@@ -2,11 +2,13 @@ import dotenv from 'dotenv';
 import path from 'path';
 
 // __dirname is dist/main/ after compilation, so .env is 2 levels up at desktop/
-// Try multiple paths to find .env
+// Try multiple paths to find .env (including installed app locations)
+const userHome = process.env.USERPROFILE || process.env.HOME || '';
 const envPaths = [
-  path.resolve(__dirname, '..', '..', '.env'),       // dist/main/ -> desktop/.env
-  path.resolve(__dirname, '..', '..', '..', '.env'),  // fallback: one more level up
-  path.resolve(process.cwd(), '.env'),                 // CWD (when running from desktop/)
+  path.resolve(userHome, '.atlas-chief', '.env'),     // User config: ~/.atlas-chief/.env
+  path.resolve(__dirname, '..', '..', '.env'),         // dist/main/ -> desktop/.env (dev)
+  path.resolve(__dirname, '..', '..', '..', '.env'),   // fallback: one more level up
+  path.resolve(process.cwd(), '.env'),                  // CWD (when running from desktop/)
 ];
 
 for (const envPath of envPaths) {
@@ -20,7 +22,8 @@ for (const envPath of envPaths) {
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+    console.warn(`Warning: Missing environment variable: ${name} — some features will be disabled.`);
+    return '';
   }
   return value;
 }
