@@ -5,7 +5,7 @@ import { config } from '../config';
 import { db, sqlite } from '../db/connection';
 import { zoomUserMappings } from '../db/schema';
 import { extractParticipantsFromVtt } from './transcript-fetcher';
-import { ingestZoomTranscript } from '../services/ingestion-service';
+
 import { analyzeCall } from '../services/call-analyzer';
 import { generateCoachingSnapshot, formatCoachingForSlack, formatCoachingForRep } from '../services/coaching-engine';
 
@@ -588,32 +588,10 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
       await handlePrivateMeeting(result, meetingInfo, meetingTopic, recording, participantMapping, slackClient);
     }
 
-    // ─── Knowledge Graph Ingestion ────────────────────────────
-    // Skip knowledge graph for external/sales calls — they pollute the internal knowledge base.
-    // Heuristic: if meeting title contains sales-related keywords, it's an external call.
-    const EXTERNAL_CALL_KEYWORDS = /\b(onboarding|demo|sales|intro|qbr|kickoff|discovery|prospect|pitch)\b/i;
-    const isExternalCall = meetingTopic ? EXTERNAL_CALL_KEYWORDS.test(meetingTopic) : false;
-
-    if (isExternalCall) {
-      console.log('[zoom] Skipping knowledge graph ingestion for external/sales call:', meetingTopic);
-    } else {
-      try {
-        await ingestZoomTranscript({
-          transcriptText,
-          zoomMeetingId: meetingUuid,
-          title: meetingTopic,
-          date: recording.start_time ? Math.floor(new Date(recording.start_time).getTime() / 1000) : undefined,
-          duration: recording.duration,
-          meetingType: meetingInfo.type,
-          participants: Object.entries(participantMapping).map(([name, slackId]) => ({
-            name,
-            slackUserId: slackId || undefined,
-          })),
-        });
-      } catch (err) {
-        console.error('[zoom] Knowledge graph ingestion failed (non-fatal):', err);
-      }
-    }
+    // ─── Knowledge graph ingestion REMOVED ─────────────────────
+    // Architecture decision: Zoom transcripts never feed the knowledge base.
+    // Knowledge base is only fed by: manual document uploads, auto-generated SOPs, user corrections.
+    // Zoom calls feed: call_analyses (sales intelligence), task detection, coaching, email drafts.
 
     // ─── Sales Call Analysis ───────────────────────────────────
     let callAnalysisId: number | undefined;

@@ -9,7 +9,7 @@ import { processedMessages } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { completeTask, dismissTask, reassignTask, getTaskById } from '../tasks/task-service';
 import { tasks } from '../db/schema';
-import { ingestSlackMessage } from '../services/ingestion-service';
+
 
 interface BufferedMessage {
   user: string;
@@ -546,19 +546,10 @@ async function processBatch(channelId: string, client: any, app: App) {
       await handleCommitment(commitment, client, originalThreadTs);
     }
 
-    // ─── Knowledge Graph Ingestion (non-blocking) ─────────────
-    for (const msg of messages) {
-      ingestSlackMessage({
-        text: msg.text,
-        userId: msg.user,
-        userName: userNameCache.get(msg.user),
-        channelId: msg.channel,
-        messageTs: msg.ts,
-        threadTs: msg.thread_ts,
-      }).catch(err => {
-        console.error('[slack] Knowledge ingestion failed (non-fatal):', err);
-      });
-    }
+    // ─── Knowledge graph ingestion REMOVED ─────────────────────
+    // Architecture decision: Slack messages do not feed the knowledge base.
+    // Knowledge base is only fed by: manual document uploads, auto-generated SOPs, user corrections.
+    // Slack feeds: task detection only.
   } catch (error) {
     // Processing failed — remove the processed markers so messages can be retried
     for (const msg of messages) {
