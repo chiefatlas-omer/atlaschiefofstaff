@@ -322,3 +322,51 @@ export function postProcess(text: string, options: PostProcessOptions = {}): str
 
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Smart Dictation Formatter — auto-formats emails, messages, etc.
+// ---------------------------------------------------------------------------
+
+// Patterns that should start on a new line (sign-offs, greetings, closings)
+const LINE_BREAK_BEFORE: RegExp[] = [
+  // Sign-offs and closings
+  /(?<=\.\s*)(Look forward to|Looking forward to|I look forward)/i,
+  /(?<=\.\s*)(Thank you|Thanks|Thank you so much|Thanks so much|Many thanks)/i,
+  /(?<=\.\s*)(Best regards|Best|Regards|Cheers|Sincerely|Warm regards|All the best)/i,
+  /(?<=\.\s*)(Let me know|Please let me know|Feel free to|Don't hesitate)/i,
+  /(?<=\.\s*)(Talk soon|Speak soon|Chat soon|Hope this helps)/i,
+  /(?<=\.\s*)(Take care|Have a great|Have a good)/i,
+  // Greetings (if they appear mid-text)
+  /(?<=\.\s*)(Hey |Hi |Hello |Dear )/i,
+  // Paragraph-like transitions
+  /(?<=\.\s*)(That said|On another note|Additionally|Also,|Furthermore|Moreover)/i,
+  /(?<=\.\s*)(The next step|Next steps|Moving forward|Going forward)/i,
+];
+
+/**
+ * Format dictation text with smart line breaks for emails and messages.
+ * Detects sign-offs, greetings, and paragraph breaks and adds newlines.
+ */
+export function formatDictation(text: string): string {
+  if (!text || text.trim().length === 0) return text;
+
+  let out = text;
+
+  // Apply line breaks before sign-off phrases
+  for (const pattern of LINE_BREAK_BEFORE) {
+    out = out.replace(pattern, (match) => '\n' + match);
+  }
+
+  // If the text ends with a name after "Thank you" / sign-off, put the name on its own line
+  // e.g., "Thank you. Tony." → "Thank you.\nTony."
+  // e.g., "Look forward to growing with you, Tony. Thank you." → already handled above
+  out = out.replace(/(\.\s*)(Thank you|Thanks|Cheers|Best|Regards)(\.\s*)$/i, '$1\n$2$3');
+
+  // Clean up double newlines
+  out = out.replace(/\n{3,}/g, '\n\n');
+
+  // Trim each line
+  out = out.split('\n').map(line => line.trim()).join('\n');
+
+  return out.trim();
+}

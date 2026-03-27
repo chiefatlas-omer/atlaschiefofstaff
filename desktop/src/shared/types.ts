@@ -24,6 +24,7 @@ export const IPC = {
   TASKS_UPDATE: 'tasks:update',
   TASKS_GET: 'tasks:get',
   ERROR: 'app:error',
+  VOICE_MODE: 'voice:mode',   // 'dictation' | 'command'
   // Knowledge Query
   KNOWLEDGE_RESPONSE: 'knowledge:response',
   // Meeting Briefing

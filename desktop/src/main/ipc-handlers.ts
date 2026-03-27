@@ -1,10 +1,11 @@
 import { ipcMain, BrowserWindow, clipboard } from 'electron';
 import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
-import { postProcess, smartProcess } from './voice/post-processor';
+import { postProcess, smartProcess, formatDictation } from './voice/post-processor';
 import { getMyTasks } from './db/task-bridge';
 import { logVoiceInteraction } from './db/voice-logger';
 import { sqlite } from './db/connection';
+import { getVoiceMode } from './hotkey';
 
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
   // Rolling context window for continuity across consecutive transcription chunks.
@@ -51,14 +52,14 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       // Update rolling context window
       transcriptionContext = transcript.slice(-200);
 
-      // Smart Process: ONE Claude call to detect command vs dictation + classify intent
-      console.log('[AUDIO] Running smartProcess...');
-      const result = await smartProcess(transcript);
-      console.log('[AUDIO] smartProcess result:', result.type, result.intent || '');
+      // Mode-based routing — no AI classification needed, user already chose
+      const mode = getVoiceMode();
+      console.log('[AUDIO] Voice mode:', mode);
 
-      if (result.type === 'dictation') {
-        // ── Dictation flow: paste polished text into active app ──
-        const finalText = result.output;
+      if (mode === 'dictation') {
+        // ── Dictation flow: format and paste text into active app ──
+        const finalText = formatDictation(transcript);
+        console.log('[DICTATION] Formatted output:', finalText.substring(0, 100));
         mainWindow.webContents.send(IPC.TRANSCRIPT, finalText);
 
         // Save current clipboard, paste transcript, restore clipboard
@@ -83,10 +84,11 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         }, 500);
 
         mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
-      } else {
-        // ── Command flow: route by intent ──
-        mainWindow.webContents.send(IPC.TRANSCRIPT, transcript);
+      } else if (mode === 'command') {
+        // ── Command flow: detect intent via regex fast-path, then route ──
+        const result = await smartProcess(transcript);
         const intent = result.intent || 'GENERAL';
+        mainWindow.webContents.send(IPC.TRANSCRIPT, transcript);
 
         if (intent === 'TASK_QUERY') {
           const tasks = getMyTasks();
