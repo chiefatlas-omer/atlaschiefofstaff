@@ -9,6 +9,25 @@ export function getVoiceMode(): 'dictation' | 'command' | null {
   return currentMode;
 }
 
+/**
+ * Send a Backspace keystroke to the focused app to eat the '\' character
+ * that leaked through before uiohook could suppress it.
+ */
+function eatBackslash() {
+  setTimeout(() => {
+    try {
+      const { execSync } = require('child_process');
+      execSync(
+        `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{BACKSPACE}')"`,
+        { timeout: 2000 }
+      );
+      console.log('[HOTKEY] Ate leaked backslash character');
+    } catch (err) {
+      console.warn('[HOTKEY] Failed to eat backslash:', err);
+    }
+  }, 50); // small delay to ensure the '\' has been typed first
+}
+
 export function initHotkeys(window: BrowserWindow) {
   mainWindow = window;
 
@@ -17,24 +36,27 @@ export function initHotkeys(window: BrowserWindow) {
   // Insert       = COMMAND   — talk TO Atlas Chief, get answers/actions
 
   // Register Insert key for COMMAND mode via Electron globalShortcut
-  const ok = globalShortcut.register('Insert', () => {
-    console.log('[HOTKEY] Insert pressed → COMMAND mode, isListening:', isListening);
+  // (globalShortcut consumes the key — no leaking)
+  const ok = globalShortcut.register('Delete', () => {
+    console.log('[HOTKEY] Delete pressed → COMMAND mode, isListening:', isListening);
     toggleRecording('command');
   });
   if (ok) {
-    console.log('[HOTKEY] Registered: Insert → command mode');
+    console.log('[HOTKEY] Registered: Delete → command mode');
   } else {
-    console.warn('[HOTKEY] Failed to register Insert key');
+    console.warn('[HOTKEY] Failed to register Delete key');
   }
 
   // Register Backslash via uiohook-napi for DICTATION mode
   // (Electron can't register '\' as a globalShortcut)
+  // NOTE: uiohook can't suppress the key, so we send Backspace to eat it
   try {
     const { uIOhook, UiohookKey } = require('uiohook-napi');
     const BACKSLASH_KEYCODE = UiohookKey?.Backslash ?? 43;
     uIOhook.on('keydown', (e: any) => {
       if (e.keycode === BACKSLASH_KEYCODE) {
         console.log('[HOTKEY] Backslash pressed → DICTATION mode, isListening:', isListening);
+        eatBackslash(); // Remove the '\' that leaked to the focused app
         toggleRecording('dictation');
       }
     });
@@ -42,7 +64,6 @@ export function initHotkeys(window: BrowserWindow) {
     console.log('[HOTKEY] uIOhook started — Backslash → dictation mode');
   } catch (err) {
     console.warn('[HOTKEY] uIOhook not available — dictation mode requires uiohook-napi.');
-    // Fallback: register Ctrl+Shift+K for dictation
     const fallbackOk = globalShortcut.register('CommandOrControl+Shift+K', () => {
       console.log('[HOTKEY] Ctrl+Shift+K pressed → DICTATION fallback');
       toggleRecording('dictation');
@@ -62,7 +83,6 @@ function toggleRecording(mode: 'dictation' | 'command') {
     isListening = false;
     console.log(`[HOTKEY] → stopListening (was ${currentMode} mode)`);
     mainWindow?.webContents.send(IPC.STATUS_CHANGE, 'processing');
-    // currentMode stays set so the IPC handler knows which path to take
   }
 }
 

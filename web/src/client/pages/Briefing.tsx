@@ -416,10 +416,11 @@ export default function Briefing() {
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-sm font-semibold mb-0.5">
-                Atlas Voice &mdash; Press \ and talk
+                Atlas Voice &mdash; Two keys, infinite power
               </h3>
               <p className="text-xs text-white/70">
-                Dictate, ask questions, draft emails, or give commands. One key does everything.
+                <strong>\</strong> (backslash) = Dictate &mdash; talk and text appears where your cursor is.
+                &nbsp;&nbsp;<strong>Delete</strong> = Command &mdash; talk to Atlas Chief, get answers and actions.
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
