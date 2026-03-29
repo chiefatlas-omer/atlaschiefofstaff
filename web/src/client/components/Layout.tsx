@@ -79,9 +79,9 @@ export default function Layout({ children }: LayoutProps) {
         <div className="px-6 py-4 border-t border-gray-200 space-y-2">
           <button
             onClick={() => setCommandBarOpen(true)}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-xs text-gray-400 hover:text-purple-600 transition-colors"
           >
-            ⌘K to search
+            Ctrl+K to search
           </button>
           <p className="text-gray-300 text-xs">Atlas Chief of Staff</p>
         </div>
@@ -90,15 +90,15 @@ export default function Layout({ children }: LayoutProps) {
       {/* Main content */}
       <main className="flex-1 overflow-auto">
         {/* Sticky command bar trigger */}
-        <div className="sticky top-0 z-40 bg-[#FAFAFA]/80 backdrop-blur-sm border-b border-gray-200/50">
-          <div className="max-w-5xl mx-auto px-8 py-2 flex items-center justify-end">
+        <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
+          <div className="max-w-5xl mx-auto px-8 py-3 flex items-center justify-center">
             <button
               onClick={() => setCommandBarOpen(true)}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm hover:shadow transition-all"
+              className="flex items-center gap-3 w-full max-w-xl text-sm text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl px-5 py-3 shadow-sm hover:shadow-md transition-all"
             >
-              <span className="text-gray-300">{'\uD83D\uDD0D'}</span>
-              <span>Search anything...</span>
-              <kbd className="ml-2 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">Ctrl+K</kbd>
+              <span className="text-lg">🔍</span>
+              <span className="flex-1 text-left">Search, ask questions, generate emails...</span>
+              <kbd className="text-xs bg-white text-gray-500 px-2 py-1 rounded-lg font-mono border border-gray-200 shadow-sm">Ctrl+K</kbd>
             </button>
           </div>
         </div>

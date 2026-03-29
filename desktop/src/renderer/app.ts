@@ -244,16 +244,11 @@ window.chiefOfStaff.onTranscript((text) => {
   }, 5000);
 });
 
-// Dictation done — brief checkmark flash, then auto-hide overlay
+// Dictation done — instantly hide everything, no overlay
 window.chiefOfStaff.onDictationDone(() => {
   waveformContainer.classList.add('hidden');
-  transcriptText.textContent = '\u2713';
-  transcriptBubble.classList.remove('hidden');
-
-  setTimeout(() => {
-    transcriptBubble.classList.add('hidden');
-    setState('idle');
-  }, 500);
+  transcriptBubble.classList.add('hidden');
+  setState('idle');
 });
 
 // Listen for errors
