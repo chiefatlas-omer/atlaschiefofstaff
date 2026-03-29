@@ -15,6 +15,9 @@ bot/data/*
 *.db-wal
 *.db-journal
 
+# Desktop release binaries (too large for GitHub — use GitHub Releases instead)
+desktop/release/
+
 # OS / editor
 .DS_Store
 Thumbs.db
