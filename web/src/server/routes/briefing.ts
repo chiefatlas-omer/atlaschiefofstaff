@@ -17,7 +17,7 @@ import { eq, ne, and, lt, gt, gte, desc, isNotNull, like } from 'drizzle-orm';
 const router = Router();
 
 // GET /api/briefing — daily briefing: needs attention, today's schedule, week summary, activity feed
-router.get('/briefing', (_req, res) => {
+router.get('/briefing', (req: any, res) => {
   try {
     const now = Math.floor(Date.now() / 1000);
     const weekAgo = now - 7 * 86400;
@@ -42,17 +42,23 @@ router.get('/briefing', (_req, res) => {
       meetingId?: string;
     }> = [];
 
-    // Overdue tasks
+    // User filtering: non-admins see only their own data
+    const userId = req.userId as string | null;
+    const isAdmin = req.isAdmin as boolean;
+
+    // Overdue tasks (filtered by user for non-admins)
+    const taskConditions = [
+      ne(tasks.status, 'COMPLETED'),
+      ne(tasks.status, 'DISMISSED'),
+      lt(tasks.deadline, new Date()),
+    ];
+    if (userId && !isAdmin) {
+      taskConditions.push(eq(tasks.slackUserId, userId));
+    }
     const overdueTasks = db
       .select()
       .from(tasks)
-      .where(
-        and(
-          ne(tasks.status, 'COMPLETED'),
-          ne(tasks.status, 'DISMISSED'),
-          lt(tasks.deadline, new Date()),
-        ),
-      )
+      .where(and(...taskConditions))
       .all();
 
     for (const t of overdueTasks) {
@@ -68,11 +74,15 @@ router.get('/briefing', (_req, res) => {
       });
     }
 
-    // Risk flags from recent calls
+    // Risk flags from recent calls (filtered by rep for non-admins)
+    const callConditions = [gt(callAnalyses.createdAt, weekAgo)];
+    if (userId && !isAdmin) {
+      callConditions.push(eq(callAnalyses.repSlackId, userId));
+    }
     const recentCalls = db
       .select()
       .from(callAnalyses)
-      .where(gt(callAnalyses.createdAt, weekAgo))
+      .where(and(...callConditions))
       .orderBy(desc(callAnalyses.createdAt))
       .all();
 
@@ -130,13 +140,17 @@ router.get('/briefing', (_req, res) => {
         hasPrep: Boolean(m.summary),
       }));
 
-    // ── Week Summary ─────────────────────────────────────────
-    const allCalls = db.select().from(callAnalyses).all();
-    const callsThisWeek = allCalls.filter((c) => (c.createdAt ?? 0) >= weekAgo);
+    // ── Week Summary (filtered by user for non-admins) ──────
+    const allCallsQuery = (userId && !isAdmin)
+      ? db.select().from(callAnalyses).where(eq(callAnalyses.repSlackId, userId)).all()
+      : db.select().from(callAnalyses).all();
+    const callsThisWeek = allCallsQuery.filter((c) => (c.createdAt ?? 0) >= weekAgo);
     const followUpsThisWeek = callsThisWeek.filter((c) => c.outcome).length;
 
-    const allTasks = db.select().from(tasks).all();
-    const completedThisWeek = allTasks.filter((t) => {
+    const allTasksQuery = (userId && !isAdmin)
+      ? db.select().from(tasks).where(eq(tasks.slackUserId, userId)).all()
+      : db.select().from(tasks).all();
+    const completedThisWeek = allTasksQuery.filter((t) => {
       if (t.status !== 'COMPLETED') return false;
       const ts =
         t.completedAt instanceof Date
@@ -175,7 +189,7 @@ router.get('/briefing', (_req, res) => {
     // ── Streaks ─────────────────────────────────────────────
     // Task streak: consecutive days with at least 1 task completed ending at today
     // If it's before noon and today has 0 activity, start from yesterday to avoid resetting a live streak.
-    const allCompletedTasks = allTasks.filter((t) => t.status === 'COMPLETED' && t.completedAt);
+    const allCompletedTasks = allTasksQuery.filter((t) => t.status === 'COMPLETED' && t.completedAt);
     let taskStreak = 0;
     {
       const completedDates = new Set<string>();
@@ -210,7 +224,7 @@ router.get('/briefing', (_req, res) => {
     let callStreak = 0;
     {
       const callDates = new Set<string>();
-      for (const c of allCalls) {
+      for (const c of allCallsQuery) {
         const ts = (c.createdAt ?? 0) * 1000;
         if (ts > 0) {
           callDates.add(new Date(ts).toISOString().slice(0, 10));
@@ -248,14 +262,14 @@ router.get('/briefing', (_req, res) => {
     {
       const activityDates = new Set<string>();
       // Tasks created
-      for (const t of allTasks) {
+      for (const t of allTasksQuery) {
         const ts = t.createdAt instanceof Date
           ? t.createdAt.getTime()
           : Number(t.createdAt) * 1000;
         if (ts > 0) activityDates.add(new Date(ts).toISOString().slice(0, 10));
       }
       // Calls analyzed
-      for (const c of allCalls) {
+      for (const c of allCallsQuery) {
         const ts = (c.createdAt ?? 0) * 1000;
         if (ts > 0) activityDates.add(new Date(ts).toISOString().slice(0, 10));
       }
@@ -387,7 +401,7 @@ router.get('/briefing', (_req, res) => {
 
     // ── Knowledge Stats ─────────────────────────────────────
     const knowledgeEntryCount = db.select().from(knowledgeEntries).all().length;
-    const callTranscriptCount = allCalls.length;
+    const callTranscriptCount = allCallsQuery.length;
     const documentCount = db.select().from(documents).all().length;
     const recentQueriesRaw = db
       .select()
@@ -408,8 +422,8 @@ router.get('/briefing', (_req, res) => {
     };
 
     // ── AI Usage Score ────────────────────────────────────────
-    const allTasksCount = allTasks.length;
-    const allCallsCount = allCalls.length;
+    const allTasksQueryCount = allTasksQuery.length;
+    const allCallsQueryCount = allCallsQuery.length;
     const coachingCount = db.select().from(coachingSnapshots).all().length;
     const sopCount = db.select().from(documents).where(eq(documents.type, 'sop')).all().length;
     const totalQaCount = db.select().from(qaInteractions).all().length;
@@ -423,12 +437,12 @@ router.get('/briefing', (_req, res) => {
 
     const scoreMilestones: AiScoreMilestone[] = [
       { label: 'Zoom connected', completed: true, points: 15 },  // Always true — Zoom connected via Fly secrets
-      { label: 'Slack connected', completed: allTasksCount > 0, points: 15 },
+      { label: 'Slack connected', completed: allTasksQueryCount > 0, points: 15 },
       { label: 'Knowledge uploaded', completed: documentCount > 0, points: 10 },
       { label: 'Voice app installed', completed: false, points: 10 },
-      { label: 'First call analyzed', completed: allCallsCount > 0, points: 10 },
+      { label: 'First call analyzed', completed: allCallsQueryCount > 0, points: 10 },
       { label: 'First SOP generated', completed: sopCount > 0, points: 10 },
-      { label: '10+ calls analyzed', completed: allCallsCount >= 10, points: 10 },
+      { label: '10+ calls analyzed', completed: allCallsQueryCount >= 10, points: 10 },
       { label: 'Team coaching active', completed: coachingCount > 0, points: 10 },
       { label: '5+ knowledge queries answered', completed: totalQaCount >= 5, points: 5 },
       { label: '3+ email drafts generated', completed: emailDraftCount >= 3, points: 5 },
