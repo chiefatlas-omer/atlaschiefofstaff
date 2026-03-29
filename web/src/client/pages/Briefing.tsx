@@ -35,8 +35,8 @@ function UploadSection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function readFile(file: File) {
-    if (!file.name.endsWith('.txt')) {
-      setError('Only .txt files are supported. Paste other content directly.');
+    if (!file.name.endsWith('.txt') && !file.name.endsWith('.md')) {
+      setError('Only .txt and .md files are supported. Paste other content directly.');
       return;
     }
     const reader = new FileReader();
@@ -46,7 +46,7 @@ function UploadSection() {
         setContent(text);
         setError(null);
         if (!title) {
-          setTitle(file.name.replace(/\.txt$/, ''));
+          setTitle(file.name.replace(/\.(txt|md)$/, ''));
         }
       }
     };
@@ -81,7 +81,7 @@ function UploadSection() {
     setResult(null);
 
     if (!title.trim()) { setError('Title is required.'); return; }
-    if (!content.trim()) { setError('Content is required — paste text or drop a .txt file.'); return; }
+    if (!content.trim()) { setError('Content is required — paste text or drop a .txt/.md file.'); return; }
 
     setSubmitting(true);
     try {
@@ -198,7 +198,7 @@ function UploadSection() {
                   ].join(' ')}
                 >
                   <p className="text-gray-500 text-sm">
-                    Drop a <span className="text-gray-700 font-medium">.txt file</span> here, or{' '}
+                    Drop a <span className="text-gray-700 font-medium">.txt or .md file</span> here, or{' '}
                     <span className="text-[#4F3588]">click to browse</span>
                   </p>
                   {content && (
@@ -209,7 +209,7 @@ function UploadSection() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".txt"
+                    accept=".txt,.md"
                     onChange={handleFileInput}
                     className="hidden"
                   />
