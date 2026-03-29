@@ -34,7 +34,16 @@ app.post('/api/auth/login', async (req, res) => {
     const Database = require('better-sqlite3');
     const path = require('path');
     const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
-    const sqlite = new Database(dbPath, { readonly: true });
+    const sqlite = new Database(dbPath);
+
+    // Ensure tables exist (fresh DB on first deploy)
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS team_members (id INTEGER PRIMARY KEY AUTOINCREMENT, slack_user_id TEXT NOT NULL, team TEXT NOT NULL, display_name TEXT, coaching_role TEXT, created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS escalation_targets (id INTEGER PRIMARY KEY AUTOINCREMENT, slack_user_id TEXT NOT NULL, role TEXT NOT NULL, display_name TEXT, created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, slack_user_id TEXT NOT NULL, slack_user_name TEXT, description TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'DETECTED', confidence TEXT, team TEXT, deadline_text TEXT, deadline INTEGER, completed_at INTEGER, source TEXT NOT NULL DEFAULT 'slack', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS documents (id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT, content TEXT, version INTEGER NOT NULL DEFAULT 1, auto_generated INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'draft', created_by TEXT, metadata TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS knowledge_entries (id INTEGER PRIMARY KEY AUTOINCREMENT, source_type TEXT NOT NULL, source_id TEXT NOT NULL, content TEXT NOT NULL, embedding BLOB, embedding_model TEXT, metadata TEXT, created_at INTEGER NOT NULL);
+    `);
 
     // Check if user exists in team_members, escalation_targets, or has tasks
     const member = sqlite.prepare('SELECT display_name, team, coaching_role FROM team_members WHERE slack_user_id = ?').get(slackUserId) as any;
