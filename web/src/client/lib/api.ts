@@ -358,7 +358,7 @@ export const api = {
   outcomes: () => fetchApi<OutcomeData>('/api/analytics/outcomes'),
   uploadDocument: (data: { title: string; type: string; content: string }) =>
     fetchApi<{ success: boolean; docId: string; chunkCount: number; entities: { people: number; companies: number } }>(
-      '/api/upload',
+      '/api/knowledge/upload',
       { method: 'POST', body: JSON.stringify(data), headers: { 'Content-Type': 'application/json' } },
     ),
   completeTask: (id: string) =>
