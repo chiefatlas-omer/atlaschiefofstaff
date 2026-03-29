@@ -20,6 +20,9 @@ COPY vite.config.ts ./
 RUN mkdir -p /bot/src/db
 COPY bot-deps/ /bot/src/db/
 
+# Link node_modules so bot schema files can resolve drizzle-orm
+RUN ln -s /app/node_modules /bot/node_modules
+
 # Build Vite frontend
 RUN npx vite build
 

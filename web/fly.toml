@@ -4,7 +4,7 @@
 #
 
 app = 'atlas-command-center'
-primary_region = 'ord'
+primary_region = 'iad'
 
 [build]
   dockerfile = "Dockerfile"
