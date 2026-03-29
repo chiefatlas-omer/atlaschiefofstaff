@@ -364,42 +364,24 @@ export default function Briefing() {
             Your company's operating system — ask questions, draft emails, search calls, and get instant answers about your business.
           </p>
 
-          {/* Suggested questions / recent queries as clickable chips */}
-          {data.knowledgeStats && data.knowledgeStats.recentQueries.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {data.knowledgeStats.recentQueries.slice(0, 3).map((q, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => {
-                    setAskQuery(q);
-                    setAskAnswer(null);
-                  }}
-                  className="text-xs text-[#4F3588] bg-[#F3F1FC] hover:bg-[#E8E4F5] px-3 py-1.5 rounded-full transition-colors truncate max-w-[250px]"
-                  title={q}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {["What's our onboarding process?", "Draft a follow-up for the last call", "What are our top customer pain points?"].map((q, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => {
-                    setAskQuery(q);
-                    setAskAnswer(null);
-                  }}
-                  className="text-xs text-[#4F3588] bg-[#F3F1FC] hover:bg-[#E8E4F5] px-3 py-1.5 rounded-full transition-colors truncate max-w-[250px]"
-                  title={q}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Suggested questions — merge recent with defaults, always show 3 */}
+          <div className="flex flex-wrap gap-2">
+            {(() => {
+              const defaults = ["What's our onboarding process?", "Draft a follow-up for the last call", "What are our top customer pain points?"];
+              const recent = data.knowledgeStats ? [...new Set(data.knowledgeStats.recentQueries)] : [];
+              return [...recent, ...defaults.filter(d => !recent.includes(d))].slice(0, 3);
+            })().map((q, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => { setAskQuery(q); setAskAnswer(null); }}
+                className="text-xs text-[#4F3588] bg-[#F3F1FC] hover:bg-[#E8E4F5] px-3 py-1.5 rounded-full transition-colors truncate max-w-[250px]"
+                title={q}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
