@@ -280,7 +280,7 @@ try {
 
 // ─── Static files (production Vite build) ────────────────────────────
 if (process.env.NODE_ENV === 'production') {
-  const clientDir = path.resolve(__dirname, '../client');
+  const clientDir = path.resolve(__dirname, '../../dist/client');
   app.use(express.static(clientDir));
   // SPA fallback — serve index.html for all non-API routes (Express 5 syntax)
   app.get('/{*splat}', (_req, res) => {

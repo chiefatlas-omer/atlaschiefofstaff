@@ -26,6 +26,9 @@ RUN ln -s /app/node_modules /bot/node_modules
 # Build Vite frontend
 RUN npx vite build
 
+# Copy public assets (favicon) into built output
+RUN cp -r public/* dist/client/ 2>/dev/null || true
+
 # Clean up build deps
 RUN apk del python3 make g++ 2>/dev/null || true
 
