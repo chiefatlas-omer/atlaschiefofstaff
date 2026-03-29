@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import CommandBar from './CommandBar';
+import { useAuth } from '../lib/auth';
 
 const NAV_ITEMS = [
-  { label: 'Command Center', href: '/' },
-  { label: 'Intelligence', href: '/intelligence' },
-  { label: 'Tasks', href: '/tasks' },
-  { label: 'Outcomes', href: '/outcomes' },
+  { label: 'Command Center', href: '/', adminOnly: false, teamAOnly: false },
+  { label: 'Intelligence', href: '/intelligence', adminOnly: false, teamAOnly: true },
+  { label: 'Tasks', href: '/tasks', adminOnly: false, teamAOnly: false },
+  { label: 'Outcomes', href: '/outcomes', adminOnly: false, teamAOnly: false },
+  { label: 'Settings', href: '/settings', adminOnly: false, teamAOnly: false },
 ];
 
 interface LayoutProps {
@@ -17,6 +19,7 @@ export default function Layout({ children }: LayoutProps) {
   const { pathname: currentPath } = useLocation();
   const [commandBarOpen, setCommandBarOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
@@ -55,7 +58,13 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_ITEMS.map(({ label, href }) => {
+          {NAV_ITEMS
+            .filter(({ teamAOnly }) => {
+              // Team B users can't see Intelligence (call coaching, sales intel)
+              if (teamAOnly && !user?.isAdmin && user?.team === 'team_b') return false;
+              return true;
+            })
+            .map(({ label, href }) => {
             const isActive =
               href === '/' ? currentPath === '/' : currentPath.startsWith(href);
             return (
@@ -77,13 +86,26 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 space-y-2">
+          {user && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-700 truncate">{user.displayName}</p>
+                {user.isAdmin && <span className="text-[10px] text-[#4F3588] font-medium">Admin</span>}
+              </div>
+              <button
+                onClick={logout}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
           <button
             onClick={() => setCommandBarOpen(true)}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
-            ⌘K to search
+            {'\u2318'}K to search
           </button>
-          <p className="text-gray-300 text-xs">Atlas Chief of Staff</p>
         </div>
       </aside>
 

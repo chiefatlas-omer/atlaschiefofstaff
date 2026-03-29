@@ -7,7 +7,7 @@ import { zoomUserMappings } from '../db/schema';
 import { extractParticipantsFromVtt } from './transcript-fetcher';
 
 import { analyzeCall, extractInternalProductSignals } from '../services/call-analyzer';
-import { generateCoachingSnapshot, formatCoachingForSlack, formatCoachingForRep } from '../services/coaching-engine';
+import { generateCoachingSnapshot, formatCoachingForRep } from '../services/coaching-engine';
 
 type MeetingType = 'private' | 'external' | 'team';
 
@@ -730,27 +730,7 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
           console.error(`[zoom] Failed to DM post-call coaching to rep ${host.slackId}:`, coachErr);
         }
 
-        // DM leadership with detailed coaching
-        if (snapshot.coachingFlags.length > 0) {
-          const leaderMessage = formatCoachingForSlack(snapshot.repName ?? host.name, snapshot);
-          const callLabel = `From call: ${meetingTopic}`;
-          const leadershipIds = [
-            config.escalation.omerSlackUserId,
-            config.escalation.markSlackUserId,
-            config.escalation.ehsanSlackUserId,
-          ].filter(Boolean);
-
-          for (const leaderId of leadershipIds) {
-            try {
-              await slackClient.chat.postMessage({
-                channel: leaderId,
-                text: `${callLabel}\n\n${leaderMessage}`,
-              });
-            } catch (leadErr) {
-              console.error(`[zoom] Failed to DM post-call coaching to leader ${leaderId}:`, leadErr);
-            }
-          }
-        }
+        // Leadership receives aggregated weekly coaching summary via Monday cron — not per-call reports
       }
     } catch (err) {
       console.error('[zoom] Post-call coaching failed (non-fatal):', err);

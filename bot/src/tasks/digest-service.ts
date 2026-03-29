@@ -15,6 +15,19 @@ function daysBetween(a: Date, b: Date): number {
   return Math.floor((b.getTime() - a.getTime()) / msPerDay);
 }
 
+function getSignOff(): string {
+  const ctNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+  const day = ctNow.getDay(); // 0=Sun, 5=Fri, 6=Sat
+  const hour = ctNow.getHours();
+
+  if (day === 5 && hour < 17) {
+    return 'Have a strong finish to the week, team';
+  } else if (day === 5 || day === 6 || day === 0) {
+    return 'Have a great weekend team';
+  }
+  return 'Have a productive week, team';
+}
+
 function buildDigestData(taskList: any[], completedList: any[]) {
   const now = new Date();
   const overdueTasks = taskList.filter((t) => t.deadline && new Date(t.deadline) < now);
@@ -35,6 +48,7 @@ function buildDigestData(taskList: any[], completedList: any[]) {
       month: 'long',
       day: 'numeric',
     }),
+    signOff: getSignOff(),
   };
 }
 
@@ -69,6 +83,11 @@ export async function generatePersonalDigest(client: any, userId: string) {
 export async function generateWeeklyDigest(client: any) {
   const completedThisWeek = getCompletedThisWeek();
   const allOpen = getAllOpenTasks();
+
+  console.log(`[digest] Open tasks: ${allOpen.length}, Completed this week: ${completedThisWeek.length}`);
+  if (allOpen.length === 0 && completedThisWeek.length === 0) {
+    console.warn('[digest] WARNING: 0 tasks found — possible DB/volume issue. Sending digest anyway.');
+  }
 
   // Full digest data
   const fullData = buildDigestData(allOpen, completedThisWeek);

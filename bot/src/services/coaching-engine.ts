@@ -1,6 +1,6 @@
 import { eq, and, gt } from 'drizzle-orm';
 import { db } from '../db/connection';
-import { callAnalyses, coachingSnapshots } from '../db/schema';
+import { callAnalyses, coachingSnapshots, teamMembers } from '../db/schema';
 import { anthropic } from '../ai/client';
 import { SALES_COACHING_PROMPT, CS_COACHING_PROMPT } from '../ai/call-analysis-prompts';
 
@@ -146,8 +146,23 @@ export async function generateCoachingSnapshot(repSlackId: string): Promise<Coac
     .slice(0, 5)
     .map(([text, count]) => ({ text, count }));
 
-  // Detect role from call patterns
-  const role = detectRepRole(calls.map((c) => ({ outcome: c.outcome, title: c.title })));
+  // Check for explicitly assigned coaching role first, then fall back to auto-detect
+  const memberRecord = db.select({ coachingRole: teamMembers.coachingRole })
+    .from(teamMembers)
+    .where(eq(teamMembers.slackUserId, repSlackId))
+    .get();
+  const rawRole = memberRecord?.coachingRole;
+
+  // Skip coaching entirely for N/A role (e.g. Team B operations)
+  if (rawRole === 'na') {
+    console.log(`[coaching-engine] Skipping coaching for ${repSlackId} (role=na)`);
+  }
+
+  const assignedRole = (rawRole === 'sales' || rawRole === 'cs') ? rawRole as RepRole : null;
+  const role: RepRole = assignedRole ?? detectRepRole(calls.map((c) => ({ outcome: c.outcome, title: c.title })));
+  if (assignedRole) {
+    console.log(`[coaching-engine] Using assigned role '${assignedRole}' for ${repSlackId}`);
+  }
 
   // Build call data summary for Claude
   const callDataSummary = {
@@ -342,6 +357,72 @@ export function formatCoachingForRep(repName: string, snapshot: CoachingSnapshot
 
   lines.push('');
   lines.push(`You had ${snapshot.callCount} call${snapshot.callCount !== 1 ? 's' : ''} this week. Keep building momentum!`);
+
+  return lines.join('\n');
+}
+
+// ─── Format Weekly Exec Summary (aggregated across all reps) ──────────
+
+export function formatWeeklyExecCoachingSummary(snapshots: CoachingSnapshotResult[]): string {
+  const lines: string[] = [];
+  const totalCalls = snapshots.reduce((sum, s) => sum + s.callCount, 0);
+
+  lines.push(':clipboard: *Weekly Team Coaching Summary*');
+  lines.push(`_${snapshots.length} rep${snapshots.length !== 1 ? 's' : ''} | ${totalCalls} total calls_`);
+  lines.push('');
+
+  // Grade summary per rep
+  const gradeEmoji: Record<string, string> = { A: ':star:', B: ':large_blue_circle:', C: ':large_yellow_circle:', D: ':large_orange_circle:', F: ':red_circle:' };
+
+  lines.push('*Rep Grades:*');
+  for (const s of snapshots) {
+    const name = s.repName ?? s.repSlackId;
+    const emoji = gradeEmoji[s.overallGrade] ?? '';
+    const roleLabel = s.role === 'cs' ? 'CS' : 'Sales';
+    lines.push(`  ${emoji} *${name}* — ${s.overallGrade} (${s.callCount} call${s.callCount !== 1 ? 's' : ''}, ${roleLabel})`);
+  }
+  lines.push('');
+
+  // Aggregate flags by type across all reps
+  const allFlags = snapshots.flatMap((s) => s.coachingFlags);
+  if (allFlags.length > 0) {
+    const flagCounts: Record<string, { count: number; severity: string }> = {};
+    for (const f of allFlags) {
+      if (!flagCounts[f.flag]) flagCounts[f.flag] = { count: 0, severity: f.severity };
+      flagCounts[f.flag].count++;
+    }
+    const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+    const sorted = Object.entries(flagCounts).sort(
+      (a, b) => (severityOrder[a[1].severity] ?? 4) - (severityOrder[b[1].severity] ?? 4),
+    );
+
+    lines.push('*Team-Wide Patterns:*');
+    for (const [flag, { count, severity }] of sorted.slice(0, 5)) {
+      lines.push(`  :warning: *${flag}* — ${count} rep${count > 1 ? 's' : ''} (${severity})`);
+    }
+    lines.push('');
+  }
+
+  // Reps needing attention (grade C or below, or critical/high flags)
+  const needsAttention = snapshots.filter(
+    (s) =>
+      ['C', 'D', 'F'].includes(s.overallGrade) ||
+      s.coachingFlags.some((f) => f.severity === 'critical' || f.severity === 'high'),
+  );
+
+  if (needsAttention.length > 0) {
+    lines.push(':rotating_light: *Needs Attention:*');
+    for (const s of needsAttention) {
+      const topFlag =
+        s.coachingFlags.find((f) => f.severity === 'critical') ??
+        s.coachingFlags.find((f) => f.severity === 'high') ??
+        s.coachingFlags[0];
+      const name = s.repName ?? s.repSlackId;
+      lines.push(`  *${name}* (${s.overallGrade}) — ${topFlag ? topFlag.flag : 'Needs improvement'}`);
+    }
+  } else {
+    lines.push(':white_check_mark: All reps performing well this week.');
+  }
 
   return lines.join('\n');
 }

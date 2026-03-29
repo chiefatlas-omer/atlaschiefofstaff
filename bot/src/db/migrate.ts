@@ -34,6 +34,7 @@ sqlite.exec(`
     slack_user_id TEXT NOT NULL,
     team TEXT NOT NULL,
     display_name TEXT,
+    coaching_role TEXT,
     created_at INTEGER NOT NULL
   );
 

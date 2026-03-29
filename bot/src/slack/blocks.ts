@@ -169,6 +169,7 @@ interface DigestData {
   overdueCount: number;
   overdueTasks: Array<{ description: string; slackUserName: string | null; slackUserId: string; daysOverdue: number }>;
   date: string;
+  signOff?: string;
 }
 
 export function digestBlocks(data: DigestData): SlackBlock[] {
@@ -210,7 +211,7 @@ export function digestBlocks(data: DigestData): SlackBlock[] {
     type: 'section',
     text: {
       type: 'mrkdwn',
-      text: 'Have a great weekend team',
+      text: data.signOff ?? 'Have a great weekend team',
     },
   });
 
