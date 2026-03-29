@@ -458,9 +458,22 @@ export default function Briefing() {
         </div>
       )}
       {askAnswer && !askLoading && (
-        <div className="bg-[#F3F1FC] rounded-xl p-4 text-gray-700 text-sm whitespace-pre-wrap">
-          {askAnswer}
-        </div>
+        <div
+          className="bg-[#F3F1FC] rounded-xl p-5 text-gray-700 text-sm prose prose-sm prose-purple max-w-none [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:mt-4 [&_h2]:mb-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-gray-800 [&_h3]:mt-3 [&_h3]:mb-1 [&_ul]:my-1 [&_li]:my-0.5 [&_p]:my-1.5 [&_strong]:text-gray-900"
+          dangerouslySetInnerHTML={{
+            __html: askAnswer
+              .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+              .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+              .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\*(.+?)\*/g, '<em>$1</em>')
+              .replace(/^[•\-] (.+)$/gm, '<li>$1</li>')
+              .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
+              .replace(/\n{2,}/g, '</p><p>')
+              .replace(/\n/g, '<br/>')
+              .replace(/^/, '<p>')
+              .replace(/$/, '</p>')
+          }}
+        />
       )}
 
       {/* ── Needs Your Attention ──────────────────────────────── */}
