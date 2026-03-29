@@ -6,7 +6,7 @@ import { createSOPForTopic } from '../services/sop-service';
 import { config } from '../config';
 import { generateProactiveAlerts, formatAlertsForSlack } from '../services/proactive-alerts';
 import { generateWeeklyDigest, formatDigestForSlack } from '../services/sales-digest';
-import { generateCoachingSnapshot, formatCoachingForSlack, formatCoachingForRep } from '../services/coaching-engine';
+import { generateCoachingSnapshot, formatCoachingForRep, formatWeeklyExecCoachingSummary, type CoachingSnapshotResult } from '../services/coaching-engine';
 import { db } from '../db/connection';
 import { tasks, callAnalyses } from '../db/schema';
 import { gt, gte, ne, eq, and } from 'drizzle-orm';
@@ -233,11 +233,15 @@ export function startCronJobs(client: any) {
         config.escalation.ehsanSlackUserId,
       ].filter(Boolean);
 
+      // Generate snapshots and DM each rep their own coaching
+      const allSnapshots: CoachingSnapshotResult[] = [];
+
       for (const repId of repIds) {
         try {
           const snapshot = await generateCoachingSnapshot(repId);
+          allSnapshots.push(snapshot);
 
-          // 1. DM the rep themselves with weekly summary coaching
+          // DM the rep themselves with weekly summary coaching
           try {
             const repMessage = formatCoachingForRep(snapshot.repName ?? repId, snapshot);
             await client.chat.postMessage({
@@ -248,25 +252,25 @@ export function startCronJobs(client: any) {
           } catch (err) {
             console.error(`[coaching] Failed to DM rep ${repId}:`, err);
           }
-
-          // 2. DM leadership with detailed coaching flags
-          if (snapshot.coachingFlags.length > 0) {
-            const leaderMessage = formatCoachingForSlack(snapshot.repName ?? repId, snapshot);
-
-            for (const leaderId of leadershipIds) {
-              try {
-                await client.chat.postMessage({
-                  channel: leaderId,
-                  text: `Weekly summary\n\n${leaderMessage}`,
-                });
-              } catch (err) {
-                console.error(`[coaching] Failed to DM leader ${leaderId}:`, err);
-              }
-            }
-          }
         } catch (err) {
           console.error(`[coaching] Failed to generate snapshot for rep ${repId}:`, err);
         }
+      }
+
+      // Send ONE aggregated exec summary to leadership
+      if (allSnapshots.length > 0) {
+        const execSummary = formatWeeklyExecCoachingSummary(allSnapshots);
+        for (const leaderId of leadershipIds) {
+          try {
+            await client.chat.postMessage({
+              channel: leaderId,
+              text: `Weekly Team Coaching Summary\n\n${execSummary}`,
+            });
+          } catch (err) {
+            console.error(`[coaching] Failed to DM exec summary to leader ${leaderId}:`, err);
+          }
+        }
+        console.log(`[coaching] Sent aggregated exec coaching summary to ${leadershipIds.length} leader(s).`);
       }
 
       console.log(`[coaching] Processed weekly summaries for ${repIds.length} rep(s).`);

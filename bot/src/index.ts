@@ -43,6 +43,7 @@ sqlite.exec(`
     slack_user_id TEXT NOT NULL,
     team TEXT NOT NULL,
     display_name TEXT,
+    coaching_role TEXT,
     created_at INTEGER NOT NULL
   );
 
@@ -315,6 +316,9 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS idx_email_drafts_status ON email_drafts(status);
   CREATE INDEX IF NOT EXISTS idx_email_drafts_created_at ON email_drafts(created_at);
 `);
+
+// Safe column migrations — ALTER TABLE is idempotent-safe via try/catch
+try { sqlite.exec('ALTER TABLE team_members ADD COLUMN coaching_role TEXT'); } catch (_e) { /* already exists */ }
 
 console.log('Database initialized.');
 

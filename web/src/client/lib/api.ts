@@ -380,6 +380,19 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ status }),
     }),
+  teamMembers: () => fetchApi<TeamMember[]>('/api/team'),
+  addTeamMember: (data: { slackUserId: string; displayName: string; team: string; coachingRole?: string }) =>
+    fetchApi<TeamMember>('/api/team', { method: 'POST', body: JSON.stringify(data) }),
+  updateTeamMember: (id: number, data: { coachingRole?: string | null; team?: string; displayName?: string }) =>
+    fetchApi<TeamMember>(`/api/team/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteTeamMember: (id: number) =>
+    fetchApi<{ success: boolean }>(`/api/team/${id}`, { method: 'DELETE' }),
+  slackUsers: () => fetchApi<SlackUser[]>('/api/slack-users'),
+  escalationTargets: () => fetchApi<EscalationTarget[]>('/api/escalation-targets'),
+  addEscalationTarget: (data: { slackUserId: string; displayName: string; role: string }) =>
+    fetchApi<EscalationTarget>('/api/escalation-targets', { method: 'POST', body: JSON.stringify(data) }),
+  deleteEscalationTarget: (id: number) =>
+    fetchApi<{ success: boolean }>(`/api/escalation-targets/${id}`, { method: 'DELETE' }),
 };
 
 export interface EmailDraft {
@@ -412,4 +425,29 @@ export interface SearchResult {
   id: string | number;
   title: string;
   subtitle?: string;
+}
+
+export interface TeamMember {
+  id: number;
+  slackUserId: string;
+  displayName: string | null;
+  team: 'team_a' | 'team_b';
+  coachingRole: 'sales' | 'cs' | 'na' | null;
+  createdAt: number;
+}
+
+export interface SlackUser {
+  slackUserId: string;
+  displayName: string;
+  email: string | null;
+  avatar: string | null;
+  title: string | null;
+}
+
+export interface EscalationTarget {
+  id: number;
+  slackUserId: string;
+  displayName: string | null;
+  role: 'owner' | 'manager';
+  createdAt: number;
 }

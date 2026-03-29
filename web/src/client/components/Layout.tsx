@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import CommandBar from './CommandBar';
+import { useAuth } from '../lib/auth';
 
 const NAV_ITEMS = [
-  { label: 'Command Center', href: '/' },
-  { label: 'Intelligence', href: '/intelligence' },
-  { label: 'Tasks', href: '/tasks' },
-  { label: 'Outcomes', href: '/outcomes' },
+  { label: 'Command Center', href: '/', adminOnly: false, teamAOnly: false },
+  { label: 'Intelligence', href: '/intelligence', adminOnly: false, teamAOnly: true },
+  { label: 'Tasks', href: '/tasks', adminOnly: false, teamAOnly: false },
+  { label: 'Outcomes', href: '/outcomes', adminOnly: false, teamAOnly: false },
+  { label: 'Settings', href: '/settings', adminOnly: false, teamAOnly: false },
 ];
 
 interface LayoutProps {
@@ -17,6 +19,7 @@ export default function Layout({ children }: LayoutProps) {
   const { pathname: currentPath } = useLocation();
   const [commandBarOpen, setCommandBarOpen] = useState(false);
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
@@ -55,7 +58,13 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {NAV_ITEMS.map(({ label, href }) => {
+          {NAV_ITEMS
+            .filter(({ teamAOnly }) => {
+              // Team B users can't see Intelligence (call coaching, sales intel)
+              if (teamAOnly && !user?.isAdmin && user?.team === 'team_b') return false;
+              return true;
+            })
+            .map(({ label, href }) => {
             const isActive =
               href === '/' ? currentPath === '/' : currentPath.startsWith(href);
             return (
@@ -77,28 +86,41 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 space-y-2">
+          {user && (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-700 truncate">{user.displayName}</p>
+                {user.isAdmin && <span className="text-[10px] text-[#4F3588] font-medium">Admin</span>}
+              </div>
+              <button
+                onClick={logout}
+                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
           <button
             onClick={() => setCommandBarOpen(true)}
-            className="text-xs text-gray-400 hover:text-purple-600 transition-colors"
+            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
-            Ctrl+K to search
+            {'\u2318'}K to search
           </button>
-          <p className="text-gray-300 text-xs">Atlas Chief of Staff</p>
         </div>
       </aside>
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
         {/* Sticky command bar trigger */}
-        <div className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm">
-          <div className="max-w-5xl mx-auto px-8 py-3 flex items-center justify-center">
+        <div className="sticky top-0 z-40 bg-[#FAFAFA]/80 backdrop-blur-sm border-b border-gray-200/50">
+          <div className="max-w-5xl mx-auto px-8 py-2 flex items-center justify-end">
             <button
               onClick={() => setCommandBarOpen(true)}
-              className="flex items-center gap-3 w-full max-w-xl text-sm text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-white border border-gray-200 rounded-xl px-5 py-3 shadow-sm hover:shadow-md transition-all"
+              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm hover:shadow transition-all"
             >
-              <span className="text-lg">🔍</span>
-              <span className="flex-1 text-left">Search, ask questions, generate emails...</span>
-              <kbd className="text-xs bg-white text-gray-500 px-2 py-1 rounded-lg font-mono border border-gray-200 shadow-sm">Ctrl+K</kbd>
+              <span className="text-gray-300">{'\uD83D\uDD0D'}</span>
+              <span>Search anything...</span>
+              <kbd className="ml-2 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">Ctrl+K</kbd>
             </button>
           </div>
         </div>

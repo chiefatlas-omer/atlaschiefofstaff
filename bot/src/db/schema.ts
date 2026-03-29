@@ -34,6 +34,7 @@ export const teamMembers = sqliteTable('team_members', {
   slackUserId: text('slack_user_id').notNull(),
   team: text('team', { enum: ['team_a', 'team_b'] }).notNull(),
   displayName: text('display_name'),
+  coachingRole: text('coaching_role', { enum: ['sales', 'cs', 'na'] }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 

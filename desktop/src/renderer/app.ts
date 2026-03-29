@@ -244,10 +244,9 @@ window.chiefOfStaff.onTranscript((text) => {
   }, 5000);
 });
 
-// Dictation done — instantly hide everything, no overlay
+// Dictation done — no visual feedback, just return to idle instantly
 window.chiefOfStaff.onDictationDone(() => {
   waveformContainer.classList.add('hidden');
-  transcriptBubble.classList.add('hidden');
   setState('idle');
 });
 

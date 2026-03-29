@@ -5,14 +5,123 @@ import briefingRouter from './routes/briefing';
 import tasksRouter from './routes/tasks';
 import dashboardRouter from './routes/dashboard';
 import graphRouter from './routes/graph';
+import settingsRouter from './routes/settings';
 const app = express();
 const PORT = Number(process.env.WEB_PORT) || 3001;
 
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3001'] }));
+app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3001'], credentials: true }));
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ─── Auth endpoints ──────────────────────────────────────────────────
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { slackUserId } = req.body as { slackUserId: string };
+    if (!slackUserId || !/^U[A-Z0-9]+$/.test(slackUserId)) {
+      res.status(400).json({ error: 'Invalid Slack User ID format. Should start with U followed by letters and numbers.' });
+      return;
+    }
+
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
+    const sqlite = new Database(dbPath, { readonly: true });
+
+    // Check if user exists in team_members, escalation_targets, or has tasks
+    const member = sqlite.prepare('SELECT display_name, team, coaching_role FROM team_members WHERE slack_user_id = ?').get(slackUserId) as any;
+    const escalation = sqlite.prepare('SELECT display_name, role FROM escalation_targets WHERE slack_user_id = ?').get(slackUserId) as any;
+    const hasTask = sqlite.prepare('SELECT 1 FROM tasks WHERE slack_user_id = ? LIMIT 1').get(slackUserId) as any;
+
+    // Also check env-configured admin IDs (bot stores these as env vars, not in DB)
+    const envAdminIds = [
+      process.env.OMER_SLACK_USER_ID,
+      process.env.MARK_SLACK_USER_ID,
+      process.env.EHSAN_SLACK_USER_ID,
+    ].filter(Boolean);
+    const isEnvAdmin = envAdminIds.includes(slackUserId);
+
+    // Bootstrap: if no escalation targets configured yet, allow any valid Slack ID
+    // (admin can then set up proper access via Settings)
+    const totalEscalation = sqlite.prepare('SELECT count(*) as c FROM escalation_targets').get() as any;
+    const noEscalationTargets = (totalEscalation?.c ?? 0) === 0;
+
+    sqlite.close();
+
+    // Allow login if user found in any table, is an env admin, OR no escalation targets exist yet (bootstrap)
+    if (!member && !escalation && !hasTask && !isEnvAdmin && !noEscalationTargets) {
+      res.status(403).json({ error: 'User not found. Ask your admin to add you to the team in Settings.' });
+      return;
+    }
+
+    // Admin if: env admin, DB escalation owner, or first user during bootstrap
+    const isAdmin = isEnvAdmin || escalation?.role === 'owner' || (noEscalationTargets && !member);
+
+    // Resolve display name: DB first, then Slack API for real name
+    let displayName = member?.display_name || escalation?.display_name || null;
+    if (!displayName && process.env.SLACK_BOT_TOKEN) {
+      try {
+        const slackRes = await fetch(`https://slack.com/api/users.info?user=${slackUserId}`, {
+          headers: { Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}` },
+        });
+        const slackData = await slackRes.json() as any;
+        if (slackData.ok && slackData.user) {
+          displayName = slackData.user.real_name || slackData.user.profile?.real_name || slackData.user.name;
+        }
+      } catch { /* fallback to ID */ }
+    }
+    displayName = displayName || slackUserId;
+
+    res.json({
+      slackUserId,
+      displayName,
+      isAdmin,
+      team: member?.team || null,
+      coachingRole: member?.coaching_role || null,
+    });
+  } catch (err) {
+    console.error('[auth] login error:', err);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// ─── Slack workspace users ───────────────────────────────────────────
+app.get('/api/slack-users', async (_req, res) => {
+  try {
+    const token = process.env.SLACK_BOT_TOKEN;
+    if (!token) {
+      res.status(500).json({ error: 'SLACK_BOT_TOKEN not configured' });
+      return;
+    }
+
+    const response = await fetch('https://slack.com/api/users.list', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await response.json() as any;
+
+    if (!data.ok) {
+      res.status(500).json({ error: `Slack API error: ${data.error}` });
+      return;
+    }
+
+    // Filter out bots, deactivated users, and Slackbot
+    const users = (data.members || [])
+      .filter((u: any) => !u.is_bot && !u.deleted && u.id !== 'USLACKBOT')
+      .map((u: any) => ({
+        slackUserId: u.id,
+        displayName: u.real_name || u.profile?.real_name || u.name,
+        email: u.profile?.email || null,
+        avatar: u.profile?.image_48 || null,
+        title: u.profile?.title || null,
+      }));
+
+    res.json(users);
+  } catch (err) {
+    console.error('[slack-users] error:', err);
+    res.status(500).json({ error: 'Failed to fetch Slack users' });
+  }
 });
 
 // Email drafts — use raw SQL to avoid import-triggered Express dual-instance issues
@@ -57,6 +166,7 @@ app.use('/api', briefingRouter);
 app.use('/api', tasksRouter);
 app.use('/api', dashboardRouter);
 app.use('/api', graphRouter);
+app.use('/api', settingsRouter);
 
 // Knowledge router loaded via require to isolate its heavy bot imports
 try {
