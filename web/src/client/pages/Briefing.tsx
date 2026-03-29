@@ -425,7 +425,7 @@ export default function Briefing() {
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <a
-                href="/downloads/atlas-voice-win.exe"
+                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/latest/download/Atlas.Chief.Setup.0.1.0.exe"
                 className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
                 style={{ animationName: 'pulse-glow' }}
               >
@@ -436,7 +436,7 @@ export default function Briefing() {
                 Download for Windows
               </a>
               <a
-                href="/downloads/atlas-voice-mac.dmg"
+                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/latest"
                 className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
                 style={{ animationName: 'pulse-glow', animationDelay: '0.3s' }}
               >

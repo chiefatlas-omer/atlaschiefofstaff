@@ -26,7 +26,7 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:3001');
 const STORAGE_KEY = 'atlas_user';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
