@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import briefingRouter from './routes/briefing';
 import tasksRouter from './routes/tasks';
 import dashboardRouter from './routes/dashboard';
@@ -9,7 +10,12 @@ import settingsRouter from './routes/settings';
 const app = express();
 const PORT = Number(process.env.WEB_PORT) || 3001;
 
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:3001'], credentials: true }));
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? true  // Allow same-origin in production (served from same server)
+    : ['http://localhost:5173', 'http://localhost:3001'],
+  credentials: true,
+}));
 app.use(express.json());
 
 app.get('/api/health', (_req, res) => {
@@ -270,6 +276,16 @@ try {
   app.use('/api', knowledgeMod.default || knowledgeMod);
 } catch (err: any) {
   console.error('[server] Knowledge routes failed:', err.message);
+}
+
+// ─── Static files (production Vite build) ────────────────────────────
+if (process.env.NODE_ENV === 'production') {
+  const clientDir = path.resolve(__dirname, '../client');
+  app.use(express.static(clientDir));
+  // SPA fallback — serve index.html for all non-API routes
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(clientDir, 'index.html'));
+  });
 }
 
 app.listen(PORT, () => {
