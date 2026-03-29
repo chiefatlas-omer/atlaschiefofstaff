@@ -15,7 +15,7 @@ import { eq, ne, and, lt, count, desc, gte, gt, isNotNull } from 'drizzle-orm';
 const router = Router();
 
 // GET /api/dashboard — aggregated metrics for all sections
-router.get('/dashboard', (_req, res) => {
+router.get('/dashboard', (req: any, res) => {
   try {
     const now = new Date();
     const thirtyDaysAgo = Math.floor(Date.now() / 1000) - 30 * 24 * 60 * 60;
@@ -126,14 +126,11 @@ router.get('/dashboard', (_req, res) => {
 });
 
 // GET /api/analytics/calls — recent call analyses (limit 50, ordered by date DESC)
-router.get('/analytics/calls', (_req, res) => {
+router.get('/analytics/calls', (req: any, res) => {
   try {
-    const calls = db
-      .select()
-      .from(callAnalyses)
-      .orderBy(desc(callAnalyses.date))
-      .limit(50)
-      .all();
+    const calls = (req.userId && !req.isAdmin)
+      ? db.select().from(callAnalyses).where(eq(callAnalyses.repSlackId, req.userId)).orderBy(desc(callAnalyses.date)).limit(50).all()
+      : db.select().from(callAnalyses).orderBy(desc(callAnalyses.date)).limit(50).all();
     res.json(calls);
   } catch (err) {
     console.error('[analytics] GET /calls error:', err);
@@ -142,14 +139,18 @@ router.get('/analytics/calls', (_req, res) => {
 });
 
 // GET /api/analytics/digest — weekly digest data (calls from last 7 days + aggregated breakdown)
-router.get('/analytics/digest', (_req, res) => {
+router.get('/analytics/digest', (req: any, res) => {
   try {
     const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
 
+    const digestConditions = [gt(callAnalyses.createdAt, weekAgo)];
+    if (req.userId && !req.isAdmin) {
+      digestConditions.push(eq(callAnalyses.repSlackId, req.userId));
+    }
     const calls = db
       .select()
       .from(callAnalyses)
-      .where(gt(callAnalyses.createdAt, weekAgo))
+      .where(and(...digestConditions))
       .orderBy(desc(callAnalyses.createdAt))
       .all();
 
@@ -235,9 +236,11 @@ router.get('/analytics/product', (_req, res) => {
 });
 
 // GET /api/analytics/coaching — coaching snapshots (limit 20, ordered by weekStart DESC)
-router.get('/analytics/coaching', (_req, res) => {
+router.get('/analytics/coaching', (req: any, res) => {
   try {
-    const snapshots = db
+    const snapshots = (req.userId && !req.isAdmin)
+      ? db.select().from(coachingSnapshots).where(eq(coachingSnapshots.repSlackId, req.userId)).orderBy(desc(coachingSnapshots.weekStart)).limit(20).all()
+      : db
       .select()
       .from(coachingSnapshots)
       .orderBy(desc(coachingSnapshots.weekStart))
