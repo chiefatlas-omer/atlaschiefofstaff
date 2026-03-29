@@ -5,13 +5,20 @@ import { eq, ne, and, lt, count, desc } from 'drizzle-orm';
 
 const router = Router();
 
-// GET /api/tasks — all open tasks (not COMPLETED or DISMISSED)
-router.get('/tasks', (_req, res) => {
+// GET /api/tasks — open tasks filtered by user (admins see all)
+router.get('/tasks', (req: any, res) => {
   try {
+    const conditions = [ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')];
+
+    // Non-admins only see their own tasks
+    if (req.userId && !req.isAdmin) {
+      conditions.push(eq(tasks.slackUserId, req.userId));
+    }
+
     const openTasks = db
       .select()
       .from(tasks)
-      .where(and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')))
+      .where(and(...conditions))
       .orderBy(desc(tasks.createdAt))
       .all();
     res.json(openTasks);
@@ -21,37 +28,36 @@ router.get('/tasks', (_req, res) => {
   }
 });
 
-// GET /api/tasks/stats — task metrics
-router.get('/tasks/stats', (_req, res) => {
+// GET /api/tasks/stats — task metrics filtered by user
+router.get('/tasks/stats', (req: any, res) => {
   try {
     const now = new Date();
+    const userFilter = (req.userId && !req.isAdmin) ? eq(tasks.slackUserId, req.userId) : undefined;
 
-    const total = db.select({ count: count() }).from(tasks).get();
+    const total = db.select({ count: count() }).from(tasks).where(userFilter).get();
     const open = db
       .select({ count: count() })
       .from(tasks)
-      .where(and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')))
+      .where(userFilter ? and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED'), userFilter) : and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')))
       .get();
     const completed = db
       .select({ count: count() })
       .from(tasks)
-      .where(eq(tasks.status, 'COMPLETED'))
+      .where(userFilter ? and(eq(tasks.status, 'COMPLETED'), userFilter) : eq(tasks.status, 'COMPLETED'))
       .get();
     const overdue = db
       .select({ count: count() })
       .from(tasks)
       .where(
-        and(
-          ne(tasks.status, 'COMPLETED'),
-          ne(tasks.status, 'DISMISSED'),
-          lt(tasks.deadline, now)
-        )
+        userFilter
+          ? and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED'), lt(tasks.deadline, now), userFilter)
+          : and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED'), lt(tasks.deadline, now))
       )
       .get();
     const escalated = db
       .select({ count: count() })
       .from(tasks)
-      .where(eq(tasks.status, 'ESCALATED'))
+      .where(userFilter ? and(eq(tasks.status, 'ESCALATED'), userFilter) : eq(tasks.status, 'ESCALATED'))
       .get();
 
     res.json({

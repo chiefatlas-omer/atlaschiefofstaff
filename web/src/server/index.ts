@@ -49,6 +49,24 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// ─── User context middleware — attach userId + isAdmin to every request ──
+app.use((req: any, _res: any, next: any) => {
+  const userId = req.headers['x-user-id'] as string | undefined;
+  req.userId = userId || null;
+  req.isAdmin = false;
+  if (userId) {
+    try {
+      const Database = require('better-sqlite3');
+      const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
+      const sqlite = new Database(dbPath, { readonly: true });
+      const esc = sqlite.prepare('SELECT role FROM escalation_targets WHERE slack_user_id = ?').get(userId) as any;
+      sqlite.close();
+      req.isAdmin = esc?.role === 'owner';
+    } catch { /* not admin */ }
+  }
+  next();
+});
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -220,46 +238,141 @@ app.post('/api/knowledge/upload', (req, res) => {
   }
 });
 
-// ─── Knowledge Q&A — raw SQL ─────────────────────────────────────────
-app.post('/api/ask', (req, res) => {
+// ─── Atlas Brain — Claude-powered Q&A with knowledge base context ────
+app.post('/api/ask', async (req, res) => {
   try {
-    const { question } = req.body as { question?: string };
+    const { question, generateEmail } = req.body as { question?: string; generateEmail?: boolean };
     if (!question?.trim()) {
       res.status(400).json({ error: 'question is required' });
       return;
     }
+
+    const q = question.trim();
     const Database = require('better-sqlite3');
-    const path = require('path');
     const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
     const sqlite = new Database(dbPath, { readonly: true });
 
-    const q = question.trim();
-    const stopWords = new Set(['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'was', 'one', 'our', 'has', 'have', 'what', 'how', 'who', 'where', 'when', 'why', 'which', 'that', 'this', 'with', 'from', 'about', 'does', 'will']);
+    // ── Step 1: Search knowledge base for relevant context ──
+    const stopWords = new Set(['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'was', 'one', 'our', 'has', 'have', 'what', 'how', 'who', 'where', 'when', 'why', 'which', 'that', 'this', 'with', 'from', 'about', 'does', 'will', 'would', 'could', 'should']);
     const keywords = q.toLowerCase().split(/\s+/).filter((w: string) => w.length >= 3 && !stopWords.has(w));
 
     let matches: any[] = [];
-    for (const kw of keywords.slice(0, 5)) {
-      const rows = sqlite.prepare(`SELECT id, content, source_type as sourceType, source_id as sourceId FROM knowledge_entries WHERE content LIKE ? LIMIT 10`).all(`%${kw}%`);
+    for (const kw of keywords.slice(0, 8)) {
+      const rows = sqlite.prepare('SELECT id, content, source_type as sourceType, source_id as sourceId FROM knowledge_entries WHERE content LIKE ? LIMIT 15').all(`%${kw}%`);
       matches.push(...rows);
     }
-    // Deduplicate
     const seen = new Set<number>();
-    matches = matches.filter((m: any) => { if (seen.has(m.id)) return false; seen.add(m.id); return true; }).slice(0, 5);
+    matches = matches.filter((m: any) => { if (seen.has(m.id)) return false; seen.add(m.id); return true; });
+    // Score by keyword overlap and take top entries
+    matches.sort((a: any, b: any) => {
+      const aScore = keywords.filter(kw => a.content.toLowerCase().includes(kw)).length;
+      const bScore = keywords.filter(kw => b.content.toLowerCase().includes(kw)).length;
+      return bScore - aScore;
+    });
+    matches = matches.slice(0, 8);
+
+    // Also search documents directly
+    let docMatches: any[] = [];
+    for (const kw of keywords.slice(0, 5)) {
+      const rows = sqlite.prepare('SELECT id, title, content, type FROM documents WHERE content LIKE ? OR title LIKE ? LIMIT 5').all(`%${kw}%`, `%${kw}%`);
+      docMatches.push(...rows);
+    }
+    const seenDocs = new Set<string>();
+    docMatches = docMatches.filter((d: any) => { if (seenDocs.has(d.id)) return false; seenDocs.add(d.id); return true; }).slice(0, 5);
 
     sqlite.close();
 
-    if (matches.length === 0) {
-      res.json({ answer: 'No knowledge entries found matching your question. Upload documents to build your knowledge base.', question: q, sources: [] });
+    // ── Step 2: Send to Claude with knowledge context ──
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      // Fallback: return raw matches if no API key
+      const parts = matches.map((m: any, i: number) => `[${i + 1}] ${m.content.slice(0, 500)}`);
+      res.json({ answer: parts.join('\n\n') || 'No relevant knowledge found.', question: q, sources: matches.map((m: any) => ({ id: m.id, sourceType: m.sourceType })) });
       return;
     }
 
-    const parts = ['Here\'s what I found in the knowledge base:\n'];
+    // Build context from knowledge entries + documents
+    const contextParts: string[] = [];
     matches.forEach((m: any, i: number) => {
-      const snippet = m.content.length > 300 ? m.content.slice(0, 300) + '...' : m.content;
-      parts.push(`**[${i + 1}]** (${m.sourceType}): ${snippet}`);
+      contextParts.push(`[Source ${i + 1}] (${m.sourceType}):\n${m.content.slice(0, 2000)}`);
+    });
+    docMatches.forEach((d: any) => {
+      contextParts.push(`[Document: ${d.title}] (${d.type}):\n${(d.content || '').slice(0, 2000)}`);
+    });
+    const context = contextParts.join('\n\n---\n\n');
+
+    const isEmailRequest = generateEmail || /email|draft|compose|write to|follow.?up|message to/i.test(q);
+
+    const systemPrompt = isEmailRequest
+      ? `You are Atlas Chief of Staff, an elite AI executive assistant for Atlas Growth (youratlas.com). You draft professional follow-up emails.
+
+Rules:
+- Write the email ready to send — subject line + body
+- Be concise, professional, and action-oriented
+- Reference specific details from the knowledge base context
+- Match the tone to the situation (warm for CS, direct for sales)
+- End with a clear call-to-action
+- Sign off as the rep (not as Atlas)
+- Never include placeholder brackets like [Name] — use context to fill in real details`
+      : `You are Atlas Brain — the AI-powered knowledge engine for Atlas Growth (youratlas.com). You are an expert on everything Atlas: products, processes, playbooks, talk tracks, customer pain points, onboarding, and competitive positioning.
+
+Rules:
+- Give clear, confident, actionable answers — like a senior executive briefing
+- Synthesize information from multiple sources into a cohesive answer
+- Use bullet points and structure for readability
+- When referencing source material, mention it naturally (e.g., "According to our AE Talk Track...")
+- If the knowledge base has relevant info, use it. If not, say so honestly
+- Be concise but thorough — quality over quantity
+- Sound like a trusted advisor, not a search engine
+- For process questions, give step-by-step guidance
+- For competitive questions, be strategic and confident
+- Always end with a clear takeaway or next step`;
+
+    const userPrompt = context.length > 0
+      ? `Here is relevant context from the Atlas knowledge base:\n\n${context}\n\n---\n\nQuestion: ${q}`
+      : `Question: ${q}\n\n(Note: No matching documents were found in the knowledge base for this query. Answer based on general best practices if possible, and suggest what documents might help if uploaded.)`;
+
+    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
     });
 
-    res.json({ answer: parts.join('\n'), question: q, sources: matches.map((m: any) => ({ id: m.id, sourceType: m.sourceType })) });
+    const claudeData = await claudeRes.json() as any;
+
+    if (!claudeRes.ok) {
+      console.error('[ask] Claude API error:', claudeData);
+      res.status(500).json({ error: 'AI processing failed. Please try again.' });
+      return;
+    }
+
+    const answer = claudeData.content?.[0]?.text || 'No response generated.';
+
+    // Record the Q&A interaction
+    try {
+      const writeDb = new (require('better-sqlite3'))(process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db'));
+      writeDb.prepare('INSERT INTO qa_interactions (question, answer, confidence, source_entry_ids, asked_via, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+        q, answer, matches.length > 2 ? 'high' : matches.length > 0 ? 'medium' : 'low',
+        JSON.stringify(matches.map((m: any) => m.id)), 'web', Math.floor(Date.now() / 1000)
+      );
+      writeDb.close();
+    } catch { /* non-critical */ }
+
+    res.json({
+      answer,
+      question: q,
+      sources: matches.map((m: any) => ({ id: m.id, sourceType: m.sourceType })),
+      isEmail: isEmailRequest,
+    });
   } catch (err) {
     console.error('[ask] error:', err);
     res.status(500).json({ error: 'Failed to process question' });
@@ -267,13 +380,15 @@ app.post('/api/ask', (req, res) => {
 });
 
 // Email drafts — use raw SQL to avoid import-triggered Express dual-instance issues
-app.get('/api/email-drafts', (_req, res) => {
+app.get('/api/email-drafts', (req: any, res) => {
   try {
     const Database = require('better-sqlite3');
-    const path = require('path');
     const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
     const sqlite = new Database(dbPath, { readonly: true });
-    const drafts = sqlite.prepare('SELECT * FROM email_drafts ORDER BY created_at DESC LIMIT 20').all();
+    // Non-admins only see their own follow-up drafts
+    const drafts = (req.userId && !req.isAdmin)
+      ? sqlite.prepare('SELECT * FROM email_drafts WHERE rep_slack_id = ? ORDER BY created_at DESC LIMIT 20').all(req.userId)
+      : sqlite.prepare('SELECT * FROM email_drafts ORDER BY created_at DESC LIMIT 20').all();
     sqlite.close();
     res.json(drafts);
   } catch (err) {

@@ -323,9 +323,17 @@ export interface BriefingData {
 // ---- Base fetch ----
 
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+  // Send logged-in user's Slack ID with every request for data filtering
+  const stored = localStorage.getItem('atlas_user');
+  const userId = stored ? (JSON.parse(stored) as { slackUserId?: string }).slackUserId : undefined;
+
   const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(userId ? { 'X-User-Id': userId } : {}),
+      ...options?.headers,
+    },
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
