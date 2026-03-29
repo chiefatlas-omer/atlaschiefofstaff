@@ -239,7 +239,7 @@ app.post('/api/knowledge/upload', (req, res) => {
 });
 
 // ─── Atlas Brain — Claude-powered Q&A with knowledge base context ────
-app.post('/api/ask', async (req, res) => {
+app.post('/api/ask', async (req: any, res) => {
   try {
     const { question, generateEmail } = req.body as { question?: string; generateEmail?: boolean };
     if (!question?.trim()) {
@@ -248,9 +248,50 @@ app.post('/api/ask', async (req, res) => {
     }
 
     const q = question.trim();
+    const userId = req.userId as string | null;
     const Database = require('better-sqlite3');
     const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
     const sqlite = new Database(dbPath, { readonly: true });
+
+    // ── Step 0: Check if this is a call-related request — pull user's recent calls ──
+    let callContext = '';
+    const isCallRelated = /last call|recent call|follow.?up|draft.*email|call summary|my calls/i.test(q);
+    if (isCallRelated && userId) {
+      try {
+        const recentCalls = sqlite.prepare(
+          'SELECT title, rep_name, business_name, business_type, objections, pains, desires, next_steps, outcome, summary, awareness_level FROM call_analyses WHERE rep_slack_id = ? ORDER BY created_at DESC LIMIT 3'
+        ).all(userId) as any[];
+
+        if (recentCalls.length > 0) {
+          const callParts = recentCalls.map((c: any, i: number) => {
+            const parts = [`Call ${i + 1}: ${c.title || 'Untitled'}`];
+            if (c.business_name) parts.push(`Prospect: ${c.business_name} (${c.business_type || 'unknown type'})`);
+            if (c.summary) parts.push(`Summary: ${c.summary}`);
+            if (c.objections) { try { const obj = JSON.parse(c.objections); if (obj.length) parts.push(`Objections raised: ${obj.join(', ')}`); } catch {} }
+            if (c.pains) { try { const p = JSON.parse(c.pains); if (p.length) parts.push(`Pain points: ${p.join(', ')}`); } catch {} }
+            if (c.desires) { try { const d = JSON.parse(c.desires); if (d.length) parts.push(`Desires: ${d.join(', ')}`); } catch {} }
+            if (c.next_steps) { try { const ns = JSON.parse(c.next_steps); if (ns.length) parts.push(`Next steps agreed: ${ns.join(', ')}`); } catch {} }
+            if (c.outcome) parts.push(`Outcome: ${c.outcome}`);
+            if (c.awareness_level) parts.push(`Awareness level: ${c.awareness_level}`);
+            return parts.join('\n');
+          });
+          callContext = `\n\nRecent calls for this rep:\n${callParts.join('\n\n')}`;
+        }
+
+        // Also pull email drafts already generated for context
+        const recentDrafts = sqlite.prepare(
+          'SELECT recipient_name, recipient_company, archetype, email_body, meeting_title FROM email_drafts WHERE rep_slack_id = ? ORDER BY created_at DESC LIMIT 2'
+        ).all(userId) as any[];
+        if (recentDrafts.length > 0) {
+          const draftParts = recentDrafts.map((d: any) =>
+            `Previous draft for ${d.recipient_name} (${d.recipient_company}, archetype: ${d.archetype}): ${(d.email_body || '').slice(0, 500)}`
+          );
+          callContext += `\n\nPrevious follow-up drafts:\n${draftParts.join('\n\n')}`;
+        }
+      } catch (callErr) {
+        console.error('[ask] Call context lookup failed (non-fatal):', callErr);
+      }
+    }
 
     // ── Step 1: Search knowledge base for relevant context ──
     const stopWords = new Set(['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'was', 'one', 'our', 'has', 'have', 'what', 'how', 'who', 'where', 'when', 'why', 'which', 'that', 'this', 'with', 'from', 'about', 'does', 'will', 'would', 'could', 'should']);
@@ -333,8 +374,13 @@ Response style:
 - If something isn't in the knowledge base, be honest: "I don't have specifics on that yet — you might want to upload [X] to fill that gap"
 - Never say "according to the documents" or cite sources with brackets — just speak with authority`;
 
-    const userPrompt = context.length > 0
-      ? `Here is relevant context from the Atlas knowledge base:\n\n${context}\n\n---\n\nQuestion: ${q}`
+    const allContext = [
+      context.length > 0 ? `Knowledge base context:\n\n${context}` : '',
+      callContext ? `Call intelligence:${callContext}` : '',
+    ].filter(Boolean).join('\n\n---\n\n');
+
+    const userPrompt = allContext.length > 0
+      ? `${allContext}\n\n---\n\nQuestion: ${q}`
       : `Question: ${q}\n\n(Note: No matching documents were found in the knowledge base for this query. Answer based on general best practices if possible, and suggest what documents might help if uploaded.)`;
 
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
