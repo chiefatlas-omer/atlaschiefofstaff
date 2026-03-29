@@ -2,28 +2,31 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install build dependencies for better-sqlite3
+# Install build dependencies for better-sqlite3 native module
 RUN apk add --no-cache python3 make g++
 
-# Copy the entire monorepo (web needs bot/src/db/schema imports)
-COPY . /monorepo
-WORKDIR /monorepo
-
-# Install bot dependencies (for schema imports)
-WORKDIR /monorepo/bot
-RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
-
 # Install web dependencies
-WORKDIR /monorepo/web
+COPY package*.json ./
 RUN npm ci
 
-# Build Vite frontend (static assets)
+# Copy web source
+COPY tsconfig.json ./
+COPY src/ ./src/
+COPY public/ ./public/
+COPY vite.config.ts ./
+
+# Copy bot DB schema files (web server imports these via ../../../../bot/src/db/schema)
+# Recreate the relative path the imports expect
+RUN mkdir -p /bot/src/db
+COPY bot-deps/ /bot/src/db/
+
+# Build Vite frontend
 RUN npx vite build
 
 # Clean up build deps
 RUN apk del python3 make g++ 2>/dev/null || true
 
-# Create data directory
+# Create data directory for SQLite
 RUN mkdir -p /data
 
 EXPOSE 3001
@@ -32,5 +35,4 @@ ENV DATABASE_PATH=/data/chiefofstaff.db
 ENV WEB_PORT=3001
 ENV NODE_ENV=production
 
-# Run the server with tsx (handles TypeScript + cross-project imports)
 CMD ["npx", "tsx", "src/server/index.ts"]

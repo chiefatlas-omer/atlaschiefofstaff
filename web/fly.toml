@@ -1,13 +1,19 @@
+# fly.toml app configuration file generated for atlas-command-center on 2026-03-28T19:33:21-07:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
 app = 'atlas-command-center'
 primary_region = 'ord'
 
 [build]
+  dockerfile = "Dockerfile"
 
 [env]
   DATABASE_PATH = '/data/chiefofstaff.db'
-  WEB_PORT = '3001'
-  TZ = 'America/Chicago'
   NODE_ENV = 'production'
+  TZ = 'America/Chicago'
+  WEB_PORT = '3001'
 
 [[mounts]]
   source = 'chiefofstaff_data'
@@ -16,23 +22,24 @@ primary_region = 'ord'
 [http_service]
   internal_port = 3001
   force_https = true
-  auto_stop_machines = false
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
 
   [http_service.concurrency]
-    type = "connections"
+    type = 'connections'
     hard_limit = 100
     soft_limit = 50
 
   [[http_service.checks]]
-    interval = "30s"
-    timeout = "5s"
-    grace_period = "15s"
-    method = "GET"
-    path = "/api/health"
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '15s'
+    method = 'GET'
+    path = '/api/health'
 
 [[vm]]
   memory = '512mb'
   cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 512
