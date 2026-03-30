@@ -369,11 +369,17 @@ export function taskListBlocks(
       ? dl.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : 'no deadline';
 
-    // Build thread link if available
+    // Build thread link — link to the original message where the task was detected
     let threadLink = '';
-    if (t.sourceChannelId && (t.sourceThreadTs || t.sourceMessageTs)) {
-      const ts = (t.sourceThreadTs || t.sourceMessageTs)!.replace('.', '');
-      threadLink = '  <https://slack.com/archives/' + t.sourceChannelId + '/p' + ts + '|:link: view thread>';
+    if (t.sourceChannelId && t.sourceMessageTs) {
+      const msgTs = t.sourceMessageTs.replace('.', '');
+      // If the message was in a thread, link with thread context; otherwise link to the message directly
+      if (t.sourceThreadTs) {
+        const threadTs = t.sourceThreadTs.replace('.', '');
+        threadLink = '  <https://slack.com/archives/' + t.sourceChannelId + '/p' + threadTs + '?thread_ts=' + t.sourceThreadTs + '&cid=' + t.sourceChannelId + '|:link: view thread>';
+      } else {
+        threadLink = '  <https://slack.com/archives/' + t.sourceChannelId + '/p' + msgTs + '|:link: view thread>';
+      }
     }
 
     blocks.push({

@@ -111,16 +111,16 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        {/* Sticky command bar trigger */}
+        {/* Sticky search bar — centered and prominent */}
         <div className="sticky top-0 z-40 bg-[#FAFAFA]/80 backdrop-blur-sm border-b border-gray-200/50">
-          <div className="max-w-5xl mx-auto px-8 py-2 flex items-center justify-end">
+          <div className="max-w-3xl mx-auto px-8 py-3 flex items-center justify-center">
             <button
               onClick={() => setCommandBarOpen(true)}
-              className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm hover:shadow transition-all"
+              className="w-full max-w-xl flex items-center gap-3 text-sm text-gray-400 hover:text-gray-600 bg-white border border-gray-200 rounded-xl px-5 py-2.5 shadow-sm hover:shadow-md hover:border-[#4F3588]/30 transition-all"
             >
-              <span className="text-gray-300">{'\uD83D\uDD0D'}</span>
-              <span>Search anything...</span>
-              <kbd className="ml-2 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">Ctrl+K</kbd>
+              <span className="text-[#4F3588]/40 text-base">{'\uD83D\uDD0D'}</span>
+              <span className="flex-1 text-left">Search anything...</span>
+              <kbd className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-mono">Ctrl+K</kbd>
             </button>
           </div>
         </div>
