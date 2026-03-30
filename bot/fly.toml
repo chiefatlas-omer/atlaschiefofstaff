@@ -2,16 +2,20 @@ app = 'atlaschief-bot'
 primary_region = 'ord'
 
 [build]
+  dockerfile = "../Dockerfile.combined"
+  # Build context is the repo root so we can copy both bot/ and web/
 
 [env]
   DATABASE_PATH = '/data/chiefofstaff.db'
   PORT = '3000'
+  WEB_PORT = '3001'
   TZ = 'America/Chicago'
 
 [[mounts]]
   source = 'chiefofstaff_data'
   destination = '/data'
 
+# Bot HTTP (Zoom webhooks + health check)
 [http_service]
   internal_port = 3000
   force_https = true

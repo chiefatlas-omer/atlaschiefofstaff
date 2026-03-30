@@ -39,7 +39,7 @@ Rules:
 - talkListenRatio: estimate based on relative speaking time; good range is 30-50% for the rep
 - If you cannot determine a value, use null for strings or empty arrays for lists
 - Do NOT invent information not in the transcript
-- productSignals should only include items explicitly mentioned in the transcript
+- productSignals should only include items about OUR product/platform (Atlas), NOT about the prospect's or client's own products, campaigns, or tools being discussed. If the call is reviewing a client's campaign or external product, those are NOT our product signals. Only capture feedback, requests, bugs, or friction about the Atlas platform itself.
 
 Transcript:
 {{TRANSCRIPT}}`;

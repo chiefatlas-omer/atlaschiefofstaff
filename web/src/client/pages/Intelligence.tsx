@@ -388,6 +388,7 @@ function CoachingTab() {
   const [snapshots, setSnapshots] = useState<CoachingSnapshot[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedRep, setSelectedRep] = useState<string>('all');
 
   useEffect(() => {
     api
@@ -413,9 +414,36 @@ function CoachingTab() {
     );
   }
 
+  // Get unique rep names for filter dropdown
+  const repNames = [...new Set(snapshots.map((s) => s.repName ?? s.repSlackId))].sort();
+  const filteredSnapshots = selectedRep === 'all'
+    ? snapshots
+    : snapshots.filter((s) => (s.repName ?? s.repSlackId) === selectedRep);
+
   return (
     <div className="space-y-6">
-      {snapshots.length === 0 ? (
+      {/* Rep filter dropdown */}
+      {snapshots.length > 0 && repNames.length > 1 && (
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-500">Filter by rep:</label>
+          <select
+            value={selectedRep}
+            onChange={(e) => setSelectedRep(e.target.value)}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4F3588]/20 focus:border-[#4F3588]"
+          >
+            <option value="all">All Reps ({repNames.length})</option>
+            {repNames.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {filteredSnapshots.length === 0 && snapshots.length > 0 ? (
+        <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-gray-400 text-sm">
+          No coaching data for this rep yet.
+        </div>
+      ) : snapshots.length === 0 ? (
         <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-gray-400 text-sm space-y-3">
           <p className="font-medium text-gray-500">What you'll see here:</p>
           <div className="font-mono text-xs space-y-1">
@@ -429,7 +457,7 @@ function CoachingTab() {
           </p>
         </div>
       ) : (
-        snapshots.map((snapshot) => {
+        filteredSnapshots.map((snapshot) => {
           const flags = snapshot.coachingFlags ?? [];
           const sortedFlags = [...flags].sort(
             (a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity),

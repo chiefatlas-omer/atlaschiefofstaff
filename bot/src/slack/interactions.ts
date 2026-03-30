@@ -25,8 +25,28 @@ export function registerInteractionHandlers(app: App) {
     }
 
     completeTask(taskId);
+    console.log(`[interactions] Task ${taskId} marked complete by ${body.user?.id}`);
 
     // Update the message — preserve other tasks, only replace the completed one's blocks
+    const channelId = (body as any).channel?.id;
+    const messageTs = (body as any).message?.ts;
+
+    if (!channelId || !messageTs) {
+      // Fallback for DMs or missing context — send a new confirmation message
+      try {
+        const userId = body.user?.id;
+        if (userId) {
+          await client.chat.postMessage({
+            channel: userId,
+            text: `:white_check_mark: Done! _${task.description}_ marked complete.`,
+          });
+        }
+      } catch (dmErr) {
+        console.error('[interactions] Failed to send DM completion confirmation:', dmErr);
+      }
+      return;
+    }
+
     if ('channel' in body && body.channel && 'message' in body && body.message) {
       const existingBlocks: any[] = (body as any).message.blocks || [];
 

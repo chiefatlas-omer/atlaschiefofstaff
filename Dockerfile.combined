@@ -4,7 +4,7 @@ FROM node:20-alpine
 RUN apk add --no-cache python3 make g++
 
 # ─── Bot setup ───
-WORKDIR /app
+WORKDIR /app/bot
 COPY bot/package*.json ./
 RUN npm ci
 COPY bot/tsconfig.json ./
@@ -12,12 +12,13 @@ COPY bot/src/ ./src/
 RUN npx tsc
 
 # ─── Web setup ───
-WORKDIR /web
+WORKDIR /app/web
 COPY web/package*.json ./
 RUN npm ci
 COPY web/src/ ./src/
-COPY web/dist/ ./dist/
 COPY web/tsconfig.json ./
+COPY web/dist/ ./dist/
+COPY web/vite.config.ts ./
 
 WORKDIR /app
 

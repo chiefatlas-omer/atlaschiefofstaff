@@ -1,0 +1,9 @@
+node_modules
+.git
+.claude
+desktop
+*.md
+.gitignore
+bot/node_modules
+bot/dist
+web/node_modules

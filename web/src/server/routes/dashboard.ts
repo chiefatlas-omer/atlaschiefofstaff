@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { tasks } from '../../../../bot/src/db/schema';
+import { tasks, teamMembers, escalationTargets } from '../../../../bot/src/db/schema';
 import {
   meetings,
   documents,
@@ -504,6 +504,23 @@ router.get('/analytics/leaderboard', (_req, res) => {
 
     // Remove 'Unknown' from leaderboard
     allNames.delete('Unknown');
+
+    // Filter to internal team only — only show names that match a team member or escalation target
+    const allTeamMembers = db.select().from(teamMembers).all();
+    const allEscTargets = db.select().from(escalationTargets).all();
+    const internalNames = new Set([
+      ...allTeamMembers.map((m) => m.displayName).filter(Boolean),
+      ...allEscTargets.map((t) => t.displayName).filter(Boolean),
+    ]);
+
+    // If team members are configured, filter to only internal team
+    if (internalNames.size > 0) {
+      for (const name of allNames) {
+        if (!internalNames.has(name)) {
+          allNames.delete(name);
+        }
+      }
+    }
 
     interface LeaderboardEntry {
       rank: number;
