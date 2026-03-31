@@ -102,9 +102,13 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
   const isOpen = (status: Task['status']) =>
     status !== 'COMPLETED' && status !== 'DISMISSED';
 
+  const [celebrateId, setCelebrateId] = useState<string | null>(null);
+
   const handleComplete = async (id: string) => {
     try {
       await api.completeTask(id);
+      setCelebrateId(id);
+      setTimeout(() => setCelebrateId(null), 1200);
       onTaskAction?.();
     } catch { /* ignore */ }
   };
@@ -132,7 +136,7 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
           {tasks.map((task) => (
             <tr
               key={task.id}
-              className="border-b border-gray-100 hover:bg-purple-50/50 transition-colors"
+              className={`border-b border-gray-100 hover:bg-purple-50/50 transition-all duration-300 ${celebrateId === task.id ? 'bg-emerald-50 scale-[0.98]' : ''}`}
             >
               <td className="py-3 pr-4 max-w-xs">
                 <span className="text-gray-700 truncate block" title={task.description}>

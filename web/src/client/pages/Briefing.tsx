@@ -298,10 +298,19 @@ export default function Briefing() {
 
   const attentionItems = data.needsAttention;
   const hasAttention = attentionItems.length > 0;
+  const [showAllAttention, setShowAllAttention] = useState(false);
+  const [celebrateTaskId, setCelebrateTaskId] = useState<string | null>(null);
+
+  // Top 3 Today: show max 3 items by default, expand to show all
+  const visibleAttention = showAllAttention ? attentionItems : attentionItems.slice(0, 3);
+  const hiddenCount = attentionItems.length - 3;
 
   const handleCompleteTask = async (taskId: string) => {
     try {
       await api.completeTask(taskId);
+      // Micro-celebration
+      setCelebrateTaskId(taskId);
+      setTimeout(() => setCelebrateTaskId(null), 1500);
       // Refresh briefing data
       const fresh = await api.briefing();
       setData(fresh);
@@ -458,22 +467,34 @@ export default function Briefing() {
         />
       )}
 
-      {/* ── Needs Your Attention ──────────────────────────────── */}
+      {/* ── Celebration overlay ───────────────────────────────── */}
+      {celebrateTaskId && (
+        <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
+          <div className="animate-bounce text-6xl">🎉</div>
+        </div>
+      )}
+
+      {/* ── Needs Your Attention (Top 3 Today) ─────────────────── */}
       <section>
         <div className="flex items-center gap-3 mb-4">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            Needs Your Attention
+            {hasAttention ? `Top ${Math.min(3, attentionItems.length)} Today` : 'Needs Your Attention'}
           </h2>
+          {hasAttention && attentionItems.length > 3 && (
+            <span className="text-xs text-gray-400">
+              {attentionItems.length} total items
+            </span>
+          )}
           <div className="flex-1 h-px bg-gray-200" />
         </div>
 
         {!hasAttention ? (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-700 text-sm">
-            All clear — nothing needs your attention right now.
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-700 text-sm flex items-center gap-2">
+            <span className="text-lg">✅</span> All clear — nothing needs your attention right now. Great work!
           </div>
         ) : (
           <div className="space-y-3">
-            {attentionItems.map((item, i) => {
+            {visibleAttention.map((item, i) => {
               let bgClass = '';
               let indicator = '';
 
@@ -497,7 +518,7 @@ export default function Briefing() {
               return (
                 <div
                   key={`${item.type}-${i}`}
-                  className={`border rounded-xl p-4 ${bgClass}`}
+                  className={`border rounded-xl p-4 ${bgClass} transition-all duration-300 ${celebrateTaskId === item.taskId ? 'scale-95 opacity-50' : ''}`}
                 >
                   <p className="text-xs font-semibold text-gray-500 mb-1">
                     {indicator} {labelMap[item.type] ?? item.type}
@@ -523,9 +544,56 @@ export default function Briefing() {
                 </div>
               );
             })}
+
+            {/* Expand/collapse for items beyond top 3 */}
+            {hiddenCount > 0 && !showAllAttention && (
+              <button
+                onClick={() => setShowAllAttention(true)}
+                className="w-full text-center text-xs font-medium text-[#4F3588] hover:text-[#5A3C9E] py-2 rounded-lg border border-dashed border-gray-300 hover:border-[#4F3588] transition-colors"
+              >
+                Show {hiddenCount} more item{hiddenCount !== 1 ? 's' : ''} →
+              </button>
+            )}
+            {showAllAttention && attentionItems.length > 3 && (
+              <button
+                onClick={() => setShowAllAttention(false)}
+                className="w-full text-center text-xs font-medium text-gray-400 hover:text-gray-600 py-2 transition-colors"
+              >
+                Collapse ↑
+              </button>
+            )}
           </div>
         )}
       </section>
+
+      {/* ── Milestones (promoted for new users with low score) ── */}
+      {data.aiScore && data.aiScore.score < 50 && (
+        <section className="bg-gradient-to-r from-[#FAF9FE] to-[#F3F1FC] border border-[#4F3588]/10 rounded-xl p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="text-xs font-semibold text-[#4F3588] uppercase tracking-wider">
+              🚀 Get Started — Complete Your Setup
+            </h2>
+            <div className="flex-1 h-px bg-[#4F3588]/10" />
+            <span className="text-xs font-bold text-[#4F3588]">{data.aiScore.score}/100</span>
+          </div>
+          <div className="w-full h-2 bg-white/60 rounded-full overflow-hidden mb-4">
+            <div
+              className="h-full bg-[#4F3588] rounded-full transition-all duration-500"
+              style={{ width: `${data.aiScore.score}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {data.aiScore.milestones.map((m) => (
+              <div key={m.label} className="flex items-center gap-2">
+                <span className="text-sm leading-none">{m.completed ? '✅' : '⬜'}</span>
+                <span className={`text-sm ${m.completed ? 'text-emerald-600' : 'text-gray-500'}`}>
+                  {m.label} {m.completed ? '' : `(+${m.points})`}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── This Week + Streaks (side by side) ────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

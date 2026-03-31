@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import CommandBar from './CommandBar';
 import { useAuth } from '../lib/auth';
+import { api } from '../lib/api';
 
 const NAV_ITEMS = [
   { label: 'Command Center', href: '/', adminOnly: false, teamAOnly: false },
@@ -18,8 +19,22 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { pathname: currentPath } = useLocation();
   const [commandBarOpen, setCommandBarOpen] = useState(false);
+  const [streaks, setStreaks] = useState<{ tasks: number; calls: number; active: number } | null>(null);
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  // Fetch streaks for sidebar
+  useEffect(() => {
+    api.briefing().then((b) => {
+      if (b.streaks) {
+        setStreaks({
+          tasks: b.streaks.tasksCompleted.current,
+          calls: b.streaks.callsAnalyzed.current,
+          active: b.streaks.systemActive.current,
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
@@ -83,6 +98,23 @@ export default function Layout({ children }: LayoutProps) {
             );
           })}
         </nav>
+
+        {/* Streaks */}
+        {streaks && (streaks.tasks > 0 || streaks.calls > 0 || streaks.active > 0) && (
+          <div className="px-4 py-3 border-t border-gray-100">
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              {streaks.tasks > 0 && (
+                <span title={`${streaks.tasks}-day task streak`}>🔥 {streaks.tasks}d</span>
+              )}
+              {streaks.calls > 0 && (
+                <span title={`${streaks.calls}-day call streak`}>📞 {streaks.calls}d</span>
+              )}
+              {streaks.active > 0 && (
+                <span title={`${streaks.active} days active`}>⚡ {streaks.active}d</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 space-y-2">
