@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, DragEvent, ChangeEvent } from 'react';
 import { api, BriefingData } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import ActivityFeed from '../components/ActivityFeed';
 import type { ActivityItem } from '../components/ActivityFeed';
 
@@ -251,6 +252,7 @@ function UploadSection() {
 }
 
 export default function Briefing() {
+  const { user } = useAuth();
   const [data, setData] = useState<BriefingData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -302,8 +304,24 @@ export default function Briefing() {
 
   const attentionItems = data.needsAttention;
   const hasAttention = attentionItems.length > 0;
+  const isAdmin = user?.isAdmin ?? false;
 
-  // Top 3 Today: show max 3 items by default, expand to show all
+  // Admin: aggregate overdue tasks by person for summary view
+  const overdueByPerson: Record<string, { name: string; count: number }> = {};
+  if (isAdmin) {
+    for (const item of attentionItems) {
+      if (item.type === 'overdue_task' && item.subtitle) {
+        const match = item.subtitle.match(/Assigned to (.+?) ·/);
+        const name = match?.[1] ?? 'Unknown';
+        if (!overdueByPerson[name]) overdueByPerson[name] = { name, count: 0 };
+        overdueByPerson[name].count++;
+      }
+    }
+  }
+  const sortedOverduePeople = Object.values(overdueByPerson).sort((a, b) => b.count - a.count);
+  const nonTaskAttention = attentionItems.filter((i) => i.type !== 'overdue_task');
+
+  // Regular users: show max 3 items by default, expand to show all
   const visibleAttention = showAllAttention ? attentionItems : attentionItems.slice(0, 3);
   const hiddenCount = attentionItems.length - 3;
 
@@ -476,13 +494,13 @@ export default function Briefing() {
         </div>
       )}
 
-      {/* ── Needs Your Attention (Top 3 Today) ─────────────────── */}
+      {/* ── Needs Your Attention ──────────────────────────────── */}
       <section>
         <div className="flex items-center gap-3 mb-4">
           <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            {hasAttention ? `Top ${Math.min(3, attentionItems.length)} Today` : 'Needs Your Attention'}
+            {isAdmin ? 'Team Status' : hasAttention ? `Top ${Math.min(3, attentionItems.length)} Today` : 'Needs Your Attention'}
           </h2>
-          {hasAttention && attentionItems.length > 3 && (
+          {hasAttention && (
             <span className="text-xs text-gray-400">
               {attentionItems.length} total items
             </span>
@@ -490,7 +508,48 @@ export default function Briefing() {
           <div className="flex-1 h-px bg-gray-200" />
         </div>
 
-        {!hasAttention ? (
+        {/* Admin: Team overdue summary */}
+        {isAdmin && sortedOverduePeople.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-4 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Overdue Tasks by Person</span>
+            </div>
+            {sortedOverduePeople.map((p) => (
+              <div key={p.name} className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                <span className="text-sm font-medium text-gray-900">{p.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-semibold ${p.count >= 5 ? 'text-red-600' : p.count >= 3 ? 'text-amber-600' : 'text-gray-600'}`}>
+                    {p.count} overdue
+                  </span>
+                  {p.count >= 5 && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">Needs follow-up</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Admin: non-task attention items (risk flags, unprepped meetings) */}
+        {isAdmin && nonTaskAttention.length > 0 && (
+          <div className="space-y-3 mb-4">
+            {nonTaskAttention.map((item, i) => {
+              const bgClass = item.type === 'risk_flag' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200';
+              const indicator = item.type === 'risk_flag' ? '\u26A0\uFE0F' : '\u{1F4C5}';
+              const label = item.type === 'risk_flag' ? 'Risk detected' : 'Needs prep';
+              return (
+                <div key={`${item.type}-${i}`} className={`border rounded-xl p-4 ${bgClass}`}>
+                  <p className="text-xs font-semibold text-gray-500 mb-1">{indicator} {label}</p>
+                  <p className="text-sm font-medium text-gray-900">{item.title}</p>
+                  <p className="text-xs text-gray-500 mt-1">{item.subtitle}</p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Non-admin: regular Top 3 view */}
+        {!isAdmin && (!hasAttention ? (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-700 text-sm flex items-center gap-2">
             <span className="text-lg">✅</span> All clear — nothing needs your attention right now. Great work!
           </div>
@@ -565,7 +624,7 @@ export default function Briefing() {
               </button>
             )}
           </div>
-        )}
+        ))}
       </section>
 
       {/* ── Milestones (promoted for new users with low score) ── */}
