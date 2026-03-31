@@ -57,6 +57,12 @@ export default function Settings() {
   const [newTeam, setNewTeam] = useState('team_a');
   const [newRole, setNewRole] = useState('');
 
+  // Bulk add state
+  const [showBulkAdd, setShowBulkAdd] = useState(false);
+  const [bulkTeam, setBulkTeam] = useState('team_a');
+  const [bulkRole, setBulkRole] = useState('');
+  const [bulkAdding, setBulkAdding] = useState(false);
+
   // Add escalation form state
   const [escSlackId, setEscSlackId] = useState('');
   const [escRole, setEscRole] = useState('owner');
@@ -143,6 +149,29 @@ export default function Settings() {
     }
   };
 
+  const handleBulkAdd = async (selectedIds: string[]) => {
+    if (selectedIds.length === 0) return;
+    setBulkAdding(true);
+    try {
+      for (const slackId of selectedIds) {
+        const slackUser = slackUsers.find((u) => u.slackUserId === slackId);
+        const displayName = slackUser?.displayName || slackId;
+        await api.addTeamMember({
+          slackUserId: slackId,
+          displayName,
+          team: bulkTeam as 'team_a' | 'team_b',
+          coachingRole: bulkRole || undefined,
+        });
+      }
+      setShowBulkAdd(false);
+      loadMembers();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setBulkAdding(false);
+    }
+  };
+
   const handleDeleteEscalation = async (id: number) => {
     try {
       await api.deleteEscalationTarget(id);
@@ -182,12 +211,20 @@ export default function Settings() {
             <h2 className="text-sm font-semibold text-gray-900 tracking-wide uppercase">Team Members</h2>
             <p className="text-xs text-gray-400 mt-0.5">Assign coaching roles to determine which methodology each rep receives</p>
           </div>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="px-3 py-1.5 bg-[#4F3588] text-white text-sm font-medium rounded-lg hover:bg-[#5A3C9E] transition-colors"
-          >
-            {showAddForm ? 'Cancel' : '+ Add Member'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setShowBulkAdd(!showBulkAdd); setShowAddForm(false); }}
+              className="px-3 py-1.5 border border-[#4F3588] text-[#4F3588] text-sm font-medium rounded-lg hover:bg-[#FAF9FE] transition-colors"
+            >
+              {showBulkAdd ? 'Cancel' : 'Bulk Add'}
+            </button>
+            <button
+              onClick={() => { setShowAddForm(!showAddForm); setShowBulkAdd(false); }}
+              className="px-3 py-1.5 bg-[#4F3588] text-white text-sm font-medium rounded-lg hover:bg-[#5A3C9E] transition-colors"
+            >
+              {showAddForm ? 'Cancel' : '+ Add Member'}
+            </button>
+          </div>
         </div>
 
         {showAddForm && (
@@ -244,6 +281,62 @@ export default function Settings() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {showBulkAdd && (
+          <div className="px-6 py-4 bg-[#FAF9FE] border-b border-gray-100">
+            <p className="text-sm font-medium text-gray-700 mb-3">Select multiple Slack users to add at once</p>
+            <div className="grid grid-cols-3 gap-4 mb-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Team</label>
+                <select
+                  value={bulkTeam}
+                  onChange={(e) => setBulkTeam(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4F3588]/20 bg-white"
+                >
+                  {TEAM_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Coaching Role</label>
+                <select
+                  value={bulkRole}
+                  onChange={(e) => setBulkRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#4F3588]/20 bg-white"
+                >
+                  {ROLE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="border border-gray-200 rounded-lg bg-white max-h-48 overflow-y-auto">
+              {slackUsers.filter(u => !members.some(m => m.slackUserId === u.slackUserId)).map((user) => (
+                <label key={user.slackUserId} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0">
+                  <input
+                    type="checkbox"
+                    value={user.slackUserId}
+                    className="rounded border-gray-300 text-[#4F3588] focus:ring-[#4F3588]"
+                  />
+                  <span className="text-sm text-gray-700">{user.displayName}</span>
+                  <span className="text-xs text-gray-400">{user.slackUserId}</span>
+                </label>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                const checkboxes = document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]:checked');
+                const ids = Array.from(checkboxes).map(cb => cb.value).filter(v => v.startsWith('U'));
+                handleBulkAdd(ids);
+              }}
+              disabled={bulkAdding}
+              className="mt-3 px-4 py-2 bg-[#4F3588] text-white text-sm font-medium rounded-lg hover:bg-[#5A3C9E] transition-colors disabled:opacity-50"
+            >
+              {bulkAdding ? 'Adding...' : 'Add Selected Members'}
+            </button>
           </div>
         )}
 

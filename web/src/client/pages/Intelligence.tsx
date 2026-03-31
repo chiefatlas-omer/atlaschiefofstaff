@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, DigestData, ProductIntelData, CoachingSnapshot, EmailDraft, SOP } from '../lib/api';
+import { api, DigestData, ProductIntelData, CoachingSnapshot, EmailDraft, SOP, RepSummary } from '../lib/api';
 import MetricCard from '../components/MetricCard';
 
 // ─── Shared badge helpers ────────────────────────────────────────────────────
@@ -85,14 +85,37 @@ function CallsTab() {
   const [data, setData] = useState<DigestData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedRep, setSelectedRep] = useState<string>('all');
+  const [repSummary, setRepSummary] = useState<RepSummary | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
-  useEffect(() => {
+  // Load calls (with optional rep filter)
+  const loadCalls = (repSlackId?: string) => {
+    setLoading(true);
     api
-      .salesDigest()
+      .salesDigest(repSlackId)
       .then(setData)
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { loadCalls(); }, []);
+
+  // When rep changes, reload calls and fetch exec summary
+  const handleRepChange = (repSlackId: string) => {
+    setSelectedRep(repSlackId);
+    setRepSummary(null);
+    if (repSlackId === 'all') {
+      loadCalls();
+    } else {
+      loadCalls(repSlackId);
+      setSummaryLoading(true);
+      api.repSummary(repSlackId)
+        .then(setRepSummary)
+        .catch(() => setRepSummary(null))
+        .finally(() => setSummaryLoading(false));
+    }
+  };
 
   if (loading) {
     return (
@@ -113,8 +136,127 @@ function CallsTab() {
   const talkRatioColor = data.avgTalkRatio !== null && data.avgTalkRatio < 60 ? 'green' : 'red';
   const questionsColor = data.avgQuestionsPerCall !== null && data.avgQuestionsPerCall >= 5 ? 'green' : 'red';
 
+  // Get unique reps from calls for the dropdown
+  const repList = data ? [...new Map(data.calls
+    .filter(c => c.repSlackId && c.repName)
+    .map(c => [c.repSlackId!, { slackId: c.repSlackId!, name: c.repName! }])
+  ).values()].sort((a, b) => a.name.localeCompare(b.name)) : [];
+
+  const SEVERITY_BADGE: Record<string, string> = {
+    critical: 'bg-red-50 text-red-700 border-red-200',
+    high: 'bg-orange-50 text-orange-700 border-orange-200',
+    medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+    low: 'bg-gray-50 text-gray-500 border-gray-200',
+  };
+
   return (
     <div className="space-y-8">
+      {/* Rep filter dropdown (admin only) */}
+      {repList.length > 1 && (
+        <div className="flex items-center gap-3">
+          <label className="text-sm font-medium text-gray-500">Filter by rep:</label>
+          <select
+            value={selectedRep}
+            onChange={(e) => handleRepChange(e.target.value)}
+            className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#4F3588]/20 focus:border-[#4F3588]"
+          >
+            <option value="all">All Reps ({repList.length})</option>
+            {repList.map((rep) => (
+              <option key={rep.slackId} value={rep.slackId}>{rep.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Executive Summary Panel (when a rep is selected) */}
+      {repSummary && (
+        <section className="bg-gradient-to-r from-[#FAF9FE] to-[#F3F1FC] rounded-xl border border-[#4F3588]/10 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[#4F3588]">
+              Executive Summary — {repSummary.repName}
+            </h2>
+            <span className="text-xs text-gray-400">Last 30 days · {repSummary.totalCalls} calls</span>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white rounded-lg border border-gray-200 p-3">
+              <p className="text-xs text-gray-400">Total Calls</p>
+              <p className="text-xl font-bold text-[#4F3588]">{repSummary.totalCalls}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-3">
+              <p className="text-xs text-gray-400">Avg Talk Ratio</p>
+              <p className={`text-xl font-bold ${(repSummary.avgTalkRatio ?? 0) > 60 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {repSummary.avgTalkRatio ?? '—'}%
+              </p>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-3">
+              <p className="text-xs text-gray-400">Avg Questions</p>
+              <p className="text-xl font-bold text-blue-600">{repSummary.avgQuestions ?? '—'}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-gray-200 p-3">
+              <p className="text-xs text-gray-400">Coaching Flags</p>
+              <p className="text-xl font-bold text-amber-600">{repSummary.topFlags.length}</p>
+            </div>
+          </div>
+
+          {/* Top coaching flags */}
+          {repSummary.topFlags.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Key Areas to Coach</p>
+              <div className="space-y-2">
+                {repSummary.topFlags.map((f, i) => (
+                  <div key={`flag-${i}`} className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded border font-medium ${SEVERITY_BADGE[f.severity] ?? SEVERITY_BADGE.low}`}>
+                      {f.severity}
+                    </span>
+                    <span className="text-sm text-gray-700">{f.flag}</span>
+                    <span className="text-xs text-gray-400">({f.count}x)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top objections + pains */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {repSummary.topObjections.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Top Objections</p>
+                <div className="space-y-1">
+                  {repSummary.topObjections.map((o, i) => (
+                    <div key={`obj-${i}`} className="flex items-center gap-2 text-sm">
+                      <span className="text-amber-500">•</span>
+                      <span className="text-gray-700 capitalize">{o.text}</span>
+                      <span className="text-xs text-gray-400">({o.count}x)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {repSummary.topPains.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Top Pain Points</p>
+                <div className="space-y-1">
+                  {repSummary.topPains.map((p, i) => (
+                    <div key={`pain-${i}`} className="flex items-center gap-2 text-sm">
+                      <span className="text-blue-500">•</span>
+                      <span className="text-gray-700 capitalize">{p.text}</span>
+                      <span className="text-xs text-gray-400">({p.count}x)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {summaryLoading && (
+        <div className="flex items-center justify-center h-20 text-gray-400 text-sm">
+          Loading executive summary...
+        </div>
+      )}
+
       {/* Gong/Rilla-style metric cards */}
       <section>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

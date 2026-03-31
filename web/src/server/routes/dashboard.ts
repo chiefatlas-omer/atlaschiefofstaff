@@ -144,7 +144,11 @@ router.get('/analytics/digest', (req: any, res) => {
     const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
 
     const digestConditions = [gt(callAnalyses.createdAt, weekAgo)];
-    if (req.userId && !req.isAdmin) {
+    // Admin can filter by specific rep via query param
+    const filterRep = req.query?.repSlackId as string | undefined;
+    if (filterRep && req.isAdmin) {
+      digestConditions.push(eq(callAnalyses.repSlackId, filterRep));
+    } else if (req.userId && !req.isAdmin) {
       digestConditions.push(eq(callAnalyses.repSlackId, req.userId));
     }
     const calls = db
@@ -210,6 +214,101 @@ router.get('/analytics/digest', (req: any, res) => {
   } catch (err) {
     console.error('[analytics] GET /digest error:', err);
     res.status(500).json({ error: 'Failed to fetch digest data' });
+  }
+});
+
+// GET /api/analytics/rep-summary?repSlackId=xxx — executive coaching summary for a specific rep
+router.get('/analytics/rep-summary', (req: any, res) => {
+  try {
+    if (!req.isAdmin) {
+      res.status(403).json({ error: 'Admin only' });
+      return;
+    }
+    const repSlackId = req.query?.repSlackId as string;
+    if (!repSlackId) {
+      res.status(400).json({ error: 'repSlackId query param required' });
+      return;
+    }
+
+    // All calls for this rep (last 30 days)
+    const monthAgo = Math.floor(Date.now() / 1000) - 30 * 86400;
+    const calls = db.select().from(callAnalyses)
+      .where(and(eq(callAnalyses.repSlackId, repSlackId), gt(callAnalyses.createdAt, monthAgo)))
+      .orderBy(desc(callAnalyses.createdAt))
+      .all();
+
+    const repName = calls[0]?.repName ?? repSlackId;
+
+    // Aggregate metrics
+    const talkRatios = calls.map(c => c.talkListenRatio).filter((v): v is number => v !== null);
+    const avgTalkRatio = talkRatios.length > 0 ? Math.round(talkRatios.reduce((a, b) => a + b, 0) / talkRatios.length) : null;
+    const questionCounts = calls.map(c => c.questionCount).filter((v): v is number => v !== null);
+    const avgQuestions = questionCounts.length > 0 ? Math.round(questionCounts.reduce((a, b) => a + b, 0) / questionCounts.length) : null;
+
+    // Outcome breakdown
+    const outcomes: Record<string, number> = {};
+    for (const c of calls) { const o = c.outcome ?? 'unknown'; outcomes[o] = (outcomes[o] ?? 0) + 1; }
+
+    // Top objections across all calls
+    const allObjections: string[] = [];
+    for (const c of calls) {
+      try { const obj = JSON.parse(c.objections as string ?? '[]'); allObjections.push(...obj); } catch {}
+    }
+    const objFreq: Record<string, number> = {};
+    for (const o of allObjections) { const k = o.trim().toLowerCase(); objFreq[k] = (objFreq[k] ?? 0) + 1; }
+    const topObjections = Object.entries(objFreq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([text, count]) => ({ text, count }));
+
+    // Top pains across all calls
+    const allPains: string[] = [];
+    for (const c of calls) {
+      try { const p = JSON.parse(c.pains as string ?? '[]'); allPains.push(...p); } catch {}
+    }
+    const painFreq: Record<string, number> = {};
+    for (const p of allPains) { const k = p.trim().toLowerCase(); painFreq[k] = (painFreq[k] ?? 0) + 1; }
+    const topPains = Object.entries(painFreq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([text, count]) => ({ text, count }));
+
+    // Latest coaching snapshots
+    const snapshots = db.select().from(coachingSnapshots)
+      .where(eq(coachingSnapshots.repSlackId, repSlackId))
+      .orderBy(desc(coachingSnapshots.weekStart))
+      .limit(4)
+      .all();
+
+    // Aggregate coaching flags across snapshots
+    const flagFreq: Record<string, { count: number; severity: string }> = {};
+    for (const s of snapshots) {
+      const flags = (s.coachingFlags as any[]) ?? [];
+      for (const f of flags) {
+        if (!flagFreq[f.flag]) flagFreq[f.flag] = { count: 0, severity: f.severity };
+        flagFreq[f.flag].count++;
+      }
+    }
+    const topFlags = Object.entries(flagFreq)
+      .sort((a, b) => {
+        const sev: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+        return (sev[a[1].severity] ?? 4) - (sev[b[1].severity] ?? 4);
+      })
+      .slice(0, 5)
+      .map(([flag, { count, severity }]) => ({ flag, count, severity }));
+
+    res.json({
+      repSlackId,
+      repName,
+      totalCalls: calls.length,
+      avgTalkRatio,
+      avgQuestions,
+      outcomes,
+      topObjections,
+      topPains,
+      topFlags,
+      recentGrades: snapshots.map(s => ({
+        weekStart: s.weekStart,
+        callCount: s.callCount,
+      })),
+    });
+  } catch (err) {
+    console.error('[analytics] GET /rep-summary error:', err);
+    res.status(500).json({ error: 'Failed to fetch rep summary' });
   }
 });
 

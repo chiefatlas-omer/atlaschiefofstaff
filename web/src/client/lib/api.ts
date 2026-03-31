@@ -166,6 +166,19 @@ export interface DigestData {
   calls: CallAnalysis[];
 }
 
+export interface RepSummary {
+  repSlackId: string;
+  repName: string;
+  totalCalls: number;
+  avgTalkRatio: number | null;
+  avgQuestions: number | null;
+  outcomes: Record<string, number>;
+  topObjections: { text: string; count: number }[];
+  topPains: { text: string; count: number }[];
+  topFlags: { flag: string; count: number; severity: string }[];
+  recentGrades: { weekStart: number | null; callCount: number | null }[];
+}
+
 export interface ProductSignal {
   id: number;
   type: string;
@@ -360,7 +373,10 @@ export const api = {
       body: JSON.stringify({ question }),
     }),
   calls: () => fetchApi<CallAnalysis[]>('/api/analytics/calls'),
-  salesDigest: () => fetchApi<DigestData>('/api/analytics/digest'),
+  salesDigest: (repSlackId?: string) => fetchApi<DigestData>(
+    repSlackId ? `/api/analytics/digest?repSlackId=${encodeURIComponent(repSlackId)}` : '/api/analytics/digest'
+  ),
+  repSummary: (repSlackId: string) => fetchApi<RepSummary>(`/api/analytics/rep-summary?repSlackId=${encodeURIComponent(repSlackId)}`),
   productSignals: () => fetchApi<ProductIntelData>('/api/analytics/product'),
   coaching: () => fetchApi<CoachingSnapshot[]>('/api/analytics/coaching'),
   outcomes: () => fetchApi<OutcomeData>('/api/analytics/outcomes'),
