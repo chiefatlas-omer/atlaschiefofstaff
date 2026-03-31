@@ -44,9 +44,14 @@ router.get('/tasks', (req: any, res) => {
       const sqlite = new Database(dbPath, { readonly: true });
 
       // Zoom meeting title lookup
-      const zoomCalls = sqlite.prepare('SELECT zoom_meeting_id, title, business_name FROM call_analyses WHERE zoom_meeting_id IS NOT NULL').all() as { zoom_meeting_id: string; title: string | null; business_name: string | null }[];
+      // Build lookup maps by both UUID (zoom_meeting_id) and numeric ID (meeting_id)
+      const zoomCalls = sqlite.prepare('SELECT zoom_meeting_id, meeting_id, title, business_name FROM call_analyses WHERE zoom_meeting_id IS NOT NULL OR meeting_id IS NOT NULL').all() as { zoom_meeting_id: string | null; meeting_id: string | null; title: string | null; business_name: string | null }[];
       const zoomTitleMap = new Map<string, { title: string | null; business: string | null }>();
-      for (const c of zoomCalls) zoomTitleMap.set(c.zoom_meeting_id, { title: c.title, business: c.business_name });
+      for (const c of zoomCalls) {
+        const info = { title: c.title, business: c.business_name };
+        if (c.zoom_meeting_id) zoomTitleMap.set(c.zoom_meeting_id, info);
+        if (c.meeting_id) zoomTitleMap.set(c.meeting_id, info);
+      }
 
       // Admin: also filter to internal team and resolve names
       if (req.isAdmin) {
