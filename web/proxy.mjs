@@ -1,19 +1,23 @@
 // Thin reverse proxy — forwards all requests to the bot's web server
 // running on the same Fly.io private network
 import http from 'http';
+import dns from 'dns';
 
-const TARGET = 'http://atlaschief-bot.internal:3001';
+// Fly.io internal DNS only resolves over IPv6 — force Node to prefer IPv6
+dns.setDefaultResultOrder('verbatim');
+
+const TARGET_HOST = 'atlaschief-bot.internal';
+const TARGET_PORT = 3001;
 const PORT = parseInt(process.env.WEB_PORT || '3001');
 
 const server = http.createServer((clientReq, clientRes) => {
-  const url = new URL(TARGET + clientReq.url);
-
   const options = {
-    hostname: url.hostname,
-    port: url.port || 3001,
+    hostname: TARGET_HOST,
+    port: TARGET_PORT,
     path: clientReq.url,
     method: clientReq.method,
-    headers: { ...clientReq.headers, host: url.hostname },
+    headers: { ...clientReq.headers, host: TARGET_HOST },
+    family: 6, // Force IPv6 for Fly.io internal network
   };
 
   const proxy = http.request(options, (proxyRes) => {
@@ -31,5 +35,5 @@ const server = http.createServer((clientReq, clientRes) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Atlas Command Center proxy listening on port ${PORT} → ${TARGET}`);
+  console.log(`Atlas Command Center proxy listening on port ${PORT} → http://${TARGET_HOST}:${TARGET_PORT} (IPv6)`);
 });

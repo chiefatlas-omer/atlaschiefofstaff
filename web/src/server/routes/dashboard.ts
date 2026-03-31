@@ -220,7 +220,7 @@ router.get('/analytics/digest', (req: any, res) => {
 });
 
 // GET /api/analytics/rep-summary?repSlackId=xxx — executive coaching summary for a specific rep
-router.get('/analytics/rep-summary', (req: any, res) => {
+router.get('/analytics/rep-summary', async (req: any, res) => {
   try {
     if (!req.isAdmin) {
       res.status(403).json({ error: 'Admin only' });
