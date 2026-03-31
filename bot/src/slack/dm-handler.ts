@@ -137,8 +137,17 @@ async function tryCreateTaskFromDM(
   client: any,
 ): Promise<boolean> {
   try {
-    // Strip bot @mentions from the text so "remind me" maps to the DM sender, not the bot
-    const cleanedText = text.replace(/<@[A-Z0-9]+>/gi, '').trim();
+    // Keep @mentions in text so AI can detect assignees like "@Carlos do X"
+    // Only strip the bot's own mention (detected from auth.test) so it doesn't confuse the AI
+    let cleanedText = text;
+    try {
+      const authResult = await client.auth.test();
+      if (authResult.user_id) {
+        cleanedText = text.replace(new RegExp(`<@${authResult.user_id}>`, 'gi'), '').trim();
+      }
+    } catch {
+      // Fallback: don't strip anything, AI will handle it
+    }
 
     const commitments = await extractCommitments([{
       user: userId,
