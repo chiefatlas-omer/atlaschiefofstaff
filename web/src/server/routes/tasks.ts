@@ -20,7 +20,9 @@ router.get('/tasks', (req: any, res) => {
       .from(tasks)
       .where(and(...conditions))
       .orderBy(desc(tasks.createdAt))
-      .all();
+      .all()
+      // Filter to internal team only (Slack User IDs start with 'U')
+      .filter((t) => t.slackUserId?.startsWith('U'));
     res.json(openTasks);
   } catch (err) {
     console.error('[tasks] GET /tasks error:', err);

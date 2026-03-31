@@ -61,7 +61,10 @@ router.get('/briefing', (req: any, res) => {
       .where(and(...taskConditions))
       .all();
 
-    for (const t of overdueTasks) {
+    // Filter to only internal team (Slack User IDs start with 'U')
+    const internalOverdue = overdueTasks.filter((t) => t.slackUserId?.startsWith('U'));
+
+    for (const t of internalOverdue) {
       const deadlineTs = t.deadline instanceof Date ? t.deadline.getTime() : Number(t.deadline) * 1000;
       const daysOverdue = Math.ceil((Date.now() - deadlineTs) / (1000 * 60 * 60 * 24));
       const dueLabel = daysOverdue === 1 ? 'was due yesterday' : `${daysOverdue} days overdue`;
