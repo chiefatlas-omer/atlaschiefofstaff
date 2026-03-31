@@ -179,6 +179,9 @@ export default function Outcomes() {
   }
 
   const { timeSaved, thisWeek, wow, taskManagement, callIntelligence, knowledgeBase, productIntelligence } = data;
+  const roiTrend = data.roiTrend ?? [];
+  const adoption = data.teamAdoption;
+  const maxRoi = Math.max(...roiTrend.map(w => w.roi), 1);
 
   return (
     <div className="space-y-10">
@@ -190,7 +193,7 @@ export default function Outcomes() {
         </p>
       </div>
 
-      {/* Hero — Time Saved */}
+      {/* Hero — Time Saved + Team Adoption */}
       <section>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">This Month</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -206,9 +209,60 @@ export default function Outcomes() {
             color="purple"
             subtitle="At $50/hr fully loaded cost"
           />
-          {/* Minutes Saved removed — redundant with Hours Saved */}
+          {adoption && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+              <p className="text-gray-500 text-sm font-medium mb-2">Team Adoption</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-gray-900">{adoption.pct}%</span>
+                <span className="text-sm text-gray-400">active this week</span>
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {adoption.activeThisWeek} of {adoption.totalMembers} members
+              </p>
+              <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${adoption.pct >= 80 ? 'bg-emerald-500' : adoption.pct >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                  style={{ width: `${adoption.pct}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </section>
+
+      {/* ROI Trend — Weekly bar chart */}
+      {roiTrend.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Weekly ROI Trend</h2>
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <div className="flex items-end gap-2 h-40">
+              {roiTrend.map((w, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-[10px] text-gray-500 font-medium">
+                    {w.roi > 0 ? `$${w.roi}` : ''}
+                  </span>
+                  <div
+                    className={`w-full rounded-t-md transition-all ${i === roiTrend.length - 1 ? 'bg-[#4F3588]' : 'bg-[#4F3588]/30'}`}
+                    style={{ height: `${Math.max((w.roi / maxRoi) * 120, 4)}px` }}
+                    title={`${w.week}: $${w.roi} (${w.hours}h saved)`}
+                  />
+                  <span className="text-[10px] text-gray-400">{w.week}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Top Wins This Week */}
+      <TopWinsSection
+        tasksCompleted={thisWeek.tasksCompleted}
+        callsAnalyzed={callIntelligence.callsAnalyzedThisMonth}
+        followUps={thisWeek.followUpsDrafted}
+        signals={thisWeek.productSignals}
+        roiDollars={timeSaved.roiDollars}
+        adoption={adoption}
+      />
 
       {/* Week-over-Week Trends */}
       <section>
@@ -319,5 +373,74 @@ export default function Outcomes() {
         <LeaderboardSection />
       </section>
     </div>
+  );
+}
+
+interface TopWinsProps {
+  tasksCompleted: number;
+  callsAnalyzed: number;
+  followUps: number;
+  signals: number;
+  roiDollars: number;
+  adoption?: { activeThisWeek: number; totalMembers: number; pct: number } | null;
+}
+
+function TopWinsSection({ tasksCompleted, callsAnalyzed, followUps, signals, roiDollars, adoption }: TopWinsProps) {
+  // Generate wins from actual data — no AI call needed, just smart templates
+  const wins: Array<{ emoji: string; text: string }> = [];
+
+  if (tasksCompleted > 0) {
+    wins.push({
+      emoji: '✅',
+      text: `Team completed ${tasksCompleted} tasks this week — that's ${tasksCompleted * 5} minutes of follow-through Atlas tracked and ensured happened.`,
+    });
+  }
+  if (callsAnalyzed > 0) {
+    wins.push({
+      emoji: '📞',
+      text: `${callsAnalyzed} calls analyzed with AI coaching — every objection, pain point, and next step captured automatically.`,
+    });
+  }
+  if (followUps > 0) {
+    wins.push({
+      emoji: '📧',
+      text: `${followUps} follow-up emails drafted and ready to send — personalized to each prospect's communication style.`,
+    });
+  }
+  if (signals > 0) {
+    wins.push({
+      emoji: '📊',
+      text: `${signals} product signals captured from real conversations — feature requests, friction points, and competitive intel flowing to leadership.`,
+    });
+  }
+  if (roiDollars > 0) {
+    wins.push({
+      emoji: '💰',
+      text: `$${roiDollars.toLocaleString()} in estimated ROI this month — time your team would have spent on manual work, now automated.`,
+    });
+  }
+  if (adoption && adoption.pct >= 80) {
+    wins.push({
+      emoji: '🚀',
+      text: `${adoption.pct}% team adoption — ${adoption.activeThisWeek} of ${adoption.totalMembers} members actively using Atlas this week.`,
+    });
+  }
+
+  // Show top 3
+  const topWins = wins.slice(0, 3);
+  if (topWins.length === 0) return null;
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Wins This Week</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {topWins.map((win, i) => (
+          <div key={i} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <span className="text-2xl mb-2 block">{win.emoji}</span>
+            <p className="text-sm text-gray-700 leading-relaxed">{win.text}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

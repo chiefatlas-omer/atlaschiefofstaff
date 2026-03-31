@@ -266,6 +266,12 @@ export default function Briefing() {
   // UX state — must be before any early returns (React hooks rules)
   const [showAllAttention, setShowAllAttention] = useState(false);
   const [celebrateTaskId, setCelebrateTaskId] = useState<string | null>(null);
+  const [onboardDismissed, setOnboardDismissed] = useState(() => {
+    return localStorage.getItem('atlas_onboard_dismissed') === 'true';
+  });
+  const [voiceDownloaded, setVoiceDownloaded] = useState(() => {
+    return localStorage.getItem('atlas_voice_downloaded') === 'true';
+  });
 
   const handleAsk = () => {
     const q = askQuery.trim();
@@ -342,19 +348,10 @@ export default function Briefing() {
     } catch { /* ignore */ }
   };
 
-  // Onboarding: track if user has dismissed the welcome card
-  const [onboardDismissed, setOnboardDismissed] = useState(() => {
-    return localStorage.getItem('atlas_onboard_dismissed') === 'true';
-  });
   const dismissOnboard = () => {
     localStorage.setItem('atlas_onboard_dismissed', 'true');
     setOnboardDismissed(true);
   };
-
-  // Voice banner: track if user has clicked download
-  const [voiceDownloaded, setVoiceDownloaded] = useState(() => {
-    return localStorage.getItem('atlas_voice_downloaded') === 'true';
-  });
   const markVoiceDownloaded = () => {
     localStorage.setItem('atlas_voice_downloaded', 'true');
     setVoiceDownloaded(true);

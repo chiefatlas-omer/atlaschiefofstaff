@@ -519,11 +519,50 @@ router.get('/analytics/outcomes', (_req, res) => {
       return Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
     }
 
+    // ── Weekly ROI Trend (past 8 weeks) ─────────────────────
+    const roiTrend: Array<{ week: string; roi: number; hours: number }> = [];
+    for (let w = 7; w >= 0; w--) {
+      const wStart = now - (w + 1) * 7 * 86400;
+      const wEnd = now - w * 7 * 86400;
+      const wLabel = new Date(wEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const wCompleted = allTasks.filter(t => {
+        if (t.status !== 'COMPLETED') return false;
+        const ts = t.completedAt instanceof Date ? Math.floor(t.completedAt.getTime() / 1000) : (t.completedAt ? Number(t.completedAt) : 0);
+        return ts >= wStart && ts < wEnd;
+      }).length;
+      const wCalls = allCalls.filter(c => (c.createdAt ?? 0) >= wStart && (c.createdAt ?? 0) < wEnd).length;
+      const wFollowUps = allCalls.filter(c => (c.createdAt ?? 0) >= wStart && (c.createdAt ?? 0) < wEnd && c.outcome).length;
+      const wQA = allQA.filter(q => (q.createdAt ?? 0) >= wStart && (q.createdAt ?? 0) < wEnd).length;
+      const wMinutes = wFollowUps * 10 + wCompleted * 5 + wQA * 3;
+      const wHours = Math.round((wMinutes / 60) * 10) / 10;
+      roiTrend.push({ week: wLabel, roi: Math.round(wHours * 50), hours: wHours });
+    }
+
+    // ── Team Adoption Rate ─────────────────────────────────
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
+    const rawDb = new Database(dbPath, { readonly: true });
+    const totalMembers = (rawDb.prepare('SELECT COUNT(*) as c FROM team_members').get() as { c: number }).c +
+      (rawDb.prepare('SELECT COUNT(*) as c FROM escalation_targets').get() as { c: number }).c;
+    // Active = has tasks completed or calls this week
+    const activeSlackIds = new Set<string>();
+    for (const t of completedThisWeek) activeSlackIds.add(t.slackUserId);
+    for (const c of callsThisWeek) if (c.repSlackId) activeSlackIds.add(c.repSlackId);
+    const activeCount = activeSlackIds.size;
+    rawDb.close();
+
     res.json({
       timeSaved: {
         hours: timeSavedHours,
         minutes: timeSavedMinutes,
         roiDollars: Math.round(timeSavedHours * 50),
+      },
+      roiTrend,
+      teamAdoption: {
+        activeThisWeek: activeCount,
+        totalMembers,
+        pct: totalMembers > 0 ? Math.round((activeCount / totalMembers) * 100) : 0,
       },
       thisWeek: {
         meetingsPrepped: meetingsPreppedhisWeek,

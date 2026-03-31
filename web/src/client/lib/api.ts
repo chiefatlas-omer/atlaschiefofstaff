@@ -215,6 +215,12 @@ export interface OutcomeData {
     minutes: number;
     roiDollars: number;
   };
+  roiTrend?: Array<{ week: string; roi: number; hours: number }>;
+  teamAdoption?: {
+    activeThisWeek: number;
+    totalMembers: number;
+    pct: number;
+  };
   thisWeek: OutcomeWeekData;
   lastWeek: OutcomeWeekData;
   wow: {
