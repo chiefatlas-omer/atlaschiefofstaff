@@ -370,18 +370,23 @@ router.get('/analytics/product', (_req, res) => {
   }
 });
 
-// GET /api/analytics/coaching — coaching snapshots (limit 20, ordered by weekStart DESC)
+// GET /api/analytics/coaching — coaching snapshots (deduplicated: latest per rep per week)
 router.get('/analytics/coaching', (req: any, res) => {
   try {
-    const snapshots = (req.userId && !req.isAdmin)
-      ? db.select().from(coachingSnapshots).where(eq(coachingSnapshots.repSlackId, req.userId)).orderBy(desc(coachingSnapshots.weekStart)).limit(20).all()
-      : db
-      .select()
-      .from(coachingSnapshots)
-      .orderBy(desc(coachingSnapshots.weekStart))
-      .limit(20)
-      .all();
-    res.json(snapshots);
+    const allSnapshots = (req.userId && !req.isAdmin)
+      ? db.select().from(coachingSnapshots).where(eq(coachingSnapshots.repSlackId, req.userId)).orderBy(desc(coachingSnapshots.weekStart)).limit(50).all()
+      : db.select().from(coachingSnapshots).orderBy(desc(coachingSnapshots.weekStart)).limit(50).all();
+
+    // Deduplicate: keep only the latest snapshot per rep per weekStart
+    const seen = new Set<string>();
+    const deduped = allSnapshots.filter((s) => {
+      const key = `${s.repSlackId}_${s.weekStart}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    res.json(deduped.slice(0, 20));
   } catch (err) {
     console.error('[analytics] GET /coaching error:', err);
     res.status(500).json({ error: 'Failed to fetch coaching snapshots' });
