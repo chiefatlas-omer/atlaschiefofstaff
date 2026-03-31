@@ -6,7 +6,7 @@ import { handleDirectMessage } from './dm-handler';
 import { config } from '../config';
 import { db } from '../db/connection';
 import { processedMessages } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, inArray, desc } from 'drizzle-orm';
 import { completeTask, dismissTask, reassignTask, getTaskById } from '../tasks/task-service';
 import { tasks } from '../db/schema';
 
@@ -17,6 +17,7 @@ interface BufferedMessage {
   ts: string;
   channel: string;
   thread_ts?: string;
+  thread_parent_user?: string;
 }
 
 // Cache for user ID -> display name lookups
@@ -137,6 +138,9 @@ async function handleBotReply(
       .get()
       || db.select().from(tasks)
         .where(eq(tasks.sourceMessageTs, threadTs))
+        .get()
+      || db.select().from(tasks)
+        .where(eq(tasks.sourceThreadTs, threadTs))
         .get();
 
     // --- COMPLETE command: "complete", "done", "mark complete", "complete 1 and 3" ---
@@ -451,6 +455,109 @@ async function handleBotReply(
       }
     }
 
+    // --- CONVERSATIONAL REASSIGNMENT: "reassign the task to @Person", "reassign this to @Person", etc. ---
+    const reassignMatch = lowerText.match(/\breassign\b.*\bto\b/i);
+    if (reassignMatch) {
+      // Find the task to reassign — use linkedTask or broader search
+      let taskToReassign = linkedTask;
+
+      if (!taskToReassign) {
+        // Try sourceThreadTs
+        taskToReassign = db.select().from(tasks)
+          .where(eq(tasks.sourceThreadTs, threadTs))
+          .get();
+      }
+
+      if (!taskToReassign) {
+        // Fallback: find most recent active task assigned to the sender in this channel
+        taskToReassign = db.select().from(tasks)
+          .where(and(
+            eq(tasks.sourceChannelId, channel),
+            eq(tasks.slackUserId, userId),
+            inArray(tasks.status, ['DETECTED', 'CONFIRMED', 'OVERDUE', 'ESCALATED']),
+          ))
+          .orderBy(desc(tasks.createdAt))
+          .limit(1)
+          .get();
+      }
+
+      if (!taskToReassign) {
+        await client.chat.postMessage({
+          channel, thread_ts: threadTs,
+          text: "I couldn't find a task to reassign. Try `/reassign tsk_xxx @person`.",
+        });
+        return true;
+      }
+
+      // Extract target user from the message
+      const mentionInText = text.match(/<@([A-Z0-9]+)(?:\|([^>]*))?>/i);
+      let targetUserId: string | undefined;
+      let targetUserName: string | undefined;
+
+      if (mentionInText) {
+        targetUserId = mentionInText[1];
+        // Skip if this is the bot mention
+        if (targetUserId === botUserId) {
+          // Look for second mention
+          const allMentions = [...text.matchAll(/<@([A-Z0-9]+)(?:\|([^>]*))?>/gi)];
+          const nonBotMention = allMentions.find(m => m[1] !== botUserId);
+          if (nonBotMention) {
+            targetUserId = nonBotMention[1];
+            targetUserName = nonBotMention[2] || undefined;
+          } else {
+            targetUserId = undefined;
+          }
+        } else {
+          targetUserName = mentionInText[2] || undefined;
+        }
+      }
+
+      if (!targetUserId) {
+        // Try name-based lookup: "reassign ... to Ahmed" or "reassign ... to Ahmed Khan"
+        const nameMatch = text.match(/\breassign\b.*?\bto\b\s+@?([A-Za-z][A-Za-z\s]+)/i);
+        if (nameMatch) {
+          const searchName = nameMatch[1].trim().toLowerCase();
+          try {
+            const listRes = await client.users.list({});
+            const userMatch = listRes.members?.find((m: any) => {
+              if (m.deleted || m.is_bot) return false;
+              return (m.profile?.display_name || '').toLowerCase() === searchName
+                || (m.real_name || '').toLowerCase() === searchName
+                || (m.name || '').toLowerCase() === searchName
+                || (m.real_name || '').toLowerCase().startsWith(searchName)
+                || (m.profile?.display_name || '').toLowerCase().startsWith(searchName);
+            });
+            if (userMatch?.id) {
+              targetUserId = userMatch.id;
+              targetUserName = userMatch.real_name || userMatch.name;
+            }
+          } catch {}
+        }
+      }
+
+      if (!targetUserId) {
+        await client.chat.postMessage({
+          channel, thread_ts: threadTs,
+          text: 'Please specify who to reassign to. Example: "reassign this to @Person".',
+        });
+        return true;
+      }
+
+      if (!targetUserName) {
+        try {
+          const info = await client.users.info({ user: targetUserId });
+          targetUserName = info.user?.real_name || info.user?.name;
+        } catch {}
+      }
+
+      reassignTask(taskToReassign.id, targetUserId, targetUserName);
+      await client.chat.postMessage({
+        channel, thread_ts: threadTs,
+        text: ':arrows_counterclockwise: Reassigned *' + taskToReassign.description + '* to <@' + targetUserId + '>.',
+      });
+      return true;
+    }
+
     // Not a recognized command for a bot reply - don't handle it
     console.log('Bot reply not matched as command. assignLines:', lines.filter((l: string) => /^assign\s/i.test(l)).length, 'actionItems:', actionItems.length, 'linkedTask:', !!linkedTask);
     return false;
@@ -499,12 +606,31 @@ export function registerMessageHandler(app: App) {
     }).run();
 
     const channelId = message.channel;
+
+    // If this is a threaded reply, look up the parent message's author
+    let threadParentUser: string | undefined;
+    const threadTs = (message as any).thread_ts;
+    if (threadTs && threadTs !== message.ts) {
+      try {
+        const parentResult = await client.conversations.replies({
+          channel: channelId,
+          ts: threadTs,
+          limit: 1,
+          inclusive: true,
+        });
+        threadParentUser = parentResult.messages?.[0]?.user;
+      } catch (e) {
+        // Non-fatal: thread parent lookup failed
+      }
+    }
+
     const bufferedMsg: BufferedMessage = {
       user,
       text,
       ts: message.ts,
       channel: channelId,
-      thread_ts: (message as any).thread_ts,
+      thread_ts: threadTs,
+      thread_parent_user: threadParentUser,
     };
 
     if (!messageBuffer.has(channelId)) {
@@ -533,8 +659,11 @@ async function processBatch(channelId: string, client: any, app: App) {
     // Resolve <@USERID> mentions to display names before sending to AI
     const resolvedMessages = await Promise.all(
       messages.map(async (msg) => ({
-        ...msg,
+        user: msg.user,
         text: await resolveUserMentions(msg.text, client),
+        ts: msg.ts,
+        channel: msg.channel,
+        ...(msg.thread_parent_user ? { thread_parent_user: msg.thread_parent_user } : {}),
       }))
     );
 
@@ -579,6 +708,7 @@ async function handleCommitment(commitment: ExtractedCommitment, client: any, th
       description: commitment.what,
       sourceChannelId: commitment.channel,
       sourceMessageTs: commitment.message_ts,
+      sourceThreadTs: threadTs,
       confidence: commitment.confidence,
       deadlineText: commitment.deadline_text,
       source: 'slack',

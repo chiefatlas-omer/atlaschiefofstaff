@@ -64,13 +64,16 @@ export function registerAllListeners(app: App) {
       const { db } = require('../db/connection');
       const { tasks } = require('../db/schema');
       const { eq } = require('drizzle-orm');
-      // Find task linked to this thread (by source_message_ts or bot_reply_ts)
+      // Find task linked to this thread (by source_message_ts, bot_reply_ts, or source_thread_ts)
       const threadTs = event.thread_ts;
       const task = db.select().from(tasks)
         .where(eq(tasks.sourceMessageTs, threadTs))
         .get()
         || db.select().from(tasks)
           .where(eq(tasks.botReplyTs, threadTs))
+          .get()
+        || db.select().from(tasks)
+          .where(eq(tasks.sourceThreadTs, threadTs))
           .get();
       if (task && task.status !== 'COMPLETED') {
         completeTask(task.id);
@@ -104,6 +107,9 @@ export function registerAllListeners(app: App) {
         .get()
         || db.select().from(tasks)
           .where(eq(tasks.botReplyTs, threadTs))
+          .get()
+        || db.select().from(tasks)
+          .where(eq(tasks.sourceThreadTs, threadTs))
           .get();
       if (task && task.status !== 'DISMISSED') {
         dismissTask(task.id);
@@ -130,14 +136,47 @@ export function registerAllListeners(app: App) {
       const { reassignTask } = require('../tasks/task-service');
       const { db } = require('../db/connection');
       const { tasks } = require('../db/schema');
-      const { eq } = require('drizzle-orm');
+      const { eq, and, inArray, desc } = require('drizzle-orm');
       const threadTs = event.thread_ts;
-      const task = db.select().from(tasks)
+
+      // Flexible task search: try multiple strategies to find the task linked to this thread
+      let task = db.select().from(tasks)
         .where(eq(tasks.sourceMessageTs, threadTs))
         .get()
         || db.select().from(tasks)
           .where(eq(tasks.botReplyTs, threadTs))
+          .get()
+        || db.select().from(tasks)
+          .where(eq(tasks.sourceThreadTs, threadTs))
           .get();
+
+      // Fallback: find most recent active task in this channel for the sender
+      if (!task) {
+        task = db.select().from(tasks)
+          .where(and(
+            eq(tasks.sourceChannelId, event.channel),
+            inArray(tasks.status, ['DETECTED', 'CONFIRMED', 'OVERDUE', 'ESCALATED']),
+          ))
+          .orderBy(desc(tasks.createdAt))
+          .limit(5)
+          .all()
+          .find((t: any) => t.sourceMessageTs === threadTs || t.sourceThreadTs === threadTs || t.botReplyTs === threadTs)
+          || null;
+      }
+
+      // Last resort: find any task assigned to the sender in this channel, created recently
+      if (!task) {
+        task = db.select().from(tasks)
+          .where(and(
+            eq(tasks.sourceChannelId, event.channel),
+            eq(tasks.slackUserId, event.user),
+            inArray(tasks.status, ['DETECTED', 'CONFIRMED', 'OVERDUE', 'ESCALATED']),
+          ))
+          .orderBy(desc(tasks.createdAt))
+          .limit(1)
+          .get() || null;
+      }
+
       if (!task) {
         await client.chat.postMessage({
           channel: event.channel,

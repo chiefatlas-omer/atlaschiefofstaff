@@ -6,6 +6,7 @@ interface SlackMessageInput {
   text: string;
   ts: string;
   channel: string;
+  thread_parent_user?: string;
 }
 
 export interface ExtractedCommitment {
@@ -30,6 +31,7 @@ export async function extractCommitments(messages: SlackMessageInput[]): Promise
       text: m.text,
       ts: m.ts,
       channel: m.channel,
+      ...(m.thread_parent_user ? { thread_parent_user: m.thread_parent_user } : {}),
     }))
   );
 

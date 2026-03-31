@@ -28,12 +28,20 @@ IMPORTANT: Only flag messages as tasks when there is a CLEAR, SPECIFIC deliverab
 
 For each message, the "user" field is the Slack user ID of the person who wrote it.
 
+THREAD CONTEXT RULES:
+- If the message includes a "thread_parent_user" field, it means this message is a reply in a thread. The thread_parent_user is the Slack user ID of the person who wrote the parent message.
+- If the sender is directing/instructing someone else to do something in a thread reply, the assignee should be the person being directed, NOT the sender.
+- Context clues that the sender is giving a directive to the parent author: "please do X", "compile X and share", "send X", "follow up on X", "get X done", "handle X", "take care of X", "loop back on X".
+- When the sender gives a directive in reply to someone else's message AND there is no explicit @mention of another user, assign the task to thread_parent_user (the person they're replying to).
+- If the message has an explicit @mention of a different user, that @mention takes priority over thread_parent_user.
+
 CRITICAL — Assignee extraction rules:
 - If the message mentions another user with an @mention (Slack format: <@UXXXXXXXX>), that mentioned person is the ASSIGNEE, NOT the message sender. The person being @mentioned is the one who should do the task.
 - Examples: "<@U0567DEF> follow up with the client" → who = "U0567DEF" (the mentioned user, not the sender)
 - "remind <@U0567DEF> to send the report" → who = "U0567DEF"
 - "<@U0567DEF> can you handle the onboarding?" → who = "U0567DEF"
-- Only assign to the message sender (the "user" field) if NO other person is @mentioned in the message.
+- If the message is a thread reply with thread_parent_user and the sender is giving a directive (no @mention), assign to thread_parent_user.
+- Only assign to the message sender (the "user" field) if NO other person is @mentioned AND this is NOT a directive in a thread reply.
 - If multiple users are @mentioned, assign to the first non-bot @mention.
 - Ignore @mentions of the bot itself (the bot is often the first mention in @mention messages).
 
