@@ -1,7 +1,7 @@
 export const COMMITMENT_EXTRACTION_PROMPT = `You are analyzing Slack messages to detect commitments, promises, and action items.
 
-A commitment is when someone says they WILL DO something specific. Examples:
-- "I'll send that over by Friday"
+A commitment is when someone says they WILL DO something specific with a CLEAR DELIVERABLE. Examples:
+- "I'll send that proposal over by Friday"
 - "Let me handle the onboarding doc"
 - "I'll follow up with the client next week"
 - "Will get back to you on that tomorrow"
@@ -13,18 +13,32 @@ Also detect DIRECTIVES — when someone assigns or requests another person to do
 - "let's get this done by Friday" → commitment if directed at a specific person
 - "@atlaschief create a task for Mason to send the report" → commitment for Mason
 
-NOT commitments (do not flag these):
+NOT commitments (do NOT flag these — be conservative):
 - Observations: "That report was good"
 - Opinions: "I think we should do X" (thinking is not committing)
 - Vague: "Yeah we should look into that" (no specific action or person)
-- Greetings, reactions, or casual chat
+- Greetings, reactions, or casual chat: "thanks", "nice work", "sounds good", "awesome"
+- Casual/exploratory: "play around with X", "check this out", "take a look", "interesting"
+- General discussion or brainstorming without a specific deliverable
 - Bot messages or automated notifications
+- Praise or acknowledgments: "great job", "well done", "love it"
+- Short affirmations: "ok", "got it", "sure", "will do" (unless followed by a specific action)
+
+IMPORTANT: Only flag messages as tasks when there is a CLEAR, SPECIFIC deliverable or action. Vague intentions, casual remarks, and general discussion should NOT be flagged. When in doubt, do NOT create a task.
 
 For each message, the "user" field is the Slack user ID of the person who wrote it.
-If someone assigns a task to another person using an @mention (e.g., "<@U123> will handle the docs"), the owner is the mentioned user, not the message author.
+
+CRITICAL — Assignee extraction rules:
+- If the message mentions another user with an @mention (Slack format: <@UXXXXXXXX>), that mentioned person is the ASSIGNEE, NOT the message sender. The person being @mentioned is the one who should do the task.
+- Examples: "<@U0567DEF> follow up with the client" → who = "U0567DEF" (the mentioned user, not the sender)
+- "remind <@U0567DEF> to send the report" → who = "U0567DEF"
+- "<@U0567DEF> can you handle the onboarding?" → who = "U0567DEF"
+- Only assign to the message sender (the "user" field) if NO other person is @mentioned in the message.
+- If multiple users are @mentioned, assign to the first non-bot @mention.
+- Ignore @mentions of the bot itself (the bot is often the first mention in @mention messages).
 
 For each commitment found, extract:
-1. who: The Slack user ID of the person who owns the commitment
+1. who: The Slack user ID of the person who owns the commitment (see assignee rules above)
 2. what: A clear, concise description of the committed action
 3. deadline_text: The raw deadline text if mentioned ANYWHERE in the message (e.g., "by Friday", "tomorrow", "next week", "this week", "end of day"), or null if truly no deadline. IMPORTANT: Look at the ENTIRE message for deadline clues, not just the sentence containing the commitment. If the message says "knocked out by friday" and later "I'll send the form", the deadline applies to the task.
 4. confidence: "high" if it's a clear commitment, "medium" if it could be a commitment but is somewhat ambiguous. Skip anything with low confidence entirely.

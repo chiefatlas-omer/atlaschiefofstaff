@@ -36,7 +36,7 @@ Extract the following and return ONLY valid JSON (no markdown, no code fences):
 
 Rules:
 - awarenessLevel: unaware = doesn't know they have a problem, problem_aware = knows the problem, solution_aware = knows solutions exist, product_aware = knows about our product, most_aware = ready to buy
-- talkListenRatio: estimate based on relative speaking time; good range is 30-50% for the rep
+- talkListenRatio: estimate based on relative speaking time; target is 60% for the rep (reps should be talking about 60% of the time)
 - If you cannot determine a value, use null for strings or empty arrays for lists
 - Do NOT invent information not in the transcript
 - productSignals should only include items about OUR product/platform (Atlas), NOT about the prospect's or client's own products, campaigns, or tools being discussed. If the call is reviewing a client's campaign or external product, those are NOT our product signals. Only capture feedback, requests, bugs, or friction about the Atlas platform itself.
@@ -62,7 +62,7 @@ Evaluate on these dimensions (use only what the data supports — do NOT fabrica
 2. OBJECTION HANDLING: Did they acknowledge, isolate, and resolve? Or steamroll? Did they use labeling ("It seems like...") or mirroring (Chris Voss)?
 3. URGENCY CREATION: Did they establish why NOW matters? Or did prospects leave with "I'll think about it"? Did they tie pain to cost of inaction?
 4. COMMITMENT PROGRESSION: Did they get micro-commitments throughout? Did they ask for the next step explicitly? (Sandler up-front contracts)
-5. TALK RATIO: Were they listening more than talking? Target is 40/60 rep/prospect. Over 55% rep talk = red flag.
+5. TALK RATIO: Target is 60% rep talk / 40% prospect listen. Under 50% rep talk = not leading enough. Over 75% rep talk = not letting the prospect engage.
 6. QUESTION QUALITY: Open vs closed questions. "Tell me more about..." and "Walk me through..." vs "Do you have..." and "Is that right?"
 7. PRICE PRESENTATION: Did they anchor value before price? Or lead with cost? Did they present price confidently or apologetically?
 8. COMPETITIVE POSITIONING: How did they handle competitor mentions? Did they acknowledge and reframe, or trash-talk?
