@@ -162,17 +162,17 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
                 </span>
                 {(() => {
                   if (task.source === 'zoom') {
-                    const label = task.zoomMeetingTitle
-                      ? `${task.zoomMeetingTitle}${task.zoomBusinessName ? ` · ${task.zoomBusinessName}` : ''}`
-                      : 'Zoom meeting';
+                    const meetingLabel = task.zoomMeetingTitle
+                      ? `${task.zoomMeetingTitle}${task.zoomBusinessName ? ` — ${task.zoomBusinessName}` : ''}`
+                      : null;
                     return (
-                      <span className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1.5 truncate max-w-xs" title={`From Zoom meeting: ${label}`}>
+                      <span className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1.5 truncate max-w-xs" title={meetingLabel ?? 'From Zoom meeting'}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0">
                           <circle cx="12" cy="12" r="12" fill="#2D8CFF"/>
                           <path d="M6.5 8.5C6.5 7.67 7.17 7 8 7h5.5c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5H8c-.83 0-1.5-.67-1.5-1.5v-5z" fill="white"/>
                           <path d="M15.5 10l2.5-1.5v5l-2.5-1.5" fill="white"/>
                         </svg>
-                        From Zoom meeting{task.zoomMeetingTitle ? `: ${label}` : ''}
+                        {meetingLabel ?? 'Zoom meeting'}
                       </span>
                     );
                   }
