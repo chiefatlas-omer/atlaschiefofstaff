@@ -36,10 +36,26 @@ router.get('/tasks', (req: any, res) => {
       .orderBy(desc(tasks.createdAt))
       .all();
 
-    // Admin: filter to internal team only (must be in team_members or escalation_targets)
+    // Admin: filter to internal team only and resolve proper display names
     if (req.isAdmin) {
-      const internalIds = getInternalSlackIds();
-      openTasks = openTasks.filter((t) => internalIds.has(t.slackUserId));
+      const Database = require('better-sqlite3');
+      const path = require('path');
+      const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
+      const sqlite = new Database(dbPath, { readonly: true });
+      const members = sqlite.prepare('SELECT slack_user_id, display_name FROM team_members').all() as { slack_user_id: string; display_name: string | null }[];
+      const targets = sqlite.prepare('SELECT slack_user_id, display_name FROM escalation_targets').all() as { slack_user_id: string; display_name: string | null }[];
+      sqlite.close();
+      const nameMap = new Map<string, string>();
+      for (const m of members) nameMap.set(m.slack_user_id, m.display_name ?? m.slack_user_id);
+      for (const t of targets) if (!nameMap.has(t.slack_user_id)) nameMap.set(t.slack_user_id, t.display_name ?? t.slack_user_id);
+
+      openTasks = openTasks
+        .filter((t) => nameMap.has(t.slackUserId))
+        .map((t) => ({
+          ...t,
+          // Override Zoom participant name with actual team member name
+          slackUserName: nameMap.get(t.slackUserId) ?? t.slackUserName,
+        }));
     }
     res.json(openTasks);
   } catch (err) {
