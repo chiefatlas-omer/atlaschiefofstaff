@@ -49,6 +49,10 @@ router.get('/briefing', (req: any, res) => {
       const teamMap = getInternalTeamMap();
       const fullName = teamMap.get(userId);
       if (fullName) firstName = fullName.split(' ')[0];
+      // Fallback: check login display name from request
+      if (!firstName && (req as any).displayName) {
+        firstName = ((req as any).displayName as string).split(' ')[0];
+      }
     }
     const greeting = firstName ? `${timeGreeting}, ${firstName}.` : `${timeGreeting}.`;
     const dateStr = new Date().toLocaleDateString('en-US', {
