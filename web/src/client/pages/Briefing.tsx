@@ -260,6 +260,10 @@ export default function Briefing() {
   const [askAnswer, setAskAnswer] = useState<string | null>(null);
   const [askLoading, setAskLoading] = useState(false);
 
+  // UX state — must be before any early returns (React hooks rules)
+  const [showAllAttention, setShowAllAttention] = useState(false);
+  const [celebrateTaskId, setCelebrateTaskId] = useState<string | null>(null);
+
   const handleAsk = () => {
     const q = askQuery.trim();
     if (!q) return;
@@ -298,8 +302,6 @@ export default function Briefing() {
 
   const attentionItems = data.needsAttention;
   const hasAttention = attentionItems.length > 0;
-  const [showAllAttention, setShowAllAttention] = useState(false);
-  const [celebrateTaskId, setCelebrateTaskId] = useState<string | null>(null);
 
   // Top 3 Today: show max 3 items by default, expand to show all
   const visibleAttention = showAllAttention ? attentionItems : attentionItems.slice(0, 3);
@@ -587,7 +589,7 @@ export default function Briefing() {
               <div key={m.label} className="flex items-center gap-2">
                 <span className="text-sm leading-none">{m.completed ? '✅' : '⬜'}</span>
                 <span className={`text-sm ${m.completed ? 'text-emerald-600' : 'text-gray-500'}`}>
-                  {m.label} {m.completed ? '' : `(+${m.points})`}
+                  {m.label}
                 </span>
               </div>
             ))}
