@@ -199,6 +199,14 @@ function CallsTab() {
             </div>
           </div>
 
+          {/* AI Coaching Narrative */}
+          {repSummary.coachingNarrative && (
+            <div className="bg-white rounded-lg border border-[#4F3588]/20 p-4">
+              <p className="text-xs font-medium text-[#4F3588] uppercase tracking-wide mb-2">🧠 AI Coaching Brief</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{repSummary.coachingNarrative}</p>
+            </div>
+          )}
+
           {/* Top coaching flags */}
           {repSummary.topFlags.length > 0 && (
             <div>
@@ -704,7 +712,7 @@ function EmailDraftsTab() {
   useEffect(() => {
     api
       .emailDrafts()
-      .then(setDrafts)
+      .then((data) => setDrafts(data.filter((d) => d.emailBody && d.emailBody.trim().length > 0)))
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);

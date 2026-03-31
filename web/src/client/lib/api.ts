@@ -176,6 +176,7 @@ export interface RepSummary {
   topObjections: { text: string; count: number }[];
   topPains: { text: string; count: number }[];
   topFlags: { flag: string; count: number; severity: string }[];
+  coachingNarrative: string;
   recentGrades: { weekStart: number | null; callCount: number | null }[];
 }
 

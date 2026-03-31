@@ -11,8 +11,10 @@ import {
 } from '../../../../bot/src/db/schema';
 import { callAnalyses, productSignals, coachingSnapshots } from '../schema-analytics';
 import { eq, ne, and, lt, count, desc, gte, gt, isNotNull } from 'drizzle-orm';
+import Anthropic from '@anthropic-ai/sdk';
 
 const router = Router();
+const anthropicClient = process.env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
 // GET /api/dashboard — aggregated metrics for all sections
 router.get('/dashboard', (req: any, res) => {
@@ -291,6 +293,39 @@ router.get('/analytics/rep-summary', (req: any, res) => {
       .slice(0, 5)
       .map(([flag, { count, severity }]) => ({ flag, count, severity }));
 
+    // Generate AI coaching narrative
+    let coachingNarrative = '';
+    if (anthropicClient && calls.length > 0) {
+      try {
+        const summaryData = JSON.stringify({
+          repName,
+          totalCalls: calls.length,
+          avgTalkRatio,
+          avgQuestions,
+          outcomes,
+          topObjections: topObjections.slice(0, 3),
+          topPains: topPains.slice(0, 3),
+          topFlags: topFlags.slice(0, 3),
+        });
+        const msg = await anthropicClient.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 300,
+          messages: [{
+            role: 'user',
+            content: `You are an expert sales/CS coach. Based on this rep's 30-day performance data, write a 2-3 sentence executive coaching brief for their manager. Be specific, actionable, and direct. Reference exact numbers. Suggest one concrete technique or phrase they should practice. No headers or bullets — just a confident paragraph.
+
+Data: ${summaryData}`,
+          }],
+        });
+        coachingNarrative = msg.content
+          .filter((c: any) => c.type === 'text')
+          .map((c: any) => c.text)
+          .join('');
+      } catch (aiErr) {
+        console.error('[analytics] AI coaching narrative failed (non-fatal):', aiErr);
+      }
+    }
+
     res.json({
       repSlackId,
       repName,
@@ -301,6 +336,7 @@ router.get('/analytics/rep-summary', (req: any, res) => {
       topObjections,
       topPains,
       topFlags,
+      coachingNarrative,
       recentGrades: snapshots.map(s => ({
         weekStart: s.weekStart,
         callCount: s.callCount,
