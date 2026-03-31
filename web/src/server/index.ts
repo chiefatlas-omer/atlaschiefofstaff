@@ -209,6 +209,45 @@ app.get('/api/sops', (_req, res) => {
   }
 });
 
+// ─── Knowledge base browser — list all uploaded documents ────────────
+app.get('/api/knowledge/documents', (_req, res) => {
+  try {
+    const Database = require('better-sqlite3');
+    const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
+    const sqlite = new Database(dbPath, { readonly: true });
+    const docs = sqlite.prepare(`
+      SELECT id, title, type, status, version, auto_generated, created_at, updated_at,
+             LENGTH(content) as content_length
+      FROM documents
+      ORDER BY created_at DESC
+    `).all();
+    const knowledgeEntries = sqlite.prepare(`
+      SELECT source_type, COUNT(*) as count FROM knowledge_entries GROUP BY source_type
+    `).all();
+    sqlite.close();
+    res.json({ documents: docs, knowledgeSummary: knowledgeEntries });
+  } catch (err) {
+    console.error('[knowledge] GET /documents error:', err);
+    res.json({ documents: [], knowledgeSummary: [] });
+  }
+});
+
+app.delete('/api/knowledge/documents/:id', (req, res) => {
+  try {
+    const docId = req.params.id;
+    const Database = require('better-sqlite3');
+    const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
+    const sqlite = new Database(dbPath);
+    sqlite.prepare('DELETE FROM documents WHERE id = ?').run(docId);
+    sqlite.prepare('DELETE FROM knowledge_entries WHERE source_type = ? AND source_id = ?').run('document', docId);
+    sqlite.close();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[knowledge] DELETE /documents error:', err);
+    res.status(500).json({ error: 'Failed to delete document' });
+  }
+});
+
 // ─── Knowledge upload — raw SQL fallback ─────────────────────────────
 app.post('/api/knowledge/upload', (req, res) => {
   try {

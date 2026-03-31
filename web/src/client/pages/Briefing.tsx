@@ -753,6 +753,9 @@ export default function Briefing() {
 
         <UploadSection />
       </section>
+
+      {/* ── Knowledge Base Browser ─────────────────────────────── */}
+      <KnowledgeBaseBrowser />
     </div>
   );
 }
@@ -798,5 +801,109 @@ function StreakItem({ emoji, value, label }: { emoji: string; value: number; lab
         />
       </div>
     </div>
+  );
+}
+
+function KnowledgeBaseBrowser() {
+  const [docs, setDocs] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any[]>([]);
+  const [expanded, setExpanded] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const loadDocs = () => {
+    setLoading(true);
+    fetch('/api/knowledge/documents')
+      .then((r) => r.json())
+      .then((d) => {
+        setDocs(d.documents ?? []);
+        setSummary(d.knowledgeSummary ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadDocs(); }, []);
+
+  const handleDelete = (id: string, title: string) => {
+    if (!confirm(`Delete "${title}" from the knowledge base?`)) return;
+    fetch(`/api/knowledge/documents/${id}`, { method: 'DELETE' })
+      .then(() => loadDocs())
+      .catch(() => {});
+  };
+
+  const totalEntries = summary.reduce((sum: number, s: any) => sum + (s.count ?? 0), 0);
+
+  return (
+    <section>
+      <div className="flex items-center gap-3 mb-4">
+        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          Atlas Brain — Knowledge Base
+        </h2>
+        <span className="text-xs text-gray-400">
+          {docs.length} doc{docs.length !== 1 ? 's' : ''} · {totalEntries} entries
+        </span>
+        <div className="flex-1 h-px bg-gray-200" />
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-xs text-[#4F3588] hover:underline"
+        >
+          {expanded ? 'Collapse' : 'View all'}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {loading ? (
+            <div className="p-4 text-sm text-gray-400">Loading...</div>
+          ) : docs.length === 0 ? (
+            <div className="p-4 text-sm text-gray-400">
+              No documents uploaded yet. Use the upload section above to add playbooks, talk tracks, and documentation.
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Document</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Size</th>
+                  <th className="text-left px-4 py-2 text-xs font-medium text-gray-500 uppercase">Added</th>
+                  <th className="text-right px-4 py-2 text-xs font-medium text-gray-500 uppercase"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {docs.map((doc: any) => (
+                  <tr key={doc.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                    <td className="px-4 py-2 font-medium text-gray-900 max-w-xs truncate" title={doc.title}>
+                      {doc.title}
+                    </td>
+                    <td className="px-4 py-2 text-gray-500">
+                      <span className="inline-flex px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                        {doc.type ?? 'general'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-gray-400 text-xs">
+                      {doc.content_length ? `${Math.round(doc.content_length / 1024)}KB` : '\u2014'}
+                    </td>
+                    <td className="px-4 py-2 text-gray-400 text-xs whitespace-nowrap">
+                      {doc.created_at
+                        ? new Date(doc.created_at * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                        : '\u2014'}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        onClick={() => handleDelete(doc.id, doc.title)}
+                        className="text-xs text-red-400 hover:text-red-600 transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

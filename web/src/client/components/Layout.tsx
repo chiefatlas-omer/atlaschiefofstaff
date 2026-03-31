@@ -56,9 +56,9 @@ export default function Layout({ children }: LayoutProps) {
   );
 
   return (
-    <div className="flex min-h-screen bg-[#FAFAFA] text-gray-900">
-      {/* Sidebar */}
-      <aside className="w-56 bg-white border-r border-gray-200 flex flex-col shrink-0">
+    <div className="flex h-screen bg-[#FAFAFA] text-gray-900">
+      {/* Sidebar — fixed height, never scrolls with content */}
+      <aside className="w-56 h-screen sticky top-0 bg-white border-r border-gray-200 flex flex-col shrink-0 overflow-y-auto">
         {/* Branding */}
         <div className="px-6 py-5 border-b border-gray-200">
           <div className="flex items-center gap-2">
