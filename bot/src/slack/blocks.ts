@@ -376,9 +376,9 @@ export function taskListBlocks(
       // If the message was in a thread, link with thread context; otherwise link to the message directly
       if (t.sourceThreadTs) {
         const threadTs = t.sourceThreadTs.replace('.', '');
-        threadLink = '  <https://slack.com/archives/' + t.sourceChannelId + '/p' + threadTs + '?thread_ts=' + t.sourceThreadTs + '&cid=' + t.sourceChannelId + '|:link: view thread>';
+        threadLink = '  <https://youratlas.slack.com/archives/' + t.sourceChannelId + '/p' + threadTs + '?thread_ts=' + t.sourceThreadTs + '&cid=' + t.sourceChannelId + '|:link: view thread>';
       } else {
-        threadLink = '  <https://slack.com/archives/' + t.sourceChannelId + '/p' + msgTs + '|:link: view thread>';
+        threadLink = '  <https://youratlas.slack.com/archives/' + t.sourceChannelId + '/p' + msgTs + '|:link: view thread>';
       }
     }
 
@@ -473,7 +473,7 @@ export function adminTaskListBlocks(
       let threadLink = '';
       if (t.sourceChannelId && (t.sourceThreadTs || t.sourceMessageTs)) {
         const ts = (t.sourceThreadTs || t.sourceMessageTs)!.replace('.', '');
-        threadLink = '  <https://slack.com/archives/' + t.sourceChannelId + '/p' + ts + '|:link: view>';
+        threadLink = '  <https://youratlas.slack.com/archives/' + t.sourceChannelId + '/p' + ts + '|:link: view>';
       }
 
       return statusIcon + ' ' + t.description + ' — due ' + deadlineStr + sourceTag + threadLink + '  `' + t.id + '`';
