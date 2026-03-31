@@ -161,6 +161,13 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
                   {task.description}
                 </span>
                 {(() => {
+                  if (task.source === 'zoom') {
+                    return (
+                      <span className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1">
+                        📞 From Zoom call
+                      </span>
+                    );
+                  }
                   const link = getSlackPermalink(task);
                   return link ? (
                     <a
@@ -171,6 +178,10 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
                     >
                       View in Slack {'\u2197'}
                     </a>
+                  ) : task.source === 'desktop' ? (
+                    <span className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1">
+                      🎙️ From voice command
+                    </span>
                   ) : null;
                 })()}
               </td>
