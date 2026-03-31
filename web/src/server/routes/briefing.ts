@@ -15,19 +15,19 @@ import { emailDrafts } from '../schema-email-drafts';
 import { eq, ne, and, lt, gt, gte, desc, isNotNull, like } from 'drizzle-orm';
 const router = Router();
 
-// Helper: get set of internal Slack User IDs from team_members + escalation_targets (raw SQL for reliability)
-function getInternalSlackIds(): Set<string> {
+// Helper: get map of internal Slack User IDs → display names from team_members + escalation_targets
+function getInternalTeamMap(): Map<string, string> {
   const Database = require('better-sqlite3');
   const path = require('path');
   const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
   const sqlite = new Database(dbPath, { readonly: true });
-  const members = sqlite.prepare('SELECT slack_user_id FROM team_members').all() as { slack_user_id: string }[];
-  const targets = sqlite.prepare('SELECT slack_user_id FROM escalation_targets').all() as { slack_user_id: string }[];
+  const members = sqlite.prepare('SELECT slack_user_id, display_name FROM team_members').all() as { slack_user_id: string; display_name: string | null }[];
+  const targets = sqlite.prepare('SELECT slack_user_id, display_name FROM escalation_targets').all() as { slack_user_id: string; display_name: string | null }[];
   sqlite.close();
-  const ids = new Set<string>();
-  for (const m of members) ids.add(m.slack_user_id);
-  for (const t of targets) ids.add(t.slack_user_id);
-  return ids;
+  const map = new Map<string, string>();
+  for (const m of members) map.set(m.slack_user_id, m.display_name ?? m.slack_user_id);
+  for (const t of targets) if (!map.has(t.slack_user_id)) map.set(t.slack_user_id, t.display_name ?? t.slack_user_id);
+  return map;
 }
 
 // GET /api/briefing — daily briefing: needs attention, today's schedule, week summary, activity feed
@@ -75,18 +75,22 @@ router.get('/briefing', (req: any, res) => {
       .where(and(...taskConditions))
       .all();
 
-    // Filter to only internal team members (in team_members or escalation_targets tables)
-    const internalIds = getInternalSlackIds();
-    const internalOverdue = overdueTasks.filter((t) => internalIds.has(t.slackUserId));
+    // Filter to only internal team members and resolve proper display names
+    const teamMap = getInternalTeamMap();
+    const internalOverdue = teamMap.size > 0
+      ? overdueTasks.filter((t) => teamMap.has(t.slackUserId))
+      : overdueTasks;
 
     for (const t of internalOverdue) {
       const deadlineTs = t.deadline instanceof Date ? t.deadline.getTime() : Number(t.deadline) * 1000;
       const daysOverdue = Math.ceil((Date.now() - deadlineTs) / (1000 * 60 * 60 * 24));
       const dueLabel = daysOverdue === 1 ? 'was due yesterday' : `${daysOverdue} days overdue`;
+      // Use team_members display name (not the Zoom participant name stored on the task)
+      const displayName = teamMap.get(t.slackUserId) ?? t.slackUserName ?? 'Unassigned';
       needsAttention.push({
         type: 'overdue_task',
         title: t.description,
-        subtitle: `${t.slackUserName ? `Assigned to ${t.slackUserName}` : 'Unassigned'} · ${dueLabel}`,
+        subtitle: `Assigned to ${displayName} · ${dueLabel}`,
         severity: 'high',
         taskId: t.id,
       });
