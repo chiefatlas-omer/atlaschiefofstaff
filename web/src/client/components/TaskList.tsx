@@ -163,11 +163,11 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
                 {(() => {
                   if (task.source === 'zoom') {
                     const label = task.zoomMeetingTitle
-                      ? `📞 ${task.zoomMeetingTitle}${task.zoomBusinessName ? ` · ${task.zoomBusinessName}` : ''}`
-                      : '📞 From Zoom call';
+                      ? `${task.zoomMeetingTitle}${task.zoomBusinessName ? ` · ${task.zoomBusinessName}` : ''}`
+                      : 'Zoom meeting';
                     return (
-                      <span className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1 truncate max-w-xs" title={label}>
-                        {label}
+                      <span className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1 truncate max-w-xs" title={`From Zoom meeting: ${label}`}>
+                        🎥 From Zoom meeting{task.zoomMeetingTitle ? `: ${label}` : ''}
                       </span>
                     );
                   }
