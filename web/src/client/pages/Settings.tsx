@@ -126,6 +126,7 @@ export default function Settings() {
   };
 
   const handleDelete = async (id: number) => {
+    if (!confirm('Remove this team member? They will lose access to Atlas Command Center.')) return;
     try {
       await api.deleteTeamMember(id);
       loadMembers();
@@ -173,6 +174,7 @@ export default function Settings() {
   };
 
   const handleDeleteEscalation = async (id: number) => {
+    if (!confirm('Remove this escalation target? They will no longer receive alerts and coaching summaries.')) return;
     try {
       await api.deleteEscalationTarget(id);
       loadEscalationTargets();

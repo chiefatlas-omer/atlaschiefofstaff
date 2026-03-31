@@ -342,6 +342,24 @@ export default function Briefing() {
     } catch { /* ignore */ }
   };
 
+  // Onboarding: track if user has dismissed the welcome card
+  const [onboardDismissed, setOnboardDismissed] = useState(() => {
+    return localStorage.getItem('atlas_onboard_dismissed') === 'true';
+  });
+  const dismissOnboard = () => {
+    localStorage.setItem('atlas_onboard_dismissed', 'true');
+    setOnboardDismissed(true);
+  };
+
+  // Voice banner: track if user has clicked download
+  const [voiceDownloaded, setVoiceDownloaded] = useState(() => {
+    return localStorage.getItem('atlas_voice_downloaded') === 'true';
+  });
+  const markVoiceDownloaded = () => {
+    localStorage.setItem('atlas_voice_downloaded', 'true');
+    setVoiceDownloaded(true);
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-8">
       {/* ── Header ────────────────────────────────────────────── */}
@@ -349,6 +367,44 @@ export default function Briefing() {
         <h1 className="text-2xl font-semibold text-gray-900">{data.greeting}</h1>
         <span className="text-gray-500 text-sm">{data.date}</span>
       </div>
+
+      {/* ── First-Run Onboarding Card ─────────────────────────── */}
+      {!onboardDismissed && (
+        <section className="bg-gradient-to-br from-[#4F3588] to-[#5A3C9E] rounded-xl p-6 text-white relative overflow-hidden">
+          <button
+            onClick={dismissOnboard}
+            className="absolute top-3 right-3 text-white/60 hover:text-white text-sm transition-colors"
+            title="Dismiss"
+          >
+            ✕
+          </button>
+          <h2 className="text-lg font-semibold mb-1">Welcome to Atlas Chief of Staff</h2>
+          <p className="text-white/70 text-sm mb-4">Your AI-powered command center. Here's how to get the most out of it:</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+              <span className="text-lg mb-1 block">🧠</span>
+              <p className="text-sm font-medium">Ask the Brain</p>
+              <p className="text-xs text-white/60 mt-1">Ask anything — onboarding, playbooks, customer pain points. It knows your business.</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+              <span className="text-lg mb-1 block">✅</span>
+              <p className="text-sm font-medium">Track Your Tasks</p>
+              <p className="text-xs text-white/60 mt-1">Tasks are auto-detected from Slack and Zoom. Complete them to build your streak.</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+              <span className="text-lg mb-1 block">🎙️</span>
+              <p className="text-sm font-medium">Download Atlas Voice</p>
+              <p className="text-xs text-white/60 mt-1">Two keys: Backslash to dictate, Delete to command. Fastest way to use Atlas.</p>
+            </div>
+          </div>
+          <button
+            onClick={dismissOnboard}
+            className="mt-4 text-xs text-white/50 hover:text-white/80 transition-colors"
+          >
+            Got it, don't show again
+          </button>
+        </section>
+      )}
 
       {/* ── Atlas Brain ─────────────────────────────────────── */}
       <section>
@@ -411,9 +467,10 @@ export default function Briefing() {
         </div>
       </section>
 
-      {/* ── Voice Assistant Download (prominent, near top) ───── */}
+      {/* ── Voice Assistant Download (dismissible after download) ── */}
+      {!voiceDownloaded ? (
       <section id="voice-assistant" className="-mt-2">
-        <div className="bg-gradient-to-r from-[#4F3588] to-[#6B4DAA] rounded-xl shadow-sm p-5 text-white">
+        <div className="bg-gradient-to-r from-[#4F3588] to-[#6B4DAA] rounded-xl shadow-sm p-5 text-white relative">
           <div className="flex items-center gap-4">
             <div className="flex-shrink-0 w-11 h-11 rounded-lg bg-white/15 flex items-center justify-center">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -434,6 +491,7 @@ export default function Briefing() {
             <div className="flex items-center gap-3 flex-shrink-0">
               <a
                 href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.1.0/Atlas.Chief.Setup.0.1.0.exe"
+                onClick={markVoiceDownloaded}
                 className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
                 style={{ animationName: 'pulse-glow' }}
               >
@@ -445,6 +503,7 @@ export default function Briefing() {
               </a>
               <a
                 href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/latest"
+                onClick={markVoiceDownloaded}
                 className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
                 style={{ animationName: 'pulse-glow', animationDelay: '0.3s' }}
               >
@@ -458,6 +517,13 @@ export default function Briefing() {
           </div>
         </div>
       </section>
+      ) : (
+        <div className="flex items-center gap-2 text-xs text-gray-400">
+          <span>🎙️</span>
+          <span>Atlas Voice installed</span>
+          <button onClick={() => { localStorage.removeItem('atlas_voice_downloaded'); setVoiceDownloaded(false); }} className="text-[#4F3588] hover:underline ml-1">Show download again</button>
+        </div>
+      )}
 
       {/* ── Quick-Ask Answer ─────────────────────────────────── */}
       {askLoading && (
@@ -533,12 +599,28 @@ export default function Briefing() {
             {nonTaskAttention.map((item, i) => {
               const bgClass = item.type === 'risk_flag' ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200';
               const indicator = item.type === 'risk_flag' ? '\u26A0\uFE0F' : '\u{1F4C5}';
-              const label = item.type === 'risk_flag' ? 'Risk detected' : 'Needs prep';
+              const label = item.type === 'risk_flag' ? 'Risk intelligence' : 'Needs prep';
+              // Split risk subtitle into bullet points
+              const subtitleParts = item.subtitle?.split(' · ') ?? [];
               return (
                 <div key={`${item.type}-${i}`} className={`border rounded-xl p-4 ${bgClass}`}>
                   <p className="text-xs font-semibold text-gray-500 mb-1">{indicator} {label}</p>
-                  <p className="text-sm font-medium text-gray-900">{item.title}</p>
-                  <p className="text-xs text-gray-500 mt-1">{item.subtitle}</p>
+                  <p className="text-sm font-medium text-gray-900 mb-2">{item.title}</p>
+                  {subtitleParts.length > 1 ? (
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {subtitleParts.slice(0, 5).map((part, j) => (
+                        <li key={j} className="flex items-start gap-1.5">
+                          <span className="text-amber-500 mt-0.5">•</span>
+                          <span>{part}</span>
+                        </li>
+                      ))}
+                      {subtitleParts.length > 5 && (
+                        <li className="text-gray-400">+{subtitleParts.length - 5} more</li>
+                      )}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-500">{item.subtitle}</p>
+                  )}
                 </div>
               );
             })}

@@ -114,6 +114,7 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
   };
 
   const handleDismiss = async (id: string) => {
+    if (!confirm('Dismiss this task? It will be hidden from your list.')) return;
     try {
       await api.dismissTask(id);
       onTaskAction?.();
