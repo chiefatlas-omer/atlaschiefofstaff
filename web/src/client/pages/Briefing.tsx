@@ -3,6 +3,7 @@ import { api, BriefingData } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import ActivityFeed from '../components/ActivityFeed';
 import type { ActivityItem } from '../components/ActivityFeed';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 // ─── Upload types ────────────────────────────────────────────────────────────
 
@@ -287,11 +288,7 @@ export default function Briefing() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
-        Loading briefing...
-      </div>
-    );
+    return <SkeletonDashboard />;
   }
 
   if (error || !data) {

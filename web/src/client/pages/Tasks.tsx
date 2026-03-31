@@ -3,6 +3,7 @@ import { api, Task, TaskStats } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import TaskList from '../components/TaskList';
 import MetricCard from '../components/MetricCard';
+import { SkeletonCard, SkeletonTable } from '../components/Skeleton';
 
 export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -29,8 +30,12 @@ export default function Tasks() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-400">
-        Loading tasks...
+      <div className="space-y-8">
+        <div><div className="h-8 bg-gray-200 rounded w-32 animate-pulse mb-2" /><div className="h-4 bg-gray-100 rounded w-64 animate-pulse" /></div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <SkeletonCard key={i} />)}
+        </div>
+        <SkeletonTable rows={6} />
       </div>
     );
   }

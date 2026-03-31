@@ -54,7 +54,8 @@ router.get('/tasks/stats', (req: any, res) => {
     const now = new Date();
     const userFilter = (req.userId && !req.isAdmin) ? eq(tasks.slackUserId, req.userId) : undefined;
 
-    const total = db.select({ count: count() }).from(tasks).where(userFilter).get();
+    // Total excludes dismissed tasks (dismissed = user chose to ignore)
+    const total = db.select({ count: count() }).from(tasks).where(userFilter ? and(ne(tasks.status, 'DISMISSED'), userFilter) : ne(tasks.status, 'DISMISSED')).get();
     const open = db
       .select({ count: count() })
       .from(tasks)

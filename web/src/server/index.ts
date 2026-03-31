@@ -475,10 +475,12 @@ app.get('/api/email-drafts', (req: any, res) => {
     const Database = require('better-sqlite3');
     const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
     const sqlite = new Database(dbPath, { readonly: true });
-    // Everyone sees only their own follow-up drafts (personal tool, even for admins)
-    const drafts = req.userId
-      ? sqlite.prepare('SELECT * FROM email_drafts WHERE rep_slack_id = ? AND email_body IS NOT NULL AND email_body != \'\' ORDER BY created_at DESC LIMIT 20').all(req.userId)
-      : [];
+    // Admins see all team drafts; regular users see only their own
+    const drafts = req.isAdmin
+      ? sqlite.prepare('SELECT * FROM email_drafts WHERE email_body IS NOT NULL AND email_body != \'\' ORDER BY created_at DESC LIMIT 30').all()
+      : req.userId
+        ? sqlite.prepare('SELECT * FROM email_drafts WHERE rep_slack_id = ? AND email_body IS NOT NULL AND email_body != \'\' ORDER BY created_at DESC LIMIT 20').all(req.userId)
+        : [];
     sqlite.close();
     res.json(drafts);
   } catch (err) {

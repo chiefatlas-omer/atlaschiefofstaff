@@ -136,7 +136,7 @@ export default function Layout({ children }: LayoutProps) {
             onClick={() => setCommandBarOpen(true)}
             className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
-            {'\u2318'}K to search
+            {navigator.platform?.includes('Mac') ? '\u2318' : 'Ctrl+'}K to search
           </button>
         </div>
       </aside>

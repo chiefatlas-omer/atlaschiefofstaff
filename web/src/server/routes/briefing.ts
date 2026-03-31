@@ -36,9 +36,21 @@ router.get('/briefing', (req: any, res) => {
     const now = Math.floor(Date.now() / 1000);
     const weekAgo = now - 7 * 86400;
 
-    // ── Greeting ────────────────────────────────────────────
+    // User filtering: non-admins see only their own data
+    const userId = req.userId as string | null;
+    const isAdmin = req.isAdmin as boolean;
+
+    // ── Personalized Greeting ──────────────────────────────
     const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Good morning.' : hour < 17 ? 'Good afternoon.' : 'Good evening.';
+    const timeGreeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    // Resolve user's first name for personalization
+    let firstName = '';
+    if (userId) {
+      const teamMap = getInternalTeamMap();
+      const fullName = teamMap.get(userId);
+      if (fullName) firstName = fullName.split(' ')[0];
+    }
+    const greeting = firstName ? `${timeGreeting}, ${firstName}.` : `${timeGreeting}.`;
     const dateStr = new Date().toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
@@ -55,10 +67,6 @@ router.get('/briefing', (req: any, res) => {
       callId?: number;
       meetingId?: string;
     }> = [];
-
-    // User filtering: non-admins see only their own data
-    const userId = req.userId as string | null;
-    const isAdmin = req.isAdmin as boolean;
 
     // Overdue tasks (filtered by user for non-admins)
     const taskConditions = [
@@ -108,19 +116,35 @@ router.get('/briefing', (req: any, res) => {
       .orderBy(desc(callAnalyses.createdAt))
       .all();
 
+    // Aggregate risk flags by type (instead of individual cards per flag)
+    const riskCounts: Record<string, { count: number; reps: Set<string>; deals: Set<string> }> = {};
     for (const call of recentCalls) {
       const flags = call.riskFlags as string[] | null;
       if (flags && Array.isArray(flags) && flags.length > 0) {
         for (const flag of flags) {
-          needsAttention.push({
-            type: 'risk_flag',
-            title: flag,
-            subtitle: `From ${call.title ?? 'call'} · ${call.repName ?? 'Unknown rep'}`,
-            severity: 'medium',
-            callId: call.id,
-          });
+          const key = flag.toLowerCase().trim();
+          if (!riskCounts[key]) riskCounts[key] = { count: 0, reps: new Set(), deals: new Set() };
+          riskCounts[key].count++;
+          if (call.repName) riskCounts[key].reps.add(call.repName);
+          if (call.businessName) riskCounts[key].deals.add(call.businessName);
         }
       }
+    }
+    // Push aggregated risk summary (top 5 by frequency)
+    const sortedRisks = Object.entries(riskCounts)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 5);
+    if (sortedRisks.length > 0) {
+      const riskLines = sortedRisks.map(([flag, data]) => {
+        const dealList = [...data.deals].slice(0, 2).join(', ');
+        return `${flag} (${data.count} instance${data.count > 1 ? 's' : ''}${dealList ? ' — ' + dealList : ''})`;
+      });
+      needsAttention.push({
+        type: 'risk_flag',
+        title: `${Object.keys(riskCounts).length} risk types detected across ${recentCalls.length} calls`,
+        subtitle: riskLines.join(' · '),
+        severity: 'medium',
+      });
     }
 
     // Unprepped meetings today

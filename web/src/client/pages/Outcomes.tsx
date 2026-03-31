@@ -4,7 +4,7 @@ import MetricCard from '../components/MetricCard';
 
 function TrendBadge({ pct }: { pct: number | null }) {
   if (pct === null) {
-    return <span className="text-gray-400 text-xs ml-1">—</span>;
+    return <span className="text-blue-500 text-xs font-medium ml-1">New</span>;
   }
   if (pct > 0) {
     return (
@@ -206,12 +206,7 @@ export default function Outcomes() {
             color="purple"
             subtitle="At $50/hr fully loaded cost"
           />
-          <MetricCard
-            label="Minutes Saved"
-            value={timeSaved.minutes.toLocaleString()}
-            color="blue"
-            subtitle="Raw calculation"
-          />
+          {/* Minutes Saved removed — redundant with Hours Saved */}
         </div>
       </section>
 
@@ -219,11 +214,7 @@ export default function Outcomes() {
       <section>
         <h2 className="text-lg font-semibold text-gray-900 mb-4">This Week vs Last Week</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <WoWCard
-            label="Meetings Prepped"
-            thisWeek={thisWeek.meetingsPrepped}
-            pct={wow.meetingsPrepped}
-          />
+          {/* Meetings Prepped hidden — not connected to data source yet */}
           <WoWCard
             label="Follow-up Emails Drafted"
             thisWeek={thisWeek.followUpsDrafted}

@@ -627,11 +627,11 @@ router.get('/analytics/leaderboard', (_req, res) => {
     for (const snap of allCoachingAll) {
       const name = snap.repName ?? 'Unknown';
       if (!latestGradeByName[name]) {
-        // Derive grade from coaching flags: 0 flags=A, 1=B+, 2=B, 3+=C
-        const flags = snap.coachingFlags as unknown[] | null;
-        const flagCount = flags?.length ?? 0;
-        const grade =
-          flagCount === 0 ? 'A' : flagCount === 1 ? 'B+' : flagCount === 2 ? 'B' : 'C';
+        // Derive grade from coaching flags weighted by severity
+        const flags = (snap.coachingFlags ?? []) as Array<{ severity?: string }>;
+        const sevWeight: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+        const score = flags.reduce((sum, f) => sum + (sevWeight[f.severity ?? 'low'] ?? 1), 0);
+        const grade = score === 0 ? 'A' : score <= 2 ? 'B+' : score <= 4 ? 'B' : score <= 6 ? 'B-' : score <= 8 ? 'C+' : score <= 12 ? 'C' : 'D';
         latestGradeByName[name] = grade;
       }
     }
