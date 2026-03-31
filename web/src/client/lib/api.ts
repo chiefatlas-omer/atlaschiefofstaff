@@ -51,6 +51,8 @@ export interface Task {
   escalatedAt: string | null;
   source: 'slack' | 'zoom' | 'manual' | 'desktop';
   zoomMeetingId: string | null;
+  zoomMeetingTitle?: string | null;
+  zoomBusinessName?: string | null;
   createdAt: string;
   updatedAt: string;
 }

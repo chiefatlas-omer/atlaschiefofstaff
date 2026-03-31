@@ -162,9 +162,12 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
                 </span>
                 {(() => {
                   if (task.source === 'zoom') {
+                    const label = task.zoomMeetingTitle
+                      ? `📞 ${task.zoomMeetingTitle}${task.zoomBusinessName ? ` · ${task.zoomBusinessName}` : ''}`
+                      : '📞 From Zoom call';
                     return (
-                      <span className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1">
-                        📞 From Zoom call
+                      <span className="text-xs text-gray-400 mt-0.5 inline-flex items-center gap-1 truncate max-w-xs" title={label}>
+                        {label}
                       </span>
                     );
                   }

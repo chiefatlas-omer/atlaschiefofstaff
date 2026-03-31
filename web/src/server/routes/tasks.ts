@@ -36,7 +36,7 @@ router.get('/tasks', (req: any, res) => {
       .orderBy(desc(tasks.createdAt))
       .all();
 
-    // Admin: filter to internal team only and resolve proper display names
+    // Admin: filter to internal team only, resolve names, enrich Zoom tasks with meeting titles
     if (req.isAdmin) {
       const Database = require('better-sqlite3');
       const path = require('path');
@@ -44,18 +44,30 @@ router.get('/tasks', (req: any, res) => {
       const sqlite = new Database(dbPath, { readonly: true });
       const members = sqlite.prepare('SELECT slack_user_id, display_name FROM team_members').all() as { slack_user_id: string; display_name: string | null }[];
       const targets = sqlite.prepare('SELECT slack_user_id, display_name FROM escalation_targets').all() as { slack_user_id: string; display_name: string | null }[];
+
+      // Build Zoom meeting title lookup
+      const zoomCalls = sqlite.prepare('SELECT zoom_meeting_id, title, business_name FROM call_analyses WHERE zoom_meeting_id IS NOT NULL').all() as { zoom_meeting_id: string; title: string | null; business_name: string | null }[];
       sqlite.close();
+
       const nameMap = new Map<string, string>();
       for (const m of members) nameMap.set(m.slack_user_id, m.display_name ?? m.slack_user_id);
       for (const t of targets) if (!nameMap.has(t.slack_user_id)) nameMap.set(t.slack_user_id, t.display_name ?? t.slack_user_id);
 
+      const zoomTitleMap = new Map<string, { title: string | null; business: string | null }>();
+      for (const c of zoomCalls) zoomTitleMap.set(c.zoom_meeting_id, { title: c.title, business: c.business_name });
+
       openTasks = openTasks
         .filter((t) => nameMap.has(t.slackUserId))
-        .map((t) => ({
-          ...t,
-          // Override Zoom participant name with actual team member name
-          slackUserName: nameMap.get(t.slackUserId) ?? t.slackUserName,
-        }));
+        .map((t) => {
+          const zoomInfo = t.zoomMeetingId ? zoomTitleMap.get(t.zoomMeetingId) : null;
+          return {
+            ...t,
+            slackUserName: nameMap.get(t.slackUserId) ?? t.slackUserName,
+            // Attach Zoom meeting context for frontend display
+            zoomMeetingTitle: zoomInfo?.title ?? null,
+            zoomBusinessName: zoomInfo?.business ?? null,
+          };
+        });
     }
     res.json(openTasks);
   } catch (err) {
