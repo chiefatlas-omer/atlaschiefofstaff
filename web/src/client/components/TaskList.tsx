@@ -21,7 +21,7 @@ function getSlackPermalink(task: Task): string | null {
   // Build Slack permalink from channel + message timestamp
   if (task.sourceChannelId && task.sourceMessageTs) {
     const tsFormatted = task.sourceMessageTs.replace('.', '');
-    return `https://slack.com/archives/${task.sourceChannelId}/p${tsFormatted}`;
+    return `https://youratlas.slack.com/archives/${task.sourceChannelId}/p${tsFormatted}`;
   }
   return null;
 }
