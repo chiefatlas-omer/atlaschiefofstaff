@@ -13,8 +13,19 @@ import { callAnalyses, coachingSnapshots } from '../schema-analytics';
 import { emailDrafts } from '../schema-email-drafts';
 // emailDrafts routes moved to email-drafts.ts
 import { eq, ne, and, lt, gt, gte, desc, isNotNull, like } from 'drizzle-orm';
+import { teamMembers, escalationTargets } from '../../../../bot/src/db/schema';
 
 const router = Router();
+
+// Helper: get set of internal Slack User IDs from team_members + escalation_targets
+function getInternalSlackIds(): Set<string> {
+  const members = db.select({ id: teamMembers.slackUserId }).from(teamMembers).all();
+  const targets = db.select({ id: escalationTargets.slackUserId }).from(escalationTargets).all();
+  const ids = new Set<string>();
+  for (const m of members) ids.add(m.id);
+  for (const t of targets) ids.add(t.id);
+  return ids;
+}
 
 // GET /api/briefing — daily briefing: needs attention, today's schedule, week summary, activity feed
 router.get('/briefing', (req: any, res) => {
@@ -61,8 +72,9 @@ router.get('/briefing', (req: any, res) => {
       .where(and(...taskConditions))
       .all();
 
-    // Filter to only internal team (Slack User IDs start with 'U')
-    const internalOverdue = overdueTasks.filter((t) => t.slackUserId?.startsWith('U'));
+    // Filter to only internal team members (in team_members or escalation_targets tables)
+    const internalIds = getInternalSlackIds();
+    const internalOverdue = overdueTasks.filter((t) => internalIds.has(t.slackUserId));
 
     for (const t of internalOverdue) {
       const deadlineTs = t.deadline instanceof Date ? t.deadline.getTime() : Number(t.deadline) * 1000;

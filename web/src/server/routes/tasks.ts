@@ -1,9 +1,18 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { tasks } from '../../../../bot/src/db/schema';
+import { tasks, teamMembers, escalationTargets } from '../../../../bot/src/db/schema';
 import { eq, ne, and, lt, count, desc } from 'drizzle-orm';
 
 const router = Router();
+
+function getInternalSlackIds(): Set<string> {
+  const members = db.select({ id: teamMembers.slackUserId }).from(teamMembers).all();
+  const targets = db.select({ id: escalationTargets.slackUserId }).from(escalationTargets).all();
+  const ids = new Set<string>();
+  for (const m of members) ids.add(m.id);
+  for (const t of targets) ids.add(t.id);
+  return ids;
+}
 
 // GET /api/tasks — open tasks filtered by user (admins see all)
 router.get('/tasks', (req: any, res) => {
@@ -15,14 +24,18 @@ router.get('/tasks', (req: any, res) => {
       conditions.push(eq(tasks.slackUserId, req.userId));
     }
 
-    const openTasks = db
+    let openTasks = db
       .select()
       .from(tasks)
       .where(and(...conditions))
       .orderBy(desc(tasks.createdAt))
-      .all()
-      // Filter to internal team only (Slack User IDs start with 'U')
-      .filter((t) => t.slackUserId?.startsWith('U'));
+      .all();
+
+    // Admin: filter to internal team only (must be in team_members or escalation_targets)
+    if (req.isAdmin) {
+      const internalIds = getInternalSlackIds();
+      openTasks = openTasks.filter((t) => internalIds.has(t.slackUserId));
+    }
     res.json(openTasks);
   } catch (err) {
     console.error('[tasks] GET /tasks error:', err);
