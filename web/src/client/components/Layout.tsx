@@ -5,10 +5,10 @@ import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
 
 const NAV_ITEMS = [
-  { label: 'Command Center', href: '/', adminOnly: false, teamAOnly: false },
-  { label: 'Intelligence', href: '/intelligence', adminOnly: false, teamAOnly: true },
-  { label: 'Tasks', href: '/tasks', adminOnly: false, teamAOnly: false },
-  { label: 'Outcomes', href: '/outcomes', adminOnly: false, teamAOnly: false },
+  { label: 'Home', href: '/', adminOnly: false, teamAOnly: false },
+  { label: 'Call Intelligence', href: '/intelligence', adminOnly: false, teamAOnly: true },
+  { label: 'My Tasks', href: '/tasks', adminOnly: false, teamAOnly: false },
+  { label: 'Results & ROI', href: '/outcomes', adminOnly: false, teamAOnly: false },
   { label: 'Settings', href: '/settings', adminOnly: false, teamAOnly: false },
 ];
 

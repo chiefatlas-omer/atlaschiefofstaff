@@ -426,7 +426,7 @@ export default function Briefing() {
               type="text"
               value={askQuery}
               onChange={(e) => setAskQuery(e.target.value)}
-              placeholder="Ask anything about your business..."
+              placeholder="Ask Atlas anything — playbooks, processes, follow-ups..."
               className="flex-1 text-sm text-gray-700 placeholder-gray-400 outline-none bg-transparent"
             />
             <button
@@ -440,7 +440,7 @@ export default function Briefing() {
 
           {/* Value prop subtitle */}
           <p className="text-xs text-gray-400">
-            Your company's operating system — ask questions, draft emails, search calls, and get instant answers about your business.
+            Your team's AI brain — instant answers from your playbooks, call transcripts, and company knowledge.
           </p>
 
           {/* Suggested questions — merge recent with defaults, always show 3 */}

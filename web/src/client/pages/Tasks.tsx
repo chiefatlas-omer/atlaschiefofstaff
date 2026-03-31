@@ -74,8 +74,8 @@ export default function Tasks() {
         <h1 className="text-2xl font-bold text-gray-900">Tasks</h1>
         <p className="text-gray-500 text-sm mt-1">
           {isAdmin
-            ? 'Executive view — track team accountability and follow-through'
-            : 'Your open tasks detected from Slack, Zoom, and manual input'
+            ? 'See who\'s on track and who needs a nudge — your team at a glance'
+            : 'Everything you committed to — from Slack conversations, Zoom calls, and meetings'
           }
         </p>
       </div>

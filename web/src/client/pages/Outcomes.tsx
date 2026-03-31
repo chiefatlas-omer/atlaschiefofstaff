@@ -187,9 +187,9 @@ export default function Outcomes() {
     <div className="space-y-10">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Outcomes</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Results & ROI</h1>
         <p className="text-gray-500 text-sm mt-1">
-          What Atlas Chief actually accomplished — measured in impact, not activity
+          Real impact Atlas Chief delivered this month — time saved, deals advanced, team coached
         </p>
       </div>
 
@@ -435,7 +435,7 @@ function TopWinsSection({ tasksCompleted, callsAnalyzed, followUps, signals, roi
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Wins This Week</h2>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {topWins.map((win, i) => (
-          <div key={i} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+          <div key={i} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 animate-fadeInUp stagger-${i + 1}`}>
             <span className="text-2xl mb-2 block">{win.emoji}</span>
             <p className="text-sm text-gray-700 leading-relaxed">{win.text}</p>
           </div>

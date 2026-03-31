@@ -103,12 +103,29 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
     status !== 'COMPLETED' && status !== 'DISMISSED';
 
   const [celebrateId, setCelebrateId] = useState<string | null>(null);
+  const [undoToast, setUndoToast] = useState<{ id: string; description: string } | null>(null);
+  const undoTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleComplete = async (id: string) => {
+    const task = tasks.find(t => t.id === id);
     try {
       await api.completeTask(id);
       setCelebrateId(id);
       setTimeout(() => setCelebrateId(null), 1200);
+      // Show undo toast for 5 seconds
+      setUndoToast({ id, description: task?.description ?? 'Task' });
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = setTimeout(() => setUndoToast(null), 5000);
+      onTaskAction?.();
+    } catch { /* ignore */ }
+  };
+
+  const handleUndo = async (id: string) => {
+    try {
+      // Reopen the task by pushing it (sets status back to CONFIRMED)
+      await api.pushTask(id, 0);
+      setUndoToast(null);
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
       onTaskAction?.();
     } catch { /* ignore */ }
   };
@@ -198,6 +215,19 @@ export default function TaskList({ tasks, onTaskAction }: TaskListProps) {
           ))}
         </tbody>
       </table>
+
+      {/* Undo toast */}
+      {undoToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white rounded-xl px-5 py-3 shadow-2xl flex items-center gap-4 animate-[slideUp_0.3s_ease-out]">
+          <span className="text-sm">✅ Task completed</span>
+          <button
+            onClick={() => handleUndo(undoToast.id)}
+            className="text-sm font-semibold text-[#A78BFA] hover:text-white transition-colors underline"
+          >
+            Undo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
