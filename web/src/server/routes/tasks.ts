@@ -1,16 +1,21 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { tasks, teamMembers, escalationTargets } from '../../../../bot/src/db/schema';
+import { tasks } from '../../../../bot/src/db/schema';
 import { eq, ne, and, lt, count, desc } from 'drizzle-orm';
 
 const router = Router();
 
 function getInternalSlackIds(): Set<string> {
-  const members = db.select({ id: teamMembers.slackUserId }).from(teamMembers).all();
-  const targets = db.select({ id: escalationTargets.slackUserId }).from(escalationTargets).all();
+  const Database = require('better-sqlite3');
+  const path = require('path');
+  const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
+  const sqlite = new Database(dbPath, { readonly: true });
+  const members = sqlite.prepare('SELECT slack_user_id FROM team_members').all() as { slack_user_id: string }[];
+  const targets = sqlite.prepare('SELECT slack_user_id FROM escalation_targets').all() as { slack_user_id: string }[];
+  sqlite.close();
   const ids = new Set<string>();
-  for (const m of members) ids.add(m.id);
-  for (const t of targets) ids.add(t.id);
+  for (const m of members) ids.add(m.slack_user_id);
+  for (const t of targets) ids.add(t.slack_user_id);
   return ids;
 }
 

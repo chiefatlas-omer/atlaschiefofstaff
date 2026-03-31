@@ -13,17 +13,20 @@ import { callAnalyses, coachingSnapshots } from '../schema-analytics';
 import { emailDrafts } from '../schema-email-drafts';
 // emailDrafts routes moved to email-drafts.ts
 import { eq, ne, and, lt, gt, gte, desc, isNotNull, like } from 'drizzle-orm';
-import { teamMembers, escalationTargets } from '../../../../bot/src/db/schema';
-
 const router = Router();
 
-// Helper: get set of internal Slack User IDs from team_members + escalation_targets
+// Helper: get set of internal Slack User IDs from team_members + escalation_targets (raw SQL for reliability)
 function getInternalSlackIds(): Set<string> {
-  const members = db.select({ id: teamMembers.slackUserId }).from(teamMembers).all();
-  const targets = db.select({ id: escalationTargets.slackUserId }).from(escalationTargets).all();
+  const Database = require('better-sqlite3');
+  const path = require('path');
+  const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../../..', 'bot/data/chiefofstaff.db');
+  const sqlite = new Database(dbPath, { readonly: true });
+  const members = sqlite.prepare('SELECT slack_user_id FROM team_members').all() as { slack_user_id: string }[];
+  const targets = sqlite.prepare('SELECT slack_user_id FROM escalation_targets').all() as { slack_user_id: string }[];
+  sqlite.close();
   const ids = new Set<string>();
-  for (const m of members) ids.add(m.id);
-  for (const t of targets) ids.add(t.id);
+  for (const m of members) ids.add(m.slack_user_id);
+  for (const t of targets) ids.add(t.slack_user_id);
   return ids;
 }
 
