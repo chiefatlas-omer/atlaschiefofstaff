@@ -487,7 +487,7 @@ export default function Briefing() {
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <a
-                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.2.0/Atlas-Chief-Setup-0.2.0.exe"
+                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.3.1/Atlas-Chief-Setup-0.3.1.exe"
                 onClick={markVoiceDownloaded}
                 className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
                 style={{ animationName: 'pulse-glow' }}
@@ -499,7 +499,7 @@ export default function Briefing() {
                 Download for Windows
               </a>
               <a
-                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.2.0/Atlas-Chief-0.2.0-arm64.dmg"
+                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.3.1/Atlas-Chief-0.3.1-arm64.dmg"
                 onClick={markVoiceDownloaded}
                 className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
                 style={{ animationName: 'pulse-glow', animationDelay: '0.3s' }}
