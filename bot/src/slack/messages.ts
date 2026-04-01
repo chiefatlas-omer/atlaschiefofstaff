@@ -656,16 +656,15 @@ async function processBatch(channelId: string, client: any, app: App) {
   }
 
   try {
-    // Resolve <@USERID> mentions to display names before sending to AI
-    const resolvedMessages = await Promise.all(
-      messages.map(async (msg) => ({
-        user: msg.user,
-        text: await resolveUserMentions(msg.text, client),
-        ts: msg.ts,
-        channel: msg.channel,
-        ...(msg.thread_parent_user ? { thread_parent_user: msg.thread_parent_user } : {}),
-      }))
-    );
+    // Send raw text with <@USERID> mentions intact so AI can extract assignees
+    // The AI prompt handles <@UXXXXXXXX> format to determine task owners
+    const resolvedMessages = messages.map((msg) => ({
+      user: msg.user,
+      text: msg.text,
+      ts: msg.ts,
+      channel: msg.channel,
+      ...(msg.thread_parent_user ? { thread_parent_user: msg.thread_parent_user } : {}),
+    }));
 
     const commitments = await extractCommitments(resolvedMessages);
 
