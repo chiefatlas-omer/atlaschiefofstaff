@@ -11,15 +11,44 @@ export function createTray(mainWindow: BrowserWindow): Tray {
   if (fs.existsSync(iconPath)) {
     icon = nativeImage.createFromPath(iconPath);
   } else {
-    // Create Atlas bolt logo programmatically as a data URL PNG
-    // Electron can render SVG → nativeImage via data URL
-    const svgData = `<svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="50" cy="50" r="46" fill="#4F3588"/>
-      <path d="M55 20L35 52H48L42 80L68 45H53L55 20Z" fill="white"/>
-    </svg>`;
-    const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svgData).toString('base64')}`;
-    icon = nativeImage.createFromDataURL(dataUrl);
-    icon = icon.resize({ width: 16, height: 16 });
+    // Create Atlas bolt logo as 16x16 RGBA pixel data
+    const size = 16;
+    const buf = Buffer.alloc(size * size * 4, 0); // RGBA, transparent
+
+    // Draw purple circle with white lightning bolt
+    const cx = 7.5, cy = 7.5, r = 7;
+    const purple = [79, 53, 136, 255]; // #4F3588
+    const white = [255, 255, 255, 255];
+
+    // Bolt shape points (scaled to 16x16 from 100x100 viewbox)
+    // Original: M55,20 L35,52 H48 L42,80 L68,45 H53 L55,20
+    const boltPolygon = [
+      [8.8, 3.2], [5.6, 8.3], [7.7, 8.3], [6.7, 12.8], [10.9, 7.2], [8.5, 7.2], [8.8, 3.2]
+    ];
+
+    function pointInPolygon(px: number, py: number, poly: number[][]): boolean {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [xi, yi] = poly[i], [xj, yj] = poly[j];
+        if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+          inside = !inside;
+        }
+      }
+      return inside;
+    }
+
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = x - cx, dy = y - cy;
+        if (dx * dx + dy * dy <= r * r) {
+          const idx = (y * size + x) * 4;
+          const color = pointInPolygon(x, y, boltPolygon) ? white : purple;
+          buf[idx] = color[0]; buf[idx + 1] = color[1]; buf[idx + 2] = color[2]; buf[idx + 3] = color[3];
+        }
+      }
+    }
+
+    icon = nativeImage.createFromBitmap(buf, { width: size, height: size });
   }
 
   tray = new Tray(icon);
