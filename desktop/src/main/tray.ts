@@ -7,13 +7,19 @@ let tray: Tray | null = null;
 export function createTray(mainWindow: BrowserWindow): Tray {
   const iconPath = path.join(__dirname, '..', '..', 'assets', 'icons', 'tray-icon.png');
 
-  // Use a fallback if icon doesn't exist
   let icon;
   if (fs.existsSync(iconPath)) {
     icon = nativeImage.createFromPath(iconPath);
   } else {
-    // Create a 16x16 placeholder icon
-    icon = nativeImage.createEmpty();
+    // Create Atlas bolt logo programmatically as a data URL PNG
+    // Electron can render SVG → nativeImage via data URL
+    const svgData = `<svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="46" fill="#4F3588"/>
+      <path d="M55 20L35 52H48L42 80L68 45H53L55 20Z" fill="white"/>
+    </svg>`;
+    const dataUrl = `data:image/svg+xml;base64,${Buffer.from(svgData).toString('base64')}`;
+    icon = nativeImage.createFromDataURL(dataUrl);
+    icon = icon.resize({ width: 16, height: 16 });
   }
 
   tray = new Tray(icon);
