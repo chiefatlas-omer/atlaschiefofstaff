@@ -1,6 +1,6 @@
 {
   "name": "atlas-chief-of-staff-desktop",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "AI Chief of Staff desktop app — voice-controlled computer automation",
   "author": "Atlas Growth",
   "main": "dist/main/index.js",
@@ -23,6 +23,7 @@
     },
     "files": [
       "dist/**/*",
+      "assets/**/*",
       "node_modules/**/*",
       "!node_modules/.cache"
     ],
@@ -35,13 +36,13 @@
           ]
         }
       ],
-      "icon": null
+      "icon": "assets/icons/icon.png"
     },
     "mac": {
       "target": [
         "dmg"
       ],
-      "icon": null,
+      "icon": "assets/icons/icon.png",
       "category": "public.app-category.productivity"
     },
     "nsis": {
