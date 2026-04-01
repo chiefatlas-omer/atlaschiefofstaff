@@ -72,7 +72,7 @@ export function initHotkeys(window: BrowserWindow) {
   }
 }
 
-function toggleRecording(mode: 'dictation' | 'command') {
+export function toggleRecording(mode: 'dictation' | 'command') {
   if (!isListening) {
     isListening = true;
     currentMode = mode;

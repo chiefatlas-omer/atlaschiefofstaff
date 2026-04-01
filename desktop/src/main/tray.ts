@@ -1,6 +1,7 @@
 import { Tray, Menu, app, BrowserWindow, nativeImage } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { toggleRecording } from './hotkey';
 
 let tray: Tray | null = null;
 
@@ -94,6 +95,12 @@ export function createTray(mainWindow: BrowserWindow): Tray {
 
   tray.setToolTip('Atlas Chief of Staff');
   tray.setContextMenu(contextMenu);
+
+  // Single click on tray icon → start dictation
+  tray.on('click', () => {
+    mainWindow.show();
+    toggleRecording('dictation');
+  });
 
   return tray;
 }

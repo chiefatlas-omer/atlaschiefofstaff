@@ -1,7 +1,7 @@
 import { app, BrowserWindow, screen, dialog } from 'electron';
 import path from 'path';
 import { createTray } from './tray';
-import { initHotkeys, cleanup } from './hotkey';
+import { initHotkeys, cleanup, toggleRecording } from './hotkey';
 import { registerIpcHandlers } from './ipc-handlers';
 import { GoogleAuth } from './auth/google-auth';
 import { CalendarClient } from './calendar/google-calendar';
@@ -74,6 +74,20 @@ function createWindow() {
     if (!(app as any).isQuitting) {
       event.preventDefault();
       mainWindow?.hide();
+    }
+  });
+}
+
+// Ensure single instance — second click opens dictation
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // User clicked desktop icon while app is already running — start dictation
+    if (mainWindow) {
+      mainWindow.show();
+      toggleRecording('dictation');
     }
   });
 }

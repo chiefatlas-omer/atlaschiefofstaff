@@ -8,6 +8,7 @@ declare global {
       onTasksUpdate: (cb: (tasks: any[]) => void) => void;
       onError: (cb: (message: string) => void) => void;
       onDictationDone: (cb: () => void) => void;
+      onStartDictation: (cb: () => void) => void;
       sendAudioData: (buffer: ArrayBuffer) => void;
       getTasks: () => Promise<any[]>;
       // Knowledge

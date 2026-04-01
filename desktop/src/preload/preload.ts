@@ -46,6 +46,9 @@ contextBridge.exposeInMainWorld('chiefOfStaff', {
   onDictationDone: (cb: () => void) => {
     ipcRenderer.on(IPC.DICTATION_DONE, () => cb());
   },
+  onStartDictation: (cb: () => void) => {
+    ipcRenderer.on('start-dictation', () => cb());
+  },
 
   // Renderer -> Main commands
   sendAudioData: (buffer: ArrayBuffer) => {
