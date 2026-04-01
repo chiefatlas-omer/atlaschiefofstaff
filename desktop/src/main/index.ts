@@ -43,8 +43,8 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
-  // Open DevTools in development (detached so it doesn't interfere with transparent overlay)
-  if (process.env.NODE_ENV !== 'production') {
+  // Open DevTools only in dev (when running with `electron .`, not packaged)
+  if (!app.isPackaged) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 

@@ -316,12 +316,16 @@ export function registerAllListeners(app: App) {
       const { taskConfirmationBlocks } = require('./blocks');
 
       try {
+        const rawText = event.text || '';
+        console.log(`[app_mention] Extracting commitments from: "${rawText.substring(0, 200)}" (sender: ${event.user})`);
         const commitments = await extractCommitments([{
           user: event.user,
-          text: event.text || '',
+          text: rawText,
           ts: event.ts,
           channel: event.channel,
         }]);
+
+        console.log(`[app_mention] Found ${commitments.length} commitments:`, commitments.map((c: any) => ({ who: c.who, what: c.what })));
 
         if (commitments.length > 0) {
           for (const commitment of commitments) {
