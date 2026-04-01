@@ -1,6 +1,6 @@
 {
   "name": "atlas-chief-of-staff-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "AI Chief of Staff desktop app — voice-controlled computer automation",
   "author": "Atlas Growth",
   "main": "dist/main/index.js",
@@ -44,6 +44,11 @@
       "oneClick": true,
       "perMachine": false,
       "allowToChangeInstallationDirectory": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "chiefatlas-omer",
+      "repo": "atlaschiefofstaff"
     }
   },
   "dependencies": {
@@ -54,6 +59,7 @@
     "electron-store": "^8.2.0",
     "googleapis": "^171.4.0",
     "openai": "^4.85.0",
+    "electron-updater": "^6.3.9",
     "uiohook-napi": "^1.5.4"
   },
   "devDependencies": {

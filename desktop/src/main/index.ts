@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen } from 'electron';
+import { app, BrowserWindow, screen, dialog } from 'electron';
 import path from 'path';
 import { createTray } from './tray';
 import { initHotkeys, cleanup } from './hotkey';
@@ -6,6 +6,7 @@ import { registerIpcHandlers } from './ipc-handlers';
 import { GoogleAuth } from './auth/google-auth';
 import { CalendarClient } from './calendar/google-calendar';
 import { MeetingScheduler } from './calendar/scheduler';
+import { autoUpdater } from 'electron-updater';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -89,6 +90,22 @@ app.on('before-quit', () => {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // Auto-update: check for updates silently on launch
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.logger = console;
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log(`Update downloaded: v${info.version}. Will install on next restart.`);
+    // Notify user via system tray notification
+    if (mainWindow) {
+      mainWindow.webContents.send('update-available', info.version);
+    }
+  });
+  autoUpdater.on('error', (err) => {
+    console.warn('Auto-update check failed (non-fatal):', err.message);
+  });
+  autoUpdater.checkForUpdatesAndNotify().catch(() => {});
 });
 
 app.on('window-all-closed', () => {

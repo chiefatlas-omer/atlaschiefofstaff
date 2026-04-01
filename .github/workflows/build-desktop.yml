@@ -6,6 +6,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build-mac:
     runs-on: macos-latest
@@ -20,23 +23,18 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      - name: Build Mac app
+      - name: Build and publish Mac app
         working-directory: desktop
-        run: npm run dist:mac
+        run: npm run build && npx electron-builder --mac --publish always
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Mac DMG
         uses: actions/upload-artifact@v4
         with:
           name: mac-dmg
           path: desktop/release/*.dmg
-
-      - name: Upload to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: desktop/release/*.dmg
 
   build-windows:
     runs-on: windows-latest
@@ -51,20 +49,16 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      - name: Build Windows app
+      - name: Build and publish Windows app
         working-directory: desktop
-        run: npm run dist:win
+        run: npm run build && npx electron-builder --win --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: desktop/release/*.exe
-
-      - name: Upload to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
+          path: |
             desktop/release/*.exe
             !desktop/release/win-unpacked/**
