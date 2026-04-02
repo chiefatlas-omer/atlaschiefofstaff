@@ -362,10 +362,15 @@ router.get('/briefing', (req: any, res) => {
 
     const activity: ActivityItem[] = [];
 
-    // Call analyses
+    // Call analyses (filtered by user for non-admins)
+    const activityCallConds: any[] = [];
+    if (userId && !isAdmin) {
+      activityCallConds.push(eq(callAnalyses.repSlackId, userId));
+    }
     const recentCallsAll = db
       .select()
       .from(callAnalyses)
+      .where(activityCallConds.length ? and(...activityCallConds) : undefined)
       .orderBy(desc(callAnalyses.createdAt))
       .limit(15)
       .all();
@@ -378,10 +383,15 @@ router.get('/briefing', (req: any, res) => {
       });
     }
 
-    // Tasks
+    // Tasks (filtered by user for non-admins)
+    const activityTaskConds: any[] = [];
+    if (userId && !isAdmin) {
+      activityTaskConds.push(eq(tasks.slackUserId, userId));
+    }
     const recentTasks = db
       .select()
       .from(tasks)
+      .where(activityTaskConds.length ? and(...activityTaskConds) : undefined)
       .orderBy(desc(tasks.createdAt))
       .limit(15)
       .all();
@@ -398,10 +408,15 @@ router.get('/briefing', (req: any, res) => {
       });
     }
 
-    // Coaching snapshots
+    // Coaching snapshots (filtered by user for non-admins)
+    const activityCoachConds: any[] = [];
+    if (userId && !isAdmin) {
+      activityCoachConds.push(eq(coachingSnapshots.repSlackId, userId));
+    }
     const recentCoaching = db
       .select()
       .from(coachingSnapshots)
+      .where(activityCoachConds.length ? and(...activityCoachConds) : undefined)
       .orderBy(desc(coachingSnapshots.createdAt))
       .limit(15)
       .all();
@@ -536,9 +551,11 @@ router.get('/briefing', (req: any, res) => {
 });
 
 // GET /api/search?q=<query> — unified search across tasks, people, companies, meetings, calls, documents
-router.get('/search', (req, res) => {
+router.get('/search', (req: any, res) => {
   try {
     const q = (req.query.q as string || '').trim().toLowerCase();
+    const searchUserId = req.userId as string | null;
+    const searchIsAdmin = req.isAdmin as boolean;
 
     interface SearchResult {
       type: string;
@@ -550,11 +567,15 @@ router.get('/search', (req, res) => {
     const results: SearchResult[] = [];
 
     if (q === '') {
-      // Return recent items: last 5 tasks + last 5 calls
+      // Return recent items: last 5 tasks + last 5 calls (filtered by user for non-admins)
+      const searchTaskConds: any[] = [ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')];
+      if (searchUserId && !searchIsAdmin) {
+        searchTaskConds.push(eq(tasks.slackUserId, searchUserId));
+      }
       const recentTasks = db
         .select()
         .from(tasks)
-        .where(and(ne(tasks.status, 'COMPLETED'), ne(tasks.status, 'DISMISSED')))
+        .where(and(...searchTaskConds))
         .orderBy(desc(tasks.createdAt))
         .limit(5)
         .all();
@@ -567,9 +588,14 @@ router.get('/search', (req, res) => {
         });
       }
 
+      const searchCallConds: any[] = [];
+      if (searchUserId && !searchIsAdmin) {
+        searchCallConds.push(eq(callAnalyses.repSlackId, searchUserId));
+      }
       const recentCalls = db
         .select()
         .from(callAnalyses)
+        .where(searchCallConds.length ? and(...searchCallConds) : undefined)
         .orderBy(desc(callAnalyses.createdAt))
         .limit(5)
         .all();
@@ -584,11 +610,15 @@ router.get('/search', (req, res) => {
     } else {
       const pattern = `%${q}%`;
 
-      // Tasks
+      // Tasks (filtered by user for non-admins)
+      const searchTaskMatchConds: any[] = [like(tasks.description, pattern)];
+      if (searchUserId && !searchIsAdmin) {
+        searchTaskMatchConds.push(eq(tasks.slackUserId, searchUserId));
+      }
       const matchedTasks = db
         .select()
         .from(tasks)
-        .where(like(tasks.description, pattern))
+        .where(and(...searchTaskMatchConds))
         .limit(3)
         .all();
       for (const t of matchedTasks) {
@@ -647,11 +677,15 @@ router.get('/search', (req, res) => {
         });
       }
 
-      // Call analyses
+      // Call analyses (filtered by user for non-admins)
+      const searchCallMatchConds: any[] = [like(callAnalyses.title, pattern)];
+      if (searchUserId && !searchIsAdmin) {
+        searchCallMatchConds.push(eq(callAnalyses.repSlackId, searchUserId));
+      }
       const matchedCalls = db
         .select()
         .from(callAnalyses)
-        .where(like(callAnalyses.title, pattern))
+        .where(and(...searchCallMatchConds))
         .limit(3)
         .all();
       for (const c of matchedCalls) {
