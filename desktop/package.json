@@ -40,7 +40,12 @@
     },
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
       ],
       "icon": "assets/icons/icon.png",
       "category": "public.app-category.productivity"
