@@ -1,6 +1,6 @@
 {
   "name": "atlas-chief-of-staff-desktop",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "AI Chief of Staff desktop app — voice-controlled computer automation",
   "author": "Atlas Growth",
   "main": "dist/main/index.js",
