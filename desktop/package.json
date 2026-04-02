@@ -43,13 +43,13 @@
         {
           "target": "dmg",
           "arch": [
-            "universal"
+            "x64",
+            "arm64"
           ]
         }
       ],
       "icon": "assets/icons/icon.png",
-      "category": "public.app-category.productivity",
-      "x64ArchFiles": "Contents/Resources/app.asar.unpacked/node_modules/**/*.node"
+      "category": "public.app-category.productivity"
     },
     "nsis": {
       "oneClick": true,
