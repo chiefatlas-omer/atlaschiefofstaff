@@ -48,7 +48,8 @@
         }
       ],
       "icon": "assets/icons/icon.png",
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "x64ArchFiles": "Contents/Resources/app.asar.unpacked/node_modules/**/*.node"
     },
     "nsis": {
       "oneClick": true,
