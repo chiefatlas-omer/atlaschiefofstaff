@@ -38,13 +38,18 @@ sqlite.exec(`
   CREATE TABLE IF NOT EXISTS zoom_user_mappings (id INTEGER PRIMARY KEY AUTOINCREMENT, zoom_display_name TEXT NOT NULL UNIQUE, slack_user_id TEXT NOT NULL, created_at INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS digest_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, sent_at INTEGER NOT NULL, recipient_slack_id TEXT NOT NULL, task_count INTEGER NOT NULL, overdue_count INTEGER NOT NULL, completed_count INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS processed_messages (message_ts TEXT PRIMARY KEY, channel_id TEXT NOT NULL, processed_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS ai_employees (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, department TEXT NOT NULL, department_label TEXT, status TEXT NOT NULL DEFAULT 'idle', trust_level TEXT NOT NULL DEFAULT 'supervised', reports_to TEXT, icon TEXT, skills TEXT, training_materials TEXT, standing_instructions TEXT, hours_used INTEGER DEFAULT 0, hours_allocated INTEGER DEFAULT 0, approvals_count INTEGER DEFAULT 0, deliverables_count INTEGER DEFAULT 0, hire_date TEXT, is_chief_of_staff INTEGER DEFAULT 0, owner_slack_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS ai_activity (id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, employee_name TEXT, employee_icon TEXT, action TEXT NOT NULL, detail TEXT, timestamp TEXT, needs_approval INTEGER DEFAULT 0, approved INTEGER, deliverable_preview TEXT, owner_slack_id TEXT, created_at INTEGER NOT NULL);
+  CREATE TABLE IF NOT EXISTS ai_routines (id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT, days TEXT, time TEXT, enabled INTEGER DEFAULT 1, owner_slack_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 `);
 try { sqlite.exec('ALTER TABLE team_members ADD COLUMN coaching_role TEXT'); } catch (_e) { /* already exists */ }
 
 import * as schema from '../../../bot/src/db/schema';
 import * as analyticsSchema from './schema-analytics';
 import * as emailDraftSchema from './schema-email-drafts';
-export const db = drizzle(sqlite, { schema: { ...schema, ...analyticsSchema, ...emailDraftSchema } });
+import * as teamSchema from './schema-team';
+export const db = drizzle(sqlite, { schema: { ...schema, ...analyticsSchema, ...emailDraftSchema, ...teamSchema } });
 // Re-export analytics tables for use by routes without bot imports
 export { callAnalyses, productSignals, coachingSnapshots } from './schema-analytics';
 export { emailDrafts } from './schema-email-drafts';
+export { aiEmployees, aiActivity, aiRoutines } from './schema-team';

@@ -7,6 +7,7 @@ import tasksRouter from './routes/tasks';
 import dashboardRouter from './routes/dashboard';
 import graphRouter from './routes/graph';
 import settingsRouter from './routes/settings';
+import teamRouter from './routes/team';
 const app = express();
 const PORT = Number(process.env.WEB_PORT) || 3001;
 
@@ -36,6 +37,9 @@ const PORT = Number(process.env.WEB_PORT) || 3001;
     CREATE TABLE IF NOT EXISTS zoom_user_mappings (id INTEGER PRIMARY KEY AUTOINCREMENT, zoom_display_name TEXT NOT NULL UNIQUE, slack_user_id TEXT NOT NULL, created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS digest_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, sent_at INTEGER NOT NULL, recipient_slack_id TEXT NOT NULL, task_count INTEGER NOT NULL, overdue_count INTEGER NOT NULL, completed_count INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS processed_messages (message_ts TEXT PRIMARY KEY, channel_id TEXT NOT NULL, processed_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS ai_employees (id TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL, department TEXT NOT NULL, department_label TEXT, status TEXT NOT NULL DEFAULT 'idle', trust_level TEXT NOT NULL DEFAULT 'supervised', reports_to TEXT, icon TEXT, skills TEXT, training_materials TEXT, standing_instructions TEXT, hours_used INTEGER DEFAULT 0, hours_allocated INTEGER DEFAULT 0, approvals_count INTEGER DEFAULT 0, deliverables_count INTEGER DEFAULT 0, hire_date TEXT, is_chief_of_staff INTEGER DEFAULT 0, owner_slack_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS ai_activity (id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, employee_name TEXT, employee_icon TEXT, action TEXT NOT NULL, detail TEXT, timestamp TEXT, needs_approval INTEGER DEFAULT 0, approved INTEGER, deliverable_preview TEXT, owner_slack_id TEXT, created_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS ai_routines (id TEXT PRIMARY KEY, employee_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT, days TEXT, time TEXT, enabled INTEGER DEFAULT 1, owner_slack_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
   `);
   initDb.close();
   console.log('[server] Database tables initialized.');
@@ -516,6 +520,7 @@ app.use('/api', tasksRouter);
 app.use('/api', dashboardRouter);
 app.use('/api', graphRouter);
 app.use('/api', settingsRouter);
+app.use('/api', teamRouter);
 
 // Knowledge router loaded via require to isolate its heavy bot imports
 try {
