@@ -137,11 +137,8 @@ function findRole(name: string) {
 router.get('/team/employees', async (req: any, res) => {
   try {
     // Try Paperclip first
-    if (req.paperclipCompanyId) {
-      const employees = await paperclip.listEmployees(req.paperclipCompanyId);
-      if (employees) { res.json(employees); return; }
-    }
-    // Fall back to local SQLite
+    // Always use local SQLite as source of truth (richer data: soul, journal, etc.)
+    // Paperclip is synced via dual-write on hire/update operations
     const rows = db
       .select()
       .from(aiEmployees)
@@ -160,18 +157,7 @@ router.post('/team/employees', async (req: any, res) => {
   try {
     const { name, role, department, departmentLabel, icon, skills, estimatedHours, standingInstructions } = req.body;
 
-    // Try Paperclip first
-    if (req.paperclipCompanyId) {
-      const hired = await paperclip.hireEmployee(req.paperclipCompanyId, {
-        name,
-        role,
-        capabilities: (skills || []).join(', '),
-        hoursAllocated: estimatedHours,
-      });
-      if (hired) { res.json(hired); return; }
-    }
-
-    // Fall back to local SQLite
+    // Always write to local SQLite (our rich data store)
     const id = `emp-${Date.now()}`;
     const now = new Date().toISOString().slice(0, 10);
     const ts = Math.floor(Date.now() / 1000);
@@ -200,6 +186,21 @@ router.post('/team/employees', async (req: any, res) => {
         updatedAt: ts,
       })
       .run();
+
+    // Also push to Paperclip if connected (dual-write)
+    if (req.paperclipCompanyId) {
+      const hired = await paperclip.hireEmployee(req.paperclipCompanyId, {
+        name,
+        role,
+        capabilities: (skills || []).join(', '),
+        hoursAllocated: estimatedHours,
+      });
+      if (hired) {
+        // Store the Paperclip agent ID alongside our local ID for future syncs
+        console.log(`[team] Synced employee "${name}" to Paperclip as agent ${hired.id}`);
+      }
+    }
+
     const row = db.select().from(aiEmployees).where(eq(aiEmployees.id, id)).get();
     res.json(toEmployeeDTO(row));
   } catch (err) {
@@ -209,7 +210,7 @@ router.post('/team/employees', async (req: any, res) => {
 });
 
 // PATCH /team/employees/:id
-router.patch('/team/employees/:id', (req: any, res) => {
+router.patch('/team/employees/:id', async (req: any, res) => {
   try {
     const { id } = req.params;
     const body = req.body;
@@ -229,9 +230,27 @@ router.patch('/team/employees/:id', (req: any, res) => {
     if (body.soul !== undefined) updates.soul = body.soul;
     updates.updatedAt = Math.floor(Date.now() / 1000);
 
+    // Update local SQLite
     db.update(aiEmployees).set(updates).where(eq(aiEmployees.id, id)).run();
     const row = db.select().from(aiEmployees).where(eq(aiEmployees.id, id)).get();
     if (!row) { res.status(404).json({ error: 'Employee not found' }); return; }
+
+    // Push relevant updates to Paperclip (fire-and-forget)
+    if (req.paperclipCompanyId) {
+      const pcUpdates: Record<string, any> = {};
+      if (body.status !== undefined) pcUpdates.status = body.status;
+      if (body.hoursAllocated !== undefined) pcUpdates.hoursAllocated = body.hoursAllocated;
+      if (body.standingInstructions !== undefined) pcUpdates.standingInstructions = body.standingInstructions;
+      if (body.soul !== undefined) pcUpdates.soul = body.soul;
+      if (body.skills !== undefined) pcUpdates.skills = body.skills;
+
+      if (Object.keys(pcUpdates).length > 0) {
+        paperclip.updateEmployee(id, pcUpdates).then((ok) => {
+          if (ok) console.log(`[team] Synced employee "${id}" updates to Paperclip`);
+        }).catch(() => { /* Paperclip sync is best-effort */ });
+      }
+    }
+
     res.json(toEmployeeDTO(row));
   } catch (err) {
     console.error('[team] PATCH /team/employees/:id error:', err);
@@ -849,10 +868,30 @@ router.post('/team/employees/:id/journal', (req: any, res) => {
 
 router.get('/team/status', async (req: any, res) => {
   const alive = await paperclip.isPaperclipAlive();
+
+  // Get Paperclip health details if available
+  let paperclipVersion: string | null = null;
+  let agentCount = 0;
+  if (alive) {
+    try {
+      const health = await fetch('http://127.0.0.1:3100/api/health', { signal: AbortSignal.timeout(2000) })
+        .then((r) => r.json())
+        .catch(() => null);
+      if (health) paperclipVersion = health.version || null;
+
+      if (req.paperclipCompanyId) {
+        const agents = await paperclip.listEmployees(req.paperclipCompanyId);
+        if (agents) agentCount = agents.length;
+      }
+    } catch { /* non-critical */ }
+  }
+
   res.json({
     paperclipConnected: alive,
     companyId: req.paperclipCompanyId || null,
     mode: alive ? 'live' : 'local',
+    paperclipVersion,
+    paperclipAgents: agentCount,
   });
 });
 

@@ -122,7 +122,11 @@ export const teamApi = {
 
   // -- Paperclip status --
   status: () =>
-    fetchApi<{ paperclipConnected: boolean; companyId: string | null; mode: 'live' | 'local' }>(
-      '/api/team/status',
-    ),
+    fetchApi<{
+      paperclipConnected: boolean;
+      companyId: string | null;
+      mode: 'live' | 'local';
+      paperclipVersion?: string | null;
+      paperclipAgents?: number;
+    }>('/api/team/status'),
 };

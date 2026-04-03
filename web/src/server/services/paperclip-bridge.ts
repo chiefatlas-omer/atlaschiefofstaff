@@ -222,15 +222,43 @@ export async function hireEmployee(
 }
 
 /**
- * Update employee status or budget.
+ * Update employee status, budget, or metadata.
+ * Now also pushes soul/instructions as agent capabilities + description.
  */
 export async function updateEmployee(
   agentId: string,
-  updates: { status?: string; hoursAllocated?: number },
+  updates: {
+    status?: string;
+    hoursAllocated?: number;
+    standingInstructions?: string;
+    soul?: { personality: string; workingStyle: string; decisionFramework: string; strengths: string[]; growthAreas: string[] };
+    skills?: string[];
+  },
 ): Promise<boolean> {
   const body: Record<string, unknown> = {};
   if (updates.status) body.status = fromEmployeeStatus(updates.status);
   if (updates.hoursAllocated !== undefined) body.budgetMonthlyCents = hoursToCents(updates.hoursAllocated);
+
+  // Push skills as Paperclip capabilities
+  if (updates.skills) body.capabilities = updates.skills.join(', ');
+
+  // Build a rich description from soul + standing instructions for the agent's context
+  const descParts: string[] = [];
+  if (updates.soul) {
+    descParts.push(`Personality: ${updates.soul.personality}`);
+    descParts.push(`Working Style: ${updates.soul.workingStyle}`);
+    descParts.push(`Decision Framework: ${updates.soul.decisionFramework}`);
+    if (updates.soul.strengths.length) descParts.push(`Strengths: ${updates.soul.strengths.join(', ')}`);
+    if (updates.soul.growthAreas.length) descParts.push(`Growth Areas: ${updates.soul.growthAreas.join(', ')}`);
+  }
+  if (updates.standingInstructions) {
+    descParts.push(`Instructions: ${updates.standingInstructions}`);
+  }
+  if (descParts.length > 0) {
+    body.description = descParts.join('\n');
+  }
+
+  if (Object.keys(body).length === 0) return true; // nothing to push
 
   const result = await pcFetch(`/api/agents/${agentId}`, { method: 'PATCH', body });
   return result !== null;

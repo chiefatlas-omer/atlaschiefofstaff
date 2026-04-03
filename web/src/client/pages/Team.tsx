@@ -46,21 +46,38 @@ export default function Team() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
 
+  // Paperclip connection status
+  const [pcStatus, setPcStatus] = useState<{
+    connected: boolean;
+    mode: 'live' | 'local';
+    version: string | null;
+    agents: number;
+  }>({ connected: false, mode: 'local', version: null, agents: 0 });
+
   // ── Load data from API on mount ─────────────────────────────────────
   const loadData = useCallback(async () => {
     try {
-      const [emps, acts, rts, rls, bps] = await Promise.all([
+      const [emps, acts, rts, rls, bps, status] = await Promise.all([
         teamApi.employees(),
         teamApi.activity(),
         teamApi.routines(),
         teamApi.roles(),
         teamApi.blueprints(),
+        teamApi.status().catch(() => null),
       ]);
       setEmployees(emps);
       setActivity(acts);
       setRoutines(rts);
       setRoles(rls);
       setBlueprints(bps);
+      if (status) {
+        setPcStatus({
+          connected: status.paperclipConnected,
+          mode: status.mode,
+          version: status.paperclipVersion ?? null,
+          agents: status.paperclipAgents ?? 0,
+        });
+      }
     } catch (err) {
       console.error('[Team] Failed to load data:', err);
     } finally {
@@ -347,9 +364,30 @@ export default function Team() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">My AI Team</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your AI Team</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">My AI Team</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage your AI Team</p>
+        </div>
+
+        {/* Paperclip connection status */}
+        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+          <span
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: pcStatus.connected ? '#22C55E' : '#9CA3AF' }}
+          />
+          <span className="text-xs font-medium text-gray-700">
+            {pcStatus.connected ? 'Paperclip Connected' : 'Local Mode'}
+          </span>
+          {pcStatus.connected && pcStatus.version && (
+            <span className="text-[10px] text-gray-400">v{pcStatus.version}</span>
+          )}
+          {pcStatus.connected && pcStatus.agents > 0 && (
+            <span className="rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-medium text-[#22C55E]">
+              {pcStatus.agents} agent{pcStatus.agents !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
