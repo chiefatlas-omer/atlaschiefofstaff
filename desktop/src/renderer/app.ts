@@ -9,7 +9,10 @@ declare global {
       onError: (cb: (message: string) => void) => void;
       onDictationDone: (cb: () => void) => void;
       onStartDictation: (cb: () => void) => void;
+      onVoiceMode: (cb: (mode: string) => void) => void;
+      onPartialTranscript: (cb: (text: string) => void) => void;
       sendAudioData: (buffer: ArrayBuffer) => void;
+      sendPartialAudio: (buffer: ArrayBuffer) => void;
       getTasks: () => Promise<any[]>;
       // Knowledge
       onKnowledgeResponse: (cb: (answer: string) => void) => void;
@@ -63,6 +66,14 @@ const followupCopyBtn = document.getElementById('followup-copy-btn')!;
 const followupDismissBtn = document.getElementById('followup-dismiss-btn')!;
 const followupDismissAction = document.getElementById('followup-dismiss-action')!;
 
+// ── Live Dictation Indicator ──
+const liveTranscript = document.getElementById('live-transcript')!;
+
+// ── Voice Mode Tracking ──
+let currentVoiceMode: string | null = null;
+let partialChunkInterval: ReturnType<typeof setInterval> | null = null;
+let lastDisplayedText = '';
+
 // Click-through toggle: disable click-through when interactive panels are showing
 function updateClickThrough() {
   const anyPanelVisible = !briefingPanel.classList.contains('hidden') ||
@@ -86,6 +97,10 @@ function setState(state: string) {
   if (state === 'idle') {
     transcriptBubble.classList.add('hidden');
     errorMessage.classList.add('hidden');
+    // Clean up live transcript if still showing (e.g. error path)
+    if (!liveTranscript.classList.contains('hidden') && !liveTranscript.classList.contains('fade-out')) {
+      hideLiveTranscript();
+    }
   }
 }
 
@@ -191,6 +206,62 @@ async function flushAudioChunks(chunks: Blob[]) {
   window.chiefOfStaff.sendAudioData(buffer);
 }
 
+// ── Voice Mode Handler ──
+window.chiefOfStaff.onVoiceMode((mode: string) => {
+  currentVoiceMode = mode;
+  console.log('[RENDERER] Voice mode set to:', mode);
+});
+
+// ── Partial Transcript Notification ──
+// Text is now pasted directly into the focused app by the main process.
+// We just track that partials are arriving (for the "Dictating..." indicator).
+window.chiefOfStaff.onPartialTranscript((text: string) => {
+  if (!text) return;
+  lastDisplayedText = text;
+  // The live-transcript indicator is already shown when dictation starts;
+  // nothing else to do here — text goes straight into the focused app.
+});
+
+/** Start sending partial audio chunks to main process for live transcription */
+function startPartialChunks() {
+  stopPartialChunks();
+  partialChunkInterval = setInterval(() => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      // requestData() triggers ondataavailable with current buffered data,
+      // then we collect and send it
+      mediaRecorder.requestData();
+
+      // Small delay to let ondataavailable fire, then send accumulated chunks
+      setTimeout(() => {
+        if (audioChunks.length > 0) {
+          const partialBlob = new Blob([...audioChunks], { type: 'audio/webm' });
+          if (partialBlob.size > 1000) {
+            partialBlob.arrayBuffer().then((buf) => {
+              window.chiefOfStaff.sendPartialAudio(buf);
+            });
+          }
+        }
+      }, 100);
+    }
+  }, 1500);
+}
+
+function stopPartialChunks() {
+  if (partialChunkInterval !== null) {
+    clearInterval(partialChunkInterval);
+    partialChunkInterval = null;
+  }
+}
+
+function hideLiveTranscript() {
+  liveTranscript.classList.add('fade-out');
+  setTimeout(() => {
+    liveTranscript.classList.add('hidden');
+    liveTranscript.classList.remove('fade-out');
+    lastDisplayedText = '';
+  }, 500);
+}
+
 // Main status change handler — manages UI state, waveform, and recording
 window.chiefOfStaff.onStatusChange(async (state: string) => {
   setState(state);
@@ -221,11 +292,21 @@ window.chiefOfStaff.onStatusChange(async (state: string) => {
       startVad(stream);
       mediaRecorder.start();
       console.log('[RECORDER] Started recording');
+
+      // If in dictation mode, start sending partial audio chunks for live transcription
+      if (currentVoiceMode === 'dictation') {
+        lastDisplayedText = '';
+        // Show the small "Dictating..." indicator (no text content)
+        liveTranscript.classList.remove('hidden');
+        liveTranscript.classList.remove('fade-out');
+        startPartialChunks();
+      }
     } catch (err) {
       console.error('[RECORDER] Failed to start audio capture:', err);
     }
   } else if (state === 'processing') {
     console.log('[RECORDER] Processing state — stopping recorder');
+    stopPartialChunks();
     stopVad();
     waveform.stop();
     if (mediaRecorder && mediaRecorder.state === 'recording') {
@@ -245,9 +326,25 @@ window.chiefOfStaff.onTranscript((text) => {
   }, 5000);
 });
 
-// Dictation done — no visual feedback, just return to idle instantly
+// Dictation done — text has been pasted into focused app by main process. Hide indicator.
 window.chiefOfStaff.onDictationDone(() => {
   waveformContainer.classList.add('hidden');
+  stopPartialChunks();
+
+  // Briefly flash "Done" then hide the indicator
+  const label = liveTranscript.querySelector('.live-transcript-label');
+  if (label && !liveTranscript.classList.contains('hidden')) {
+    (label as HTMLElement).innerHTML = 'Dictated';
+    setTimeout(() => {
+      hideLiveTranscript();
+      // Restore the label for next session
+      (label as HTMLElement).innerHTML = 'Dictating<span class="typing-cursor"></span>';
+    }, 1000);
+  } else {
+    hideLiveTranscript();
+  }
+
+  currentVoiceMode = null;
   setState('idle');
 });
 

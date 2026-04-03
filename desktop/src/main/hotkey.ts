@@ -64,6 +64,8 @@ export function initHotkeys(window: BrowserWindow) {
     console.log('[HOTKEY] uIOhook started — Backslash → dictation mode');
   } catch (err) {
     console.warn('[HOTKEY] uIOhook not available — dictation mode requires uiohook-napi.');
+    // Notify the renderer so the user sees the fallback info
+    mainWindow?.webContents.send(IPC.ERROR, 'Backslash key unavailable — use Ctrl+Shift+K for dictation mode.');
     const fallbackOk = globalShortcut.register('CommandOrControl+Shift+K', () => {
       console.log('[HOTKEY] Ctrl+Shift+K pressed → DICTATION fallback');
       toggleRecording('dictation');

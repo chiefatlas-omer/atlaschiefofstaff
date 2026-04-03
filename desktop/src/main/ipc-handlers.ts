@@ -1,4 +1,5 @@
 import { ipcMain, BrowserWindow, clipboard } from 'electron';
+import { execSync } from 'child_process';
 import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
 import { postProcess, smartProcess, formatDictation } from './voice/post-processor';
@@ -11,6 +12,95 @@ import { fetchTasks, askKnowledgeBot } from './bot-api';
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
   // Rolling context window for continuity across consecutive transcription chunks.
   let transcriptionContext = '';
+
+  // ── Live transcription session state ──
+  let liveTranscriptParts: string[] = [];
+  let liveSessionActive = false;
+
+  // ── Inline dictation paste state ──
+  // Tracks what we last pasted into the focused app so we can delete it before pasting updated text.
+  let lastPastedText = '';
+
+  /**
+   * Delete previously pasted text from the focused app and paste new text in its place.
+   * Uses PowerShell SendKeys to send Backspace keystrokes, then Ctrl+V to paste.
+   */
+  async function pastePartialDictation(newText: string) {
+    const oldLen = lastPastedText.length;
+
+    if (oldLen > 0) {
+      // Delete previously pasted text by sending Backspace keystrokes
+      // SendKeys {BACKSPACE N} sends N backspaces efficiently
+      try {
+        const bsKeys = '{BACKSPACE ' + oldLen + '}';
+        execSync(
+          `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${bsKeys}')"`,
+          { timeout: 3000 },
+        );
+        console.log('[DICTATION] Sent', oldLen, 'backspaces to delete old partial text');
+      } catch (bsErr) {
+        console.warn('[DICTATION] Failed to send backspaces:', bsErr);
+      }
+    }
+
+    // Paste new text via clipboard
+    const savedClipboard = clipboard.readText();
+    clipboard.writeText(newText);
+
+    await new Promise(r => setTimeout(r, 50));
+
+    try {
+      execSync(
+        `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')"`,
+        { timeout: 3000 },
+      );
+      console.log('[DICTATION] Pasted partial text:', newText.substring(0, 80));
+    } catch (psErr) {
+      console.error('[DICTATION] Paste failed:', psErr);
+    }
+
+    // Restore original clipboard after a brief delay
+    setTimeout(() => {
+      clipboard.writeText(savedClipboard);
+    }, 300);
+
+    lastPastedText = newText;
+  }
+
+  // Handler for partial audio chunks during live dictation transcription
+  ipcMain.handle(IPC.PARTIAL_AUDIO, async (_event, audioBuffer: ArrayBuffer) => {
+    try {
+      const buffer = Buffer.from(audioBuffer);
+      if (buffer.length < 1000) return; // too small to transcribe
+
+      // Reset lastPastedText at the start of a new dictation session
+      if (!liveSessionActive) {
+        lastPastedText = '';
+      }
+      liveSessionActive = true;
+
+      const rawTranscript = await transcribeAudio(buffer, {
+        previousTranscript: liveTranscriptParts.join(' '),
+        highQualityRetry: false, // speed over quality for partial chunks
+      });
+
+      if (rawTranscript && rawTranscript.trim().length > 0) {
+        const cleaned = postProcess(rawTranscript, { stripFillers: false });
+        if (cleaned && cleaned.trim().length > 0) {
+          liveTranscriptParts.push(cleaned);
+          const accumulated = liveTranscriptParts.join(' ');
+
+          // Paste accumulated text directly into the focused app
+          await pastePartialDictation(accumulated);
+
+          // Notify renderer (for any lightweight UI indicator)
+          mainWindow.webContents.send(IPC.PARTIAL_TRANSCRIPT, accumulated);
+        }
+      }
+    } catch (err) {
+      console.warn('[PARTIAL_AUDIO] Chunk transcription failed:', err);
+    }
+  });
 
   // Unified audio handler — single flow for both command and dictation
   ipcMain.handle(IPC.AUDIO_DATA, async (_event, audioBuffer: ArrayBuffer) => {
@@ -59,48 +149,35 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
       if (mode === 'dictation') {
         // ── Dictation flow: format and paste text into active app ──
-        const finalText = formatDictation(transcript);
+        // If a live transcription session was active, combine partial results with the final pass
+        let combinedTranscript = transcript;
+        if (liveSessionActive && liveTranscriptParts.length > 0) {
+          // Use accumulated partials as the base — they covered most of the audio already
+          // The final Whisper pass on the full audio is often more accurate, so prefer it
+          // but fall back to partials if the final pass is shorter (indicating it missed content)
+          const partialText = liveTranscriptParts.join(' ');
+          if (partialText.length > transcript.length * 1.2) {
+            // Partials captured more content, use them
+            combinedTranscript = partialText;
+          }
+        }
+
+        const finalText = formatDictation(combinedTranscript);
         console.log('[DICTATION] Formatted output:', finalText.substring(0, 100));
 
-        // Skip overlay text preview — paste directly to cursor for instant feel
-
-        // Save current clipboard, paste transcript, restore clipboard
-        const savedClipboard = clipboard.readText();
-        clipboard.writeText(finalText);
-
-        // Simulate Ctrl+V to paste into focused app
-        // First, send a Backspace to eat any lingering '\' from the stop-recording keypress.
-        // The hotkey handler's eatBackslash() may race with OS key delivery, so this is a safety net.
+        // Delete previously pasted partial text and paste the final version
+        // The eatBackslash() in hotkey.ts handles the '\' from the stop keypress;
+        // wait a moment to let it run before we manipulate the text field.
         await new Promise(r => setTimeout(r, 200));
 
-        try {
-          const { execSync: execSyncBs } = require('child_process');
-          execSyncBs(
-            `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{BACKSPACE}')"`,
-            { timeout: 2000 },
-          );
-          console.log('[DICTATION] Safety backspace sent before paste');
-        } catch (_bsErr) {
-          // Non-fatal — the hotkey handler's eatBackslash may have already handled it
-        }
+        await pastePartialDictation(finalText);
 
-        await new Promise(r => setTimeout(r, 50));
+        // Reset all live session and paste state
+        liveTranscriptParts = [];
+        liveSessionActive = false;
+        lastPastedText = '';
 
-        try {
-          const { execSync } = require('child_process');
-          execSync(`powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')"`, { timeout: 3000 });
-          console.log('[DICTATION] Pasted via PowerShell SendKeys');
-        } catch (psErr) {
-          console.error('[DICTATION] Paste failed, text is in clipboard:', psErr);
-          mainWindow.webContents.send(IPC.ERROR, 'Paste failed \u2014 text is in clipboard, Ctrl+V to paste');
-        }
-
-        // Restore original clipboard after a brief delay
-        setTimeout(() => {
-          clipboard.writeText(savedClipboard);
-        }, 500);
-
-        // Signal renderer to flash checkmark and auto-hide (no text preview)
+        // Signal renderer to flash checkmark and auto-hide
         mainWindow.webContents.send(IPC.DICTATION_DONE);
       } else if (mode === 'command') {
         // ── Command flow: detect intent via regex fast-path, then route ──
@@ -213,6 +290,10 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
       }
     } catch (err: any) {
       console.error('Whisper transcription failed:', err);
+      // Reset live session and paste state on error
+      liveTranscriptParts = [];
+      liveSessionActive = false;
+      lastPastedText = '';
       mainWindow.webContents.send(IPC.ERROR, 'Failed to transcribe audio. Check your API key.');
       mainWindow.webContents.send(IPC.STATUS_CHANGE, 'idle');
     }

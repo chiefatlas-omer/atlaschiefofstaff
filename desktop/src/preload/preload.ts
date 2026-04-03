@@ -8,6 +8,9 @@ const IPC = {
   TASKS_UPDATE: 'tasks:update',
   TASKS_GET: 'tasks:get',
   ERROR: 'app:error',
+  VOICE_MODE: 'voice:mode',
+  PARTIAL_TRANSCRIPT: 'voice:partial-transcript',
+  PARTIAL_AUDIO: 'voice:partial-audio',
   // Knowledge Query
   KNOWLEDGE_RESPONSE: 'knowledge:response',
   // Meeting Briefing
@@ -49,10 +52,19 @@ contextBridge.exposeInMainWorld('chiefOfStaff', {
   onStartDictation: (cb: () => void) => {
     ipcRenderer.on('start-dictation', () => cb());
   },
+  onVoiceMode: (cb: (mode: string) => void) => {
+    ipcRenderer.on(IPC.VOICE_MODE, (_event, mode) => cb(mode));
+  },
+  onPartialTranscript: (cb: (text: string) => void) => {
+    ipcRenderer.on(IPC.PARTIAL_TRANSCRIPT, (_event, text) => cb(text));
+  },
 
   // Renderer -> Main commands
   sendAudioData: (buffer: ArrayBuffer) => {
     ipcRenderer.invoke(IPC.AUDIO_DATA, buffer);
+  },
+  sendPartialAudio: (buffer: ArrayBuffer) => {
+    ipcRenderer.invoke(IPC.PARTIAL_AUDIO, buffer);
   },
   getTasks: () => ipcRenderer.invoke(IPC.TASKS_GET),
 

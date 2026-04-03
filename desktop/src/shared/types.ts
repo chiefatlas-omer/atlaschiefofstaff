@@ -37,6 +37,9 @@ export const IPC = {
   FOLLOWUP_DISMISS: 'followup:dismiss',
   // Window control
   SET_IGNORE_MOUSE: 'window:set-ignore-mouse',
+  // Live transcription
+  PARTIAL_TRANSCRIPT: 'voice:partial-transcript',
+  PARTIAL_AUDIO: 'voice:partial-audio',
   // Dictation completed — skip text preview, just flash confirmation
   DICTATION_DONE: 'voice:dictation-done',
   // Bot API — command results from live bot

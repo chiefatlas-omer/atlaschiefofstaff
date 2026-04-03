@@ -291,15 +291,37 @@ async function resolveParticipants(
       });
     }
 
-    // 3. Try unique first name match (only if exactly one person has that first name)
+    // 3. Try unique first name match — BUT only for single-word names (e.g. just "Noah")
+    //    If the Zoom name has a last name (e.g. "Noah Sessions") and the Slack user
+    //    has a DIFFERENT last name (e.g. "Noah Malcolm"), skip it.
+    //    This prevents external attendees from being mismatched to internal team members
+    //    who happen to share the same first name.
     if (!match) {
+      const zoomParts = zoomNameLower.split(/\s+/);
+      const zoomLastName = zoomParts.length > 1 ? zoomParts.slice(1).join(' ') : '';
+
       const firstNameMatches = slackUsers.filter((u: any) => {
         const realName = (u.real_name || u.profile?.real_name || '').toLowerCase().trim();
         const slackFirstName = realName.split(' ')[0];
         return slackFirstName === zoomFirstName && zoomFirstName.length > 1;
       });
+
       if (firstNameMatches.length === 1) {
-        match = firstNameMatches[0];
+        // If the Zoom participant has a last name, verify it doesn't conflict
+        // with the Slack user's last name (which would mean they're different people)
+        if (zoomLastName) {
+          const slackRealName = (firstNameMatches[0].real_name || firstNameMatches[0].profile?.real_name || '').toLowerCase().trim();
+          const slackLastName = slackRealName.split(/\s+/).slice(1).join(' ');
+          // Only match if last names overlap (one starts with the other) or Slack has no last name
+          if (!slackLastName || slackLastName.startsWith(zoomLastName) || zoomLastName.startsWith(slackLastName)) {
+            match = firstNameMatches[0];
+          } else {
+            console.log(`[RESOLVE] Skipping first-name match: "${zoomName}" ≠ "${slackRealName}" (different last names)`);
+          }
+        } else {
+          // Single-word Zoom name (just "Noah") — allow first-name match
+          match = firstNameMatches[0];
+        }
       }
     }
 
