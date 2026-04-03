@@ -44,6 +44,8 @@ CRITICAL — Assignee extraction rules:
 - Only assign to the message sender (the "user" field) if NO other person is @mentioned AND this is NOT a directive in a thread reply.
 - If multiple users are @mentioned, assign to the first non-bot @mention.
 - Ignore @mentions of the bot itself (the bot is often the first mention in @mention messages).
+- NEVER assign a task to the bot. The bot is a tool, not a team member. If the only @mention is the bot, look for a plain-text person name in the message instead.
+- "remind [PersonName] to [task]" means assign to PersonName, NOT the sender and NOT the bot. If PersonName appears as an @mention (<@UXXXXXXXX>), use that ID. If it's plain text, return the plain text name as the "who" field — the system will resolve it.
 
 For each commitment found, extract:
 1. who: The Slack user ID of the person who owns the commitment (see assignee rules above)

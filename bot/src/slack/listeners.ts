@@ -317,10 +317,40 @@ export function registerAllListeners(app: App) {
 
       try {
         const rawText = event.text || '';
-        console.log(`[app_mention] Extracting commitments from: "${rawText.substring(0, 200)}" (sender: ${event.user})`);
+
+        // Strip the bot's own @mention so the AI doesn't assign the task to the bot
+        const botMention = rawText.match(/<@([A-Z0-9]+)>/i)?.[1];
+        let cleanText = rawText;
+        if (botMention) {
+          cleanText = rawText.replace(new RegExp(`<@${botMention}>`, 'gi'), '').trim();
+        }
+
+        // Resolve plain-text names to @mentions so the AI can identify assignees
+        // e.g. "remind Seygi to do X" → "remind <@U123|Seygi> to do X"
+        const remindNameMatch = cleanText.match(/\bremind\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+to\b/i);
+        if (remindNameMatch) {
+          const searchName = remindNameMatch[1].toLowerCase();
+          try {
+            const listRes = await client.users.list({});
+            const match = listRes.members?.find((m: any) => {
+              if (m.deleted || m.is_bot) return false;
+              return (m.profile?.display_name || '').toLowerCase() === searchName
+                || (m.real_name || '').toLowerCase() === searchName
+                || (m.name || '').toLowerCase() === searchName
+                || (m.profile?.display_name || '').toLowerCase().startsWith(searchName)
+                || (m.real_name || '').toLowerCase().startsWith(searchName);
+            });
+            if (match?.id) {
+              cleanText = cleanText.replace(remindNameMatch[1], `<@${match.id}|${match.real_name || match.name}>`);
+              console.log(`[app_mention] Resolved plain-text name "${remindNameMatch[1]}" to <@${match.id}>`);
+            }
+          } catch {}
+        }
+
+        console.log(`[app_mention] Extracting commitments from: "${cleanText.substring(0, 200)}" (sender: ${event.user})`);
         const commitments = await extractCommitments([{
           user: event.user,
-          text: rawText,
+          text: cleanText,
           ts: event.ts,
           channel: event.channel,
         }]);
