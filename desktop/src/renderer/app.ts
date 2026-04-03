@@ -243,7 +243,7 @@ function startPartialChunks() {
         }
       }, 100);
     }
-  }, 1500);
+  }, 1000);
 }
 
 function stopPartialChunks() {

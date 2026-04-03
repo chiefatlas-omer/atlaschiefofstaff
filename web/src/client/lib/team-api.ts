@@ -95,4 +95,10 @@ export const teamApi = {
       '/api/team/seed',
       { method: 'POST' },
     ),
+
+  // -- Paperclip status --
+  status: () =>
+    fetchApi<{ paperclipConnected: boolean; companyId: string | null; mode: 'live' | 'local' }>(
+      '/api/team/status',
+    ),
 };

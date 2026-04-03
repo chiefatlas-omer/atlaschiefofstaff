@@ -2,8 +2,30 @@ import { Router } from 'express';
 import { db } from '../db';
 import { aiEmployees, aiActivity, aiRoutines } from '../schema-team';
 import { eq, and, desc } from 'drizzle-orm';
+import * as paperclip from '../services/paperclip-bridge';
 
 const router = Router();
+
+// ---------------------------------------------------------------------------
+// Paperclip middleware — check once per request whether the sidecar is up.
+// Sets req.paperclipCompanyId if available; routes can use it to decide
+// whether to call the bridge or fall back to local SQLite.
+// ---------------------------------------------------------------------------
+
+let _cachedCompanyId: string | null = null;
+
+router.use(async (req: any, _res, next) => {
+  if (await paperclip.isPaperclipAlive()) {
+    if (!_cachedCompanyId) {
+      const companies = await paperclip.listCompanies();
+      if (companies && companies.length > 0) _cachedCompanyId = companies[0].id;
+    }
+    req.paperclipCompanyId = _cachedCompanyId;
+  } else {
+    req.paperclipCompanyId = null;
+  }
+  next();
+});
 
 // ---------------------------------------------------------------------------
 // DTO helpers — Drizzle returns camelCase matching the schema definitions
@@ -94,8 +116,14 @@ function findRole(name: string) {
 // ---------------------------------------------------------------------------
 
 // GET /team/employees
-router.get('/team/employees', (req: any, res) => {
+router.get('/team/employees', async (req: any, res) => {
   try {
+    // Try Paperclip first
+    if (req.paperclipCompanyId) {
+      const employees = await paperclip.listEmployees(req.paperclipCompanyId);
+      if (employees) { res.json(employees); return; }
+    }
+    // Fall back to local SQLite
     const rows = db
       .select()
       .from(aiEmployees)
@@ -110,9 +138,22 @@ router.get('/team/employees', (req: any, res) => {
 });
 
 // POST /team/employees
-router.post('/team/employees', (req: any, res) => {
+router.post('/team/employees', async (req: any, res) => {
   try {
     const { name, role, department, departmentLabel, icon, skills, estimatedHours, standingInstructions } = req.body;
+
+    // Try Paperclip first
+    if (req.paperclipCompanyId) {
+      const hired = await paperclip.hireEmployee(req.paperclipCompanyId, {
+        name,
+        role,
+        capabilities: (skills || []).join(', '),
+        hoursAllocated: estimatedHours,
+      });
+      if (hired) { res.json(hired); return; }
+    }
+
+    // Fall back to local SQLite
     const id = `emp-${Date.now()}`;
     const now = new Date().toISOString().slice(0, 10);
     const ts = Math.floor(Date.now() / 1000);
@@ -217,8 +258,14 @@ router.post('/team/employees/:id/promote', (req: any, res) => {
 // ---------------------------------------------------------------------------
 
 // GET /team/activity
-router.get('/team/activity', (req: any, res) => {
+router.get('/team/activity', async (req: any, res) => {
   try {
+    // Try Paperclip first
+    if (req.paperclipCompanyId) {
+      const activity = await paperclip.listActivity(req.paperclipCompanyId);
+      if (activity) { res.json(activity); return; }
+    }
+    // Fall back to local SQLite
     const conditions: any[] = [eq(aiActivity.ownerSlackId, req.userId)];
     if (req.query.employeeId) {
       conditions.push(eq(aiActivity.employeeId, req.query.employeeId as string));
@@ -612,6 +659,19 @@ router.post('/team/seed', (req: any, res) => {
     console.error('[team] POST /team/seed error:', err);
     res.status(500).json({ error: 'Failed to seed team data' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// PAPERCLIP STATUS — lets the frontend know if Paperclip is connected
+// ---------------------------------------------------------------------------
+
+router.get('/team/status', async (req: any, res) => {
+  const alive = await paperclip.isPaperclipAlive();
+  res.json({
+    paperclipConnected: alive,
+    companyId: req.paperclipCompanyId || null,
+    mode: alive ? 'live' : 'local',
+  });
 });
 
 export default router;
