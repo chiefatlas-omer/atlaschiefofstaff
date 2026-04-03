@@ -23,7 +23,7 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      - name: Build and publish Mac app
+      - name: Build and publish Mac app (Intel + Apple Silicon)
         working-directory: desktop
         run: npm run build && npx electron-builder --mac --publish always
         env:

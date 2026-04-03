@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { label: 'Call Intelligence', href: '/intelligence', adminOnly: false, teamAOnly: true },
   { label: 'My Tasks', href: '/tasks', adminOnly: false, teamAOnly: false },
   { label: 'Results & ROI', href: '/outcomes', adminOnly: false, teamAOnly: false },
+  { label: 'My AI Team', href: '/team', adminOnly: false, teamAOnly: false },
   { label: 'Settings', href: '/settings', adminOnly: false, teamAOnly: false },
 ];
 

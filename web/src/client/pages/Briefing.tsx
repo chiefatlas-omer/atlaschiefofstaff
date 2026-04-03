@@ -487,7 +487,7 @@ export default function Briefing() {
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
               <a
-                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.3.1/Atlas-Chief-Setup-0.3.1.exe"
+                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.3.5/Atlas-Chief-Setup-0.3.5.exe"
                 onClick={markVoiceDownloaded}
                 className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
                 style={{ animationName: 'pulse-glow' }}
@@ -499,7 +499,7 @@ export default function Briefing() {
                 Download for Windows
               </a>
               <a
-                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.3.1/Atlas-Chief-0.3.1-arm64.dmg"
+                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.3.5/Atlas-Chief-0.3.5-arm64.dmg"
                 onClick={markVoiceDownloaded}
                 className="inline-flex items-center gap-2 bg-white text-[#4F3588] text-sm font-bold px-5 py-3 rounded-xl hover:bg-white/90 transition-all shadow-lg shadow-black/10 animate-[pulse-glow_2s_ease-in-out_infinite]"
                 style={{ animationName: 'pulse-glow', animationDelay: '0.3s' }}
@@ -508,7 +508,18 @@ export default function Briefing() {
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M12.2 8.4c0-1.6 1.3-2.4 1.4-2.5-.8-1.1-2-1.3-2.4-1.3-1-.1-2 .6-2.5.6s-1.3-.6-2.2-.6c-1.1 0-2.2.7-2.8 1.7-1.2 2.1-.3 5.1.8 6.8.6.8 1.2 1.7 2.1 1.7.8 0 1.2-.5 2.2-.5s1.3.5 2.2.5c.9 0 1.5-.8 2-1.7.6-1.2.9-2.3.9-2.3 0 0-1.7-.7-1.7-2.4zM10.6 3.4c.5-.6.8-1.3.7-2.1-.7 0-1.5.5-2 1.1-.4.5-.8 1.4-.7 2.1.8.1 1.5-.4 2-1.1z"/>
                 </svg>
-                Download for Mac
+                Mac (Apple Silicon)
+              </a>
+              <a
+                href="https://github.com/chiefatlas-omer/atlaschiefofstaff/releases/download/v0.3.5/Atlas-Chief-0.3.5.dmg"
+                onClick={markVoiceDownloaded}
+                className="inline-flex items-center gap-2 bg-white/80 text-[#4F3588] text-xs font-semibold px-4 py-2.5 rounded-xl hover:bg-white transition-all"
+                style={{ animationDelay: '0.5s' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M12.2 8.4c0-1.6 1.3-2.4 1.4-2.5-.8-1.1-2-1.3-2.4-1.3-1-.1-2 .6-2.5.6s-1.3-.6-2.2-.6c-1.1 0-2.2.7-2.8 1.7-1.2 2.1-.3 5.1.8 6.8.6.8 1.2 1.7 2.1 1.7.8 0 1.2-.5 2.2-.5s1.3.5 2.2.5c.9 0 1.5-.8 2-1.7.6-1.2.9-2.3.9-2.3 0 0-1.7-.7-1.7-2.4zM10.6 3.4c.5-.6.8-1.3.7-2.1-.7 0-1.5.5-2 1.1-.4.5-.8 1.4-.7 2.1.8.1 1.5-.4 2-1.1z"/>
+                </svg>
+                Mac (Intel)
               </a>
             </div>
           </div>
