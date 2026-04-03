@@ -7,6 +7,7 @@ import Intelligence from './pages/Intelligence';
 import Tasks from './pages/Tasks';
 import Outcomes from './pages/Outcomes';
 import Settings from './pages/Settings';
+import Team from './pages/Team';
 import Login from './pages/Login';
 
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -39,6 +40,7 @@ export default function App() {
               <Route path="/intelligence" element={<Intelligence />} />
               <Route path="/tasks" element={<Tasks />} />
               <Route path="/outcomes" element={<Outcomes />} />
+              <Route path="/team" element={<Team />} />
               <Route path="/settings" element={<Settings />} />
 
               {/* Redirects from old routes */}
