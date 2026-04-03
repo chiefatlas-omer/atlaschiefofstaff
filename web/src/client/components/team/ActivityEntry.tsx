@@ -7,6 +7,7 @@ interface ActivityEntryProps {
   showApprovalActions?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
+  onClickEmployee?: () => void;
 }
 
 function relativeTime(timestamp: string): string {
@@ -28,7 +29,7 @@ function isRecent(timestamp: string): boolean {
   return diff < 3600000; // 1 hour
 }
 
-export function ActivityEntryComponent({ entry, showApprovalActions, onApprove, onReject }: ActivityEntryProps) {
+export function ActivityEntryComponent({ entry, showApprovalActions, onApprove, onReject, onClickEmployee }: ActivityEntryProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [showFullDetail, setShowFullDetail] = useState(false);
   const [showFailureDetail, setShowFailureDetail] = useState(false);
@@ -56,7 +57,13 @@ export function ActivityEntryComponent({ entry, showApprovalActions, onApprove, 
         {/* Header row */}
         <div className="flex items-center gap-2">
           <span className="text-base leading-none">{entry.employeeIcon}</span>
-          <span className="text-sm font-medium text-gray-900">{entry.employeeName}</span>
+          {onClickEmployee ? (
+            <button onClick={onClickEmployee} className="text-sm font-medium text-gray-900 hover:text-[#4F3588] transition-colors">
+              {entry.employeeName}
+            </button>
+          ) : (
+            <span className="text-sm font-medium text-gray-900">{entry.employeeName}</span>
+          )}
           <span className="text-xs text-gray-400">{relativeTime(entry.timestamp)}</span>
 
           {/* Activity status badge (failure/partial) */}

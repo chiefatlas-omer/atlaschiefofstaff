@@ -1,18 +1,12 @@
 import { useMemo, useState } from 'react';
-import { STATUS_INFO, type Employee } from '../../lib/team-types';
+import { STATUS_INFO, DEPARTMENT_INFO, type Employee } from '../../lib/team-types';
 
 interface PayrollTabProps {
   employees: Employee[];
   onTogglePause: (employeeId: string) => void;
   onUpdateHours: (employeeId: string, hours: number) => void;
+  onSelectEmployee?: (employeeId: string) => void;
 }
-
-// Mock monthly trend data
-const MONTHLY_TREND = [
-  { label: 'Jan', hours: 142 },
-  { label: 'Feb', hours: 168 },
-  { label: 'Mar', hours: 195 },
-];
 
 function usageColor(pct: number): string {
   if (pct > 85) return '#EF4444';
@@ -20,10 +14,10 @@ function usageColor(pct: number): string {
   return '#22C55E';
 }
 
-export function PayrollTab({ employees, onTogglePause, onUpdateHours }: PayrollTabProps) {
-  // Filter out the owner (non-AI employees / chief of staff)
+export function PayrollTab({ employees, onTogglePause, onUpdateHours, onSelectEmployee }: PayrollTabProps) {
+  // Filter to AI employees only (not owner, not chief of staff)
   const aiEmployees = useMemo(
-    () => employees.filter((e) => !e.isChiefOfStaff),
+    () => employees.filter((e) => e.id !== 'owner' && !e.isChiefOfStaff),
     [employees],
   );
 
@@ -39,12 +33,51 @@ export function PayrollTab({ employees, onTogglePause, onUpdateHours }: PayrollT
     return Math.round(sum / aiEmployees.length);
   }, [aiEmployees]);
 
-  const maxTrendHours = Math.max(...MONTHLY_TREND.map((m) => m.hours));
+  // Department breakdown — hours by department
+  const deptBreakdown = useMemo(() => {
+    const map = new Map<string, { used: number; allocated: number; label: string; color: string }>();
+    for (const e of aiEmployees) {
+      const existing = map.get(e.department) ?? {
+        used: 0,
+        allocated: 0,
+        label: DEPARTMENT_INFO[e.department]?.label ?? e.department,
+        color: DEPARTMENT_INFO[e.department]?.color ?? '#6B7280',
+      };
+      existing.used += e.hoursUsed;
+      existing.allocated += e.hoursAllocated;
+      map.set(e.department, existing);
+    }
+    return Array.from(map.entries()).map(([dept, data]) => ({ dept, ...data }));
+  }, [aiEmployees]);
+
+  // Monthly trend — compute from employee hire dates (cumulative hours allocated as team grows)
+  const monthlyTrend = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    // Show last 6 months up to current
+    const trend: { label: string; hours: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const monthIdx = (currentMonth - i + 12) % 12;
+      const yearOffset = currentMonth - i < 0 ? -1 : 0;
+      const monthDate = new Date(now.getFullYear() + yearOffset, monthIdx, 1);
+      // Count employees hired by this month
+      const activeByMonth = aiEmployees.filter((e) => {
+        const hireDate = new Date(e.hireDate);
+        return hireDate <= new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+      });
+      const hours = activeByMonth.reduce((sum, e) => sum + e.hoursAllocated, 0);
+      trend.push({ label: months[monthIdx], hours });
+    }
+    return trend;
+  }, [aiEmployees]);
+
+  const maxTrendHours = Math.max(...monthlyTrend.map((m) => m.hours), 1);
 
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <SummaryCard
           label="Total Hours"
           value={`${totalUsed} / ${totalAllocated}`}
@@ -61,6 +94,11 @@ export function PayrollTab({ employees, onTogglePause, onUpdateHours }: PayrollT
           value={`${avgUtilization}%`}
           sub={avgUtilization > 85 ? 'Above target' : avgUtilization > 60 ? 'On track' : 'Below target'}
           valueColor={usageColor(avgUtilization)}
+        />
+        <SummaryCard
+          label="Departments"
+          value={String(deptBreakdown.length)}
+          sub={deptBreakdown.map((d) => d.label).join(', ')}
         />
       </div>
 
@@ -85,6 +123,7 @@ export function PayrollTab({ employees, onTogglePause, onUpdateHours }: PayrollT
                 employee={emp}
                 onTogglePause={() => onTogglePause(emp.id)}
                 onUpdateHours={(hours) => onUpdateHours(emp.id, hours)}
+                onSelect={onSelectEmployee ? () => onSelectEmployee(emp.id) : undefined}
               />
             ))}
           </tbody>
@@ -95,11 +134,38 @@ export function PayrollTab({ employees, onTogglePause, onUpdateHours }: PayrollT
         )}
       </div>
 
+      {/* Department Breakdown */}
+      {deptBreakdown.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <h4 className="mb-4 text-sm font-semibold text-gray-900">Hours by Department</h4>
+          <div className="space-y-3">
+            {deptBreakdown.map((dept) => {
+              const pct = dept.allocated > 0 ? Math.round((dept.used / dept.allocated) * 100) : 0;
+              return (
+                <div key={dept.dept}>
+                  <div className="mb-1 flex items-center justify-between text-xs">
+                    <span className="font-medium" style={{ color: dept.color }}>{dept.label}</span>
+                    <span className="text-gray-500">{dept.used} / {dept.allocated} hrs ({pct}%)</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: dept.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Monthly Trend */}
       <div className="rounded-xl border border-gray-200 bg-white p-5">
-        <h4 className="mb-4 text-sm font-semibold text-gray-900">Monthly Hours Trend</h4>
-        <div className="flex items-end gap-6" style={{ height: 120 }}>
-          {MONTHLY_TREND.map((month) => {
+        <h4 className="mb-4 text-sm font-semibold text-gray-900">Team Capacity Trend</h4>
+        <p className="mb-3 text-xs text-gray-500">Allocated hours as your team grows</p>
+        <div className="flex items-end gap-4" style={{ height: 120 }}>
+          {monthlyTrend.map((month) => {
             const heightPct = maxTrendHours > 0 ? (month.hours / maxTrendHours) * 100 : 0;
             return (
               <div key={month.label} className="flex flex-1 flex-col items-center gap-1">
@@ -163,10 +229,12 @@ function EmployeeRow({
   employee,
   onTogglePause,
   onUpdateHours,
+  onSelect,
 }: {
   employee: Employee;
   onTogglePause: () => void;
   onUpdateHours: (hours: number) => void;
+  onSelect?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(String(employee.hoursAllocated));
@@ -191,7 +259,13 @@ function EmployeeRow({
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="text-base leading-none">{employee.icon}</span>
-          <span className="font-medium text-gray-900">{employee.name}</span>
+          {onSelect ? (
+            <button onClick={onSelect} className="font-medium text-gray-900 hover:text-[#4F3588] transition-colors">
+              {employee.name}
+            </button>
+          ) : (
+            <span className="font-medium text-gray-900">{employee.name}</span>
+          )}
         </div>
       </td>
 

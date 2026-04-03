@@ -106,6 +106,8 @@ export default function Team() {
         estimatedHours: role.estimatedHours,
       });
       setEmployees((prev) => [...prev, newEmp]);
+      // Auto-open the new employee's profile so the user can configure them immediately
+      setSelectedEmployeeId(newEmp.id);
     } catch (err) {
       console.error('[Team] Hire failed:', err);
     }
@@ -116,6 +118,8 @@ export default function Team() {
       const result = await teamApi.deployBlueprint(blueprint.id);
       setEmployees((prev) => [...prev, ...result.employees]);
       setRoutines((prev) => [...prev, ...result.routines]);
+      // Switch to Org Chart so user can see their new team
+      setActiveTab('org-chart');
     } catch (err) {
       console.error('[Team] Blueprint deploy failed:', err);
     }
@@ -314,6 +318,7 @@ export default function Team() {
             onApprove={handleApprove}
             onReject={handleReject}
             onPromote={handlePromote}
+            onSelectEmployee={setSelectedEmployeeId}
           />
         );
       case 'schedule':
@@ -331,6 +336,7 @@ export default function Team() {
             employees={employees}
             onTogglePause={handleTogglePause}
             onUpdateHours={handleUpdateHours}
+            onSelectEmployee={setSelectedEmployeeId}
           />
         );
       default:

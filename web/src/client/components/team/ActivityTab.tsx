@@ -11,9 +11,10 @@ interface ActivityTabProps {
   onApprove: (activityId: string) => void;
   onReject: (activityId: string) => void;
   onPromote: (employeeId: string) => void;
+  onSelectEmployee?: (employeeId: string) => void;
 }
 
-export function ActivityTab({ activity, employees, onApprove, onReject, onPromote }: ActivityTabProps) {
+export function ActivityTab({ activity, employees, onApprove, onReject, onPromote, onSelectEmployee }: ActivityTabProps) {
   const [filterEmployee, setFilterEmployee] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
 
@@ -94,6 +95,7 @@ export function ActivityTab({ activity, employees, onApprove, onReject, onPromot
                   showApprovalActions
                   onApprove={() => onApprove(entry.id)}
                   onReject={() => onReject(entry.id)}
+                  onClickEmployee={onSelectEmployee ? () => onSelectEmployee(entry.employeeId) : undefined}
                 />
               </div>
             ))}
@@ -187,7 +189,11 @@ export function ActivityTab({ activity, employees, onApprove, onReject, onPromot
             <p className="py-8 text-center text-sm text-gray-400">No activity yet</p>
           ) : (
             sortedActivity.map((entry) => (
-              <ActivityEntryComponent key={entry.id} entry={entry} />
+              <ActivityEntryComponent
+                key={entry.id}
+                entry={entry}
+                onClickEmployee={onSelectEmployee ? () => onSelectEmployee(entry.employeeId) : undefined}
+              />
             ))
           )}
         </div>
