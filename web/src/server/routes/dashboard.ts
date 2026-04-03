@@ -393,7 +393,7 @@ router.get('/analytics/coaching', (req: any, res) => {
   }
 });
 
-// GET /api/analytics/outcomes — outcome-focused metrics across all time periods
+// GET /api/analytics/outcomes — outcome-focused metrics across all time periods (org-wide)
 router.get('/analytics/outcomes', (_req, res) => {
   try {
     const now = Math.floor(Date.now() / 1000);
@@ -623,7 +623,7 @@ router.get('/analytics/outcomes', (_req, res) => {
   }
 });
 
-// GET /api/analytics/leaderboard — weekly team leaderboard
+// GET /api/analytics/leaderboard — weekly team leaderboard (org-wide)
 router.get('/analytics/leaderboard', (_req, res) => {
   try {
     const weekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
