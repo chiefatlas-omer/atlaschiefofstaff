@@ -433,3 +433,54 @@ body {
 .followup-btn-dismiss:hover {
   color: #FAF9FE;
 }
+
+/* ── Live Dictation Indicator (small pill — text goes directly into focused app) ── */
+.live-transcript {
+  position: fixed;
+  top: calc(50% + 90px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(79, 53, 136, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 8px 20px;
+  border: 1px solid rgba(90, 60, 158, 0.35);
+  -webkit-app-region: no-drag;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  opacity: 1;
+}
+
+.live-transcript.hidden {
+  display: none !important;
+}
+
+.live-transcript.fade-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(8px);
+}
+
+.live-transcript-label {
+  color: #A78BFA;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 13px;
+  background: #A78BFA;
+  margin-left: 4px;
+  animation: blink-cursor 0.8s step-end infinite;
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
