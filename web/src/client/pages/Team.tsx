@@ -46,7 +46,7 @@ export default function Team() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
 
-  // Paperclip connection status
+  // Orchestration engine connection status
   const [pcStatus, setPcStatus] = useState<{
     connected: boolean;
     mode: 'live' | 'local';
@@ -370,14 +370,14 @@ export default function Team() {
           <p className="text-sm text-gray-500 mt-1">Manage your AI Team</p>
         </div>
 
-        {/* Paperclip connection status */}
+        {/* Orchestration status */}
         <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
           <span
             className="h-2 w-2 rounded-full"
             style={{ backgroundColor: pcStatus.connected ? '#22C55E' : '#9CA3AF' }}
           />
           <span className="text-xs font-medium text-gray-700">
-            {pcStatus.connected ? 'Paperclip Connected' : 'Local Mode'}
+            {pcStatus.connected ? 'Orchestration Active' : 'Local Mode'}
           </span>
           {pcStatus.connected && pcStatus.version && (
             <span className="text-[10px] text-gray-400">v{pcStatus.version}</span>

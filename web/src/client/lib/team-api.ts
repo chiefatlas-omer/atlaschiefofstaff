@@ -120,7 +120,7 @@ export const teamApi = {
       { method: 'POST' },
     ),
 
-  // -- Paperclip status --
+  // -- Orchestration status --
   status: () =>
     fetchApi<{
       paperclipConnected: boolean;
