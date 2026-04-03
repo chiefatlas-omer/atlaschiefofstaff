@@ -247,7 +247,7 @@ export default function Team() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">My AI Team</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage your AI employees</p>
+          <p className="text-sm text-gray-500 mt-1">Manage your AI Team</p>
         </div>
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="text-6xl mb-4">🧠</div>
@@ -343,7 +343,7 @@ export default function Team() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">My AI Team</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your AI employees</p>
+        <p className="text-sm text-gray-500 mt-1">Manage your AI Team</p>
       </div>
 
       {/* Tabs */}

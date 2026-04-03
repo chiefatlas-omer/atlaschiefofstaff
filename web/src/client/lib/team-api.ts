@@ -1,5 +1,5 @@
 import { fetchApi } from './api';
-import type { Employee, Role, Blueprint, ActivityEntry, Routine } from './team-types';
+import type { Employee, Role, Blueprint, ActivityEntry, Routine, Task, JournalEntry } from './team-types';
 
 // ---------------------------------------------------------------------------
 // AI Team API client — talks to /api/team/* backend routes
@@ -77,6 +77,30 @@ export const teamApi = {
   deleteRoutine: (id: string) =>
     fetchApi<{ success: boolean }>(`/api/team/routines/${id}`, {
       method: 'DELETE',
+    }),
+
+  // -- Tasks --
+  tasks: (employeeId: string) =>
+    fetchApi<Task[]>(`/api/team/employees/${employeeId}/tasks`),
+
+  createTask: (employeeId: string, data: { title: string; description?: string; priority?: string }) =>
+    fetchApi<Task>(`/api/team/employees/${employeeId}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // -- Journal --
+  journal: (employeeId: string, type?: string) =>
+    fetchApi<JournalEntry[]>(
+      type
+        ? `/api/team/employees/${employeeId}/journal?type=${encodeURIComponent(type)}`
+        : `/api/team/employees/${employeeId}/journal`,
+    ),
+
+  createJournalEntry: (employeeId: string, data: { date: string; type: string; title: string; content: string; tags?: string[] }) =>
+    fetchApi<JournalEntry>(`/api/team/employees/${employeeId}/journal`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 
   // -- Static catalogs --

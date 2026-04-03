@@ -52,4 +52,25 @@ export const db = drizzle(sqlite, { schema: { ...schema, ...analyticsSchema, ...
 // Re-export analytics tables for use by routes without bot imports
 export { callAnalyses, productSignals, coachingSnapshots } from './schema-analytics';
 export { emailDrafts } from './schema-email-drafts';
-export { aiEmployees, aiActivity, aiRoutines } from './schema-team';
+export { aiEmployees, aiActivity, aiRoutines, aiJournals } from './schema-team';
+
+// Ensure new columns exist on existing tables (migration-safe)
+try { sqlite.exec('ALTER TABLE ai_employees ADD COLUMN soul TEXT'); } catch (_e) { /* already exists */ }
+try { sqlite.exec('ALTER TABLE ai_activity ADD COLUMN status TEXT DEFAULT \'success\''); } catch (_e) { /* already exists */ }
+try { sqlite.exec('ALTER TABLE ai_activity ADD COLUMN failure_reason TEXT'); } catch (_e) { /* already exists */ }
+try { sqlite.exec('ALTER TABLE ai_activity ADD COLUMN failure_step TEXT'); } catch (_e) { /* already exists */ }
+try { sqlite.exec('ALTER TABLE ai_activity ADD COLUMN retry_count INTEGER DEFAULT 0'); } catch (_e) { /* already exists */ }
+try { sqlite.exec('ALTER TABLE ai_activity ADD COLUMN resolution TEXT'); } catch (_e) { /* already exists */ }
+
+// Ensure ai_journals table exists
+sqlite.exec(`CREATE TABLE IF NOT EXISTS ai_journals (
+  id TEXT PRIMARY KEY,
+  employee_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT,
+  tags TEXT,
+  owner_slack_id TEXT,
+  created_at INTEGER NOT NULL
+)`);

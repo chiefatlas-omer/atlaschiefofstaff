@@ -1,11 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Employee,
   TrustLevel,
+  Task,
+  TaskPriority,
+  JournalEntry,
+  JournalEntryType,
+  Soul,
   DEPARTMENT_INFO,
   TRUST_LEVEL_INFO,
   STATUS_INFO,
+  TASK_PRIORITY_INFO,
+  TASK_STATUS_INFO,
+  JOURNAL_TYPE_INFO,
 } from '../../lib/team-types';
+import { teamApi } from '../../lib/team-api';
 
 interface EmployeeProfileProps {
   employee: Employee;
@@ -43,6 +52,40 @@ export default function EmployeeProfile({
   onRemove,
 }: EmployeeProfileProps) {
   const [visible, setVisible] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskPriority, setTaskPriority] = useState<TaskPriority>('medium');
+  const [submittingTask, setSubmittingTask] = useState(false);
+  const [journal, setJournal] = useState<JournalEntry[]>([]);
+  const [journalFilter, setJournalFilter] = useState<JournalEntryType | 'all'>('all');
+  const [showJournalForm, setShowJournalForm] = useState(false);
+  const [journalTitle, setJournalTitle] = useState('');
+  const [journalContent, setJournalContent] = useState('');
+  const [journalType, setJournalType] = useState<JournalEntryType>('work_log');
+  const [submittingJournal, setSubmittingJournal] = useState(false);
+  const [editingSoul, setEditingSoul] = useState(false);
+  const [soulDraft, setSoulDraft] = useState<Soul | null>(null);
+  const [savingSoul, setSavingSoul] = useState(false);
+
+  const loadTasks = useCallback(async () => {
+    try {
+      const data = await teamApi.tasks(employee.id);
+      setTasks(data);
+    } catch {
+      // silently fail — tasks are optional
+    }
+  }, [employee.id]);
+
+  const loadJournal = useCallback(async () => {
+    try {
+      const type = journalFilter === 'all' ? undefined : journalFilter;
+      const data = await teamApi.journal(employee.id, type);
+      setJournal(data);
+    } catch {
+      // silently fail
+    }
+  }, [employee.id, journalFilter]);
 
   // Animate in on mount
   useEffect(() => {
@@ -50,12 +93,78 @@ export default function EmployeeProfile({
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  // Re-trigger animation when employee changes
+  // Re-trigger animation when employee changes + load tasks/journal
   useEffect(() => {
     setVisible(false);
     const frame = requestAnimationFrame(() => setVisible(true));
+    setShowTaskForm(false);
+    setTaskTitle('');
+    setShowJournalForm(false);
+    setEditingSoul(false);
+    loadTasks();
+    loadJournal();
     return () => cancelAnimationFrame(frame);
-  }, [employee.id]);
+  }, [employee.id, loadTasks, loadJournal]);
+
+  async function handleAssignTask(e: React.FormEvent) {
+    e.preventDefault();
+    if (!taskTitle.trim() || submittingTask) return;
+    setSubmittingTask(true);
+    try {
+      const task = await teamApi.createTask(employee.id, {
+        title: taskTitle.trim(),
+        priority: taskPriority,
+      });
+      setTasks((prev) => [task, ...prev]);
+      setTaskTitle('');
+      setTaskPriority('medium');
+      setShowTaskForm(false);
+    } catch {
+      // keep form open on error
+    } finally {
+      setSubmittingTask(false);
+    }
+  }
+
+  async function handleAddJournal(e: React.FormEvent) {
+    e.preventDefault();
+    if (!journalTitle.trim() || submittingJournal) return;
+    setSubmittingJournal(true);
+    try {
+      const entry = await teamApi.createJournalEntry(employee.id, {
+        date: new Date().toISOString().split('T')[0],
+        type: journalType,
+        title: journalTitle.trim(),
+        content: journalContent.trim(),
+      });
+      setJournal((prev) => [entry, ...prev]);
+      setJournalTitle('');
+      setJournalContent('');
+      setShowJournalForm(false);
+    } catch {
+      // keep form open
+    } finally {
+      setSubmittingJournal(false);
+    }
+  }
+
+  async function handleSaveSoul() {
+    if (!soulDraft || savingSoul) return;
+    setSavingSoul(true);
+    try {
+      await teamApi.updateEmployee(employee.id, { soul: soulDraft } as Partial<Employee>);
+      employee.soul = soulDraft;
+      setEditingSoul(false);
+    } catch {
+      // keep editing
+    } finally {
+      setSavingSoul(false);
+    }
+  }
+
+  const filteredJournal = journalFilter === 'all'
+    ? journal
+    : journal.filter((j) => j.type === journalFilter);
 
   const status = STATUS_INFO[employee.status];
   const trust = TRUST_LEVEL_INFO[employee.trustLevel];
@@ -228,6 +337,95 @@ export default function EmployeeProfile({
             </div>
           </div>
 
+          {/* Assignments */}
+          {!employee.isChiefOfStaff && employee.id !== 'owner' && (
+            <div className="border-b border-gray-100 px-6 py-5">
+              <div className="mb-2 flex items-center justify-between">
+                <SectionLabel>Assignments</SectionLabel>
+                <button
+                  type="button"
+                  onClick={() => setShowTaskForm(!showTaskForm)}
+                  className="rounded-md bg-[#4F3588] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E]"
+                >
+                  {showTaskForm ? 'Cancel' : '+ Assign Task'}
+                </button>
+              </div>
+
+              {showTaskForm && (
+                <form onSubmit={handleAssignTask} className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <input
+                    type="text"
+                    placeholder="What needs to be done?"
+                    value={taskTitle}
+                    onChange={(e) => setTaskTitle(e.target.value)}
+                    className="mb-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
+                    autoFocus
+                  />
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={taskPriority}
+                      onChange={(e) => setTaskPriority(e.target.value as TaskPriority)}
+                      className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-[#4F3588]"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={!taskTitle.trim() || submittingTask}
+                      className="ml-auto rounded-md bg-[#4F3588] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E] disabled:opacity-50"
+                    >
+                      {submittingTask ? 'Assigning…' : 'Assign'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {tasks.length > 0 ? (
+                <div className="space-y-2">
+                  {tasks.map((task) => {
+                    const priority = TASK_PRIORITY_INFO[task.priority];
+                    const status = TASK_STATUS_INFO[task.status];
+                    return (
+                      <div
+                        key={task.id}
+                        className="flex items-start gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2.5"
+                      >
+                        <span
+                          className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: status.color }}
+                          title={status.label}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 leading-snug">
+                            {task.title}
+                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span
+                              className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                              style={{ color: priority.color, backgroundColor: priority.bgColor }}
+                            >
+                              {priority.label}
+                            </span>
+                            <span className="text-[10px] text-gray-400">
+                              {status.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : !showTaskForm ? (
+                <p className="text-sm text-gray-400">
+                  No tasks assigned yet
+                </p>
+              ) : null}
+            </div>
+          )}
+
           {/* Skills */}
           <div className="border-b border-gray-100 px-6 py-5">
             <SectionLabel>Skills</SectionLabel>
@@ -251,6 +449,212 @@ export default function EmployeeProfile({
               )}
             </div>
           </div>
+
+          {/* Personality (Soul) */}
+          {employee.id !== 'owner' && (
+            <div className="border-b border-gray-100 px-6 py-5">
+              <div className="mb-2 flex items-center justify-between">
+                <SectionLabel>Personality</SectionLabel>
+                {employee.soul && !editingSoul && (
+                  <button
+                    type="button"
+                    onClick={() => { setEditingSoul(true); setSoulDraft({ ...employee.soul! }); }}
+                    className="text-xs font-medium text-[#4F3588] hover:text-[#5A3C9E]"
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {!employee.soul && !editingSoul ? (
+                <p className="text-sm text-gray-400">No personality profile configured</p>
+              ) : editingSoul && soulDraft ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-500">Personality</label>
+                    <textarea
+                      value={soulDraft.personality}
+                      onChange={(e) => setSoulDraft({ ...soulDraft, personality: e.target.value })}
+                      rows={2}
+                      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-500">Working Style</label>
+                    <textarea
+                      value={soulDraft.workingStyle}
+                      onChange={(e) => setSoulDraft({ ...soulDraft, workingStyle: e.target.value })}
+                      rows={2}
+                      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-500">Decision Framework</label>
+                    <textarea
+                      value={soulDraft.decisionFramework}
+                      onChange={(e) => setSoulDraft({ ...soulDraft, decisionFramework: e.target.value })}
+                      rows={2}
+                      className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveSoul}
+                      disabled={savingSoul}
+                      className="rounded-md bg-[#4F3588] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E] disabled:opacity-50"
+                    >
+                      {savingSoul ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingSoul(false)}
+                      className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : employee.soul ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg bg-gray-50 px-4 py-3">
+                    <p className="text-sm leading-relaxed text-gray-600">{employee.soul.personality}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-gray-500">Working Style</span>
+                    <p className="mt-0.5 text-sm text-gray-600">{employee.soul.workingStyle}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-gray-500">Decision Framework</span>
+                    <p className="mt-0.5 text-sm text-gray-600">{employee.soul.decisionFramework}</p>
+                  </div>
+                  {employee.soul.strengths.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-gray-500">Strengths</span>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {employee.soul.strengths.map((s) => (
+                          <span key={s} className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-xs font-medium text-[#22C55E]">{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {employee.soul.growthAreas.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-gray-500">Growth Areas</span>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {employee.soul.growthAreas.map((g) => (
+                          <span key={g} className="rounded-full bg-[#FEF3C7] px-2.5 py-0.5 text-xs font-medium text-[#F59E0B]">{g}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* Journal */}
+          {employee.id !== 'owner' && (
+            <div className="border-b border-gray-100 px-6 py-5">
+              <div className="mb-2 flex items-center justify-between">
+                <SectionLabel>Journal</SectionLabel>
+                <button
+                  type="button"
+                  onClick={() => setShowJournalForm(!showJournalForm)}
+                  className="rounded-md bg-[#4F3588] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E]"
+                >
+                  {showJournalForm ? 'Cancel' : '+ Add Entry'}
+                </button>
+              </div>
+
+              {/* Journal type filter */}
+              <div className="mb-3 flex flex-wrap gap-1">
+                {(['all', 'work_log', 'learning', 'failure', 'insight'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setJournalFilter(t)}
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
+                      journalFilter === t
+                        ? 'bg-[#4F3588] text-white'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    {t === 'all' ? 'All' : JOURNAL_TYPE_INFO[t].icon + ' ' + JOURNAL_TYPE_INFO[t].label}
+                  </button>
+                ))}
+              </div>
+
+              {showJournalForm && (
+                <form onSubmit={handleAddJournal} className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+                  <select
+                    value={journalType}
+                    onChange={(e) => setJournalType(e.target.value as JournalEntryType)}
+                    className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 outline-none focus:border-[#4F3588]"
+                  >
+                    {(Object.keys(JOURNAL_TYPE_INFO) as JournalEntryType[]).map((t) => (
+                      <option key={t} value={t}>{JOURNAL_TYPE_INFO[t].icon} {JOURNAL_TYPE_INFO[t].label}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Title"
+                    value={journalTitle}
+                    onChange={(e) => setJournalTitle(e.target.value)}
+                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
+                    autoFocus
+                  />
+                  <textarea
+                    placeholder="Details (optional)"
+                    value={journalContent}
+                    onChange={(e) => setJournalContent(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!journalTitle.trim() || submittingJournal}
+                    className="rounded-md bg-[#4F3588] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E] disabled:opacity-50"
+                  >
+                    {submittingJournal ? 'Adding...' : 'Add Entry'}
+                  </button>
+                </form>
+              )}
+
+              {filteredJournal.length > 0 ? (
+                <div className="space-y-2">
+                  {filteredJournal.slice(0, 10).map((entry) => {
+                    const typeInfo = JOURNAL_TYPE_INFO[entry.type];
+                    return (
+                      <div key={entry.id} className="rounded-lg border border-gray-100 bg-white px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                            style={{ color: typeInfo.color, backgroundColor: typeInfo.bgColor }}
+                          >
+                            {typeInfo.icon} {typeInfo.label}
+                          </span>
+                          <span className="text-[10px] text-gray-400">{entry.date}</span>
+                        </div>
+                        <p className="mt-1 text-sm font-medium text-gray-900 leading-snug">{entry.title}</p>
+                        {entry.content && (
+                          <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">{entry.content}</p>
+                        )}
+                        {entry.tags.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {entry.tags.map((tag) => (
+                              <span key={tag} className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">{tag}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : !showJournalForm ? (
+                <p className="text-sm text-gray-400">No journal entries yet</p>
+              ) : null}
+            </div>
+          )}
 
           {/* Standing Instructions */}
           <div className="border-b border-gray-100 px-6 py-5">

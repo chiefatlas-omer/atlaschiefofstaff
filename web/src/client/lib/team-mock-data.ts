@@ -345,6 +345,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-31T09:15:00Z',
     needsApproval: true,
     approved: null,
+    status: 'success',
     deliverablePreview:
       '🌸 Spring is here and so are our biggest deals! Swipe through to see what\'s new this season. Slide 1: "Fresh Starts, Fresh Savings" — 20% off all services…',
   },
@@ -358,6 +359,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-28T16:30:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-3',
@@ -369,6 +371,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-30T10:00:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-4',
@@ -380,6 +383,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-29T14:20:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-5',
@@ -391,6 +395,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-31T08:05:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-6',
@@ -402,6 +407,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-31T13:45:00Z',
     needsApproval: true,
     approved: null,
+    status: 'success',
     deliverablePreview:
       'Greenfield Corp Overview: Founded 2019, HQ Austin TX. Revenue ~$2M ARR, 45 FTE. Currently expanding into Southeast region. Key contact: Dana Reeves, VP Growth. ICP score: 92/100…',
   },
@@ -415,6 +421,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-28T10:30:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-8',
@@ -426,6 +433,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-28T15:00:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-9',
@@ -437,6 +445,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-30T09:00:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-10',
@@ -448,6 +457,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-31T11:30:00Z',
     needsApproval: true,
     approved: null,
+    status: 'success',
     deliverablePreview:
       '🧵 1/5 The landscape is shifting fast — here are 3 trends every small business owner should watch this quarter. Thread 👇\n\n2/5 Trend #1: AI-powered customer service is no longer optional…',
   },

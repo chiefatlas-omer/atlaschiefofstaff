@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ActivityEntry as ActivityEntryType } from '../../lib/team-types';
+import { ACTIVITY_STATUS_INFO } from '../../lib/team-types';
 
 interface ActivityEntryProps {
   entry: ActivityEntryType;
@@ -30,8 +31,15 @@ function isRecent(timestamp: string): boolean {
 export function ActivityEntryComponent({ entry, showApprovalActions, onApprove, onReject }: ActivityEntryProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [showFullDetail, setShowFullDetail] = useState(false);
+  const [showFailureDetail, setShowFailureDetail] = useState(false);
   const recent = isRecent(entry.timestamp);
   const longDetail = entry.detail.length > 120;
+  const isFailed = entry.status === 'failure';
+  const isPartial = entry.status === 'partial';
+  const statusInfo = ACTIVITY_STATUS_INFO[entry.status || 'success'];
+
+  // Determine timeline dot color: failures red, partial orange, recent purple, default gray
+  const dotColor = isFailed ? '#EF4444' : isPartial ? '#F59E0B' : recent ? '#4F3588' : '#D1D5DB';
 
   return (
     <div className="relative flex gap-3 pb-6">
@@ -39,7 +47,7 @@ export function ActivityEntryComponent({ entry, showApprovalActions, onApprove, 
       <div className="relative z-10 mt-1.5 flex-shrink-0">
         <div
           className="h-2 w-2 rounded-full"
-          style={{ backgroundColor: recent ? '#4F3588' : '#D1D5DB' }}
+          style={{ backgroundColor: dotColor }}
         />
       </div>
 
@@ -51,7 +59,17 @@ export function ActivityEntryComponent({ entry, showApprovalActions, onApprove, 
           <span className="text-sm font-medium text-gray-900">{entry.employeeName}</span>
           <span className="text-xs text-gray-400">{relativeTime(entry.timestamp)}</span>
 
-          {/* Status badges */}
+          {/* Activity status badge (failure/partial) */}
+          {(isFailed || isPartial) && (
+            <span
+              className="rounded-full px-2 py-0.5 text-[11px] font-medium"
+              style={{ color: statusInfo.color, backgroundColor: statusInfo.bgColor }}
+            >
+              {statusInfo.icon} {statusInfo.label}
+            </span>
+          )}
+
+          {/* Approval badges */}
           {entry.approved === true && (
             <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[11px] font-medium text-[#22C55E]">
               Approved
@@ -82,6 +100,48 @@ export function ActivityEntryComponent({ entry, showApprovalActions, onApprove, 
               >
                 {showFullDetail ? 'Show less' : 'Show more'}
               </button>
+            )}
+          </div>
+        )}
+
+        {/* Failure detail section */}
+        {(isFailed || isPartial) && entry.failureReason && (
+          <div className="mt-2">
+            <button
+              onClick={() => setShowFailureDetail(!showFailureDetail)}
+              className="text-xs font-medium"
+              style={{ color: statusInfo.color }}
+            >
+              {showFailureDetail ? 'Hide details' : 'View failure details'}
+            </button>
+            {showFailureDetail && (
+              <div
+                className="mt-1.5 rounded-lg border p-3 space-y-1.5"
+                style={{ borderColor: statusInfo.color + '30', backgroundColor: statusInfo.bgColor + '60' }}
+              >
+                <div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Reason</span>
+                  <p className="text-xs text-gray-700">{entry.failureReason}</p>
+                </div>
+                {entry.failureStep && (
+                  <div>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Failed Step</span>
+                    <p className="text-xs text-gray-700">{entry.failureStep}</p>
+                  </div>
+                )}
+                {entry.retryCount != null && entry.retryCount > 0 && (
+                  <div>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Retries</span>
+                    <p className="text-xs text-gray-700">{entry.retryCount} attempt{entry.retryCount > 1 ? 's' : ''}</p>
+                  </div>
+                )}
+                {entry.resolution && (
+                  <div>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">Resolution</span>
+                    <p className="text-xs text-gray-700">{entry.resolution}</p>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
