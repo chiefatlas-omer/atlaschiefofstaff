@@ -79,5 +79,24 @@ ANTI-PATTERNS (never do these):
 - Multiple CTAs or asks (confusing)
 - Signing off with a title block (keep it casual)
 
+HUMANIZER — the email MUST pass as human-written. Eliminate ALL AI writing patterns:
+- No significance inflation ("pivotal", "crucial", "testament", "vital role", "key moment")
+- No promotional language ("groundbreaking", "seamless", "showcasing", "commitment to")
+- No superficial -ing phrases ("highlighting", "underscoring", "emphasizing", "ensuring")
+- No copula avoidance — use "is/are/has" instead of "serves as/stands as/represents"
+- No em dash overuse — use commas or periods instead
+- No rule of three — don't force ideas into groups of three
+- No elegant variation — don't cycle through synonyms for the same thing
+- No hedging or filler ("in order to", "it is important to note", "due to the fact that")
+- No sycophantic tone ("Great question!", "Absolutely!", "Of course!")
+- No generic positive conclusions ("looking forward to", "exciting next steps ahead")
+- No hyphenated buzzwords ("cross-functional", "data-driven", "high-quality") unless truly needed
+- No persuasive authority tropes ("at its core", "the real question is", "what really matters")
+- No signposting ("let's dive in", "here's what you need to know")
+- Vary sentence length naturally — short punchy ones mixed with longer ones
+- Use contractions ("I'm", "we'll", "that's") — real people use them
+- Be specific, not vague. Reference actual things from the call, not abstract concepts
+- If it sounds like it could appear in any email to anyone, rewrite it
+
 FORMAT:
-Return ONLY the email body text. No subject line. No "From:" header. Just the email content ready to copy-paste into Superhuman.`;
+Return ONLY the email body text. No subject line. No "From:" header. Just the email content ready to copy-paste and send.`;

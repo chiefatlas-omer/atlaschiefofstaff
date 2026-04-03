@@ -403,7 +403,27 @@ function classifyMeeting(
   return { type: 'team', internalSlackIds, externalNames };
 }
 
+// Track meetings where we're already polling for transcript
+const pollingMeetings = new Set<string>();
+
 export async function handleZoomWebhook(payload: any, slackClient: any) {
+  // Handle meeting.ended — start polling for transcript immediately
+  if (payload.event === 'meeting.ended') {
+    const meeting = payload.payload?.object;
+    if (!meeting) return;
+    const meetingUuid = meeting.uuid || meeting.id?.toString();
+    if (!meetingUuid || pollingMeetings.has(meetingUuid)) return;
+
+    console.log(`[zoom] meeting.ended: "${meeting.topic}" — starting transcript poll`);
+    pollingMeetings.add(meetingUuid);
+
+    // Poll in the background — don't block the webhook response
+    pollForTranscript(meetingUuid, meeting, slackClient).finally(() => {
+      pollingMeetings.delete(meetingUuid);
+    });
+    return;
+  }
+
   // Handle recording.completed and recording.transcript_completed events
   if (payload.event !== 'recording.completed' && payload.event !== 'recording.transcript_completed') {
     console.log('Ignoring Zoom event:', payload.event);
@@ -699,7 +719,7 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
       if (drafts.length > 0 && host?.slackId) {
         // DM drafts to the rep who hosted the call
         for (const draft of drafts) {
-          const msg = `📧 *Follow-Up Draft for ${draft.recipientName}* (${draft.recipientCompany})\n_${draft.archetype.replace(/_/g, ' ')} style | from: ${draft.meetingTitle}_\n\n${draft.emailBody}\n\n_Copy to Superhuman and send. Edit as needed._`;
+          const msg = `📧 *Follow-Up Draft for ${draft.recipientName}* (${draft.recipientCompany})\n_${draft.archetype.replace(/_/g, ' ')} style | from: ${draft.meetingTitle}_\n\n${draft.emailBody}\n\n_Copy and send. Edit as needed._`;
           try {
             await slackClient.chat.postMessage({ channel: host.slackId, text: msg });
           } catch {}
@@ -766,6 +786,99 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
   } catch (error) {
     console.error('Error processing Zoom webhook:', error);
   }
+}
+
+// ─── Aggressive transcript polling after meeting.ended ───────────────────────
+// Instead of waiting for Zoom's recording.completed webhook (5-15 min delay),
+// we poll the Zoom Recordings API every 30 seconds until the transcript is ready,
+// then run the full pipeline immediately.
+async function pollForTranscript(
+  meetingUuid: string,
+  meetingPayload: any,
+  slackClient: any,
+): Promise<void> {
+  const MAX_ATTEMPTS = 20;       // 20 * 30s = 10 minutes max
+  const POLL_INTERVAL_MS = 30000; // 30 seconds
+  const meetingTopic = meetingPayload.topic || 'Zoom Meeting';
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Wait before polling (Zoom needs some time to start processing)
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+    try {
+      const accessToken = await getZoomAccessToken();
+      const encodedId = encodeURIComponent(encodeURIComponent(meetingUuid));
+      const apiUrl = 'https://api.zoom.us/v2/meetings/' + encodedId + '/recordings';
+
+      const response = await fetch(apiUrl, {
+        headers: { Authorization: 'Bearer ' + accessToken },
+      });
+
+      if (!response.ok) {
+        console.log(`[zoom-poll] Attempt ${attempt}/${MAX_ATTEMPTS}: recordings not ready (${response.status})`);
+        continue;
+      }
+
+      const data = await response.json() as any;
+      const transcriptFile = data.recording_files?.find(
+        (f: any) => f.recording_type === 'audio_transcript' || f.file_type === 'TRANSCRIPT'
+      );
+
+      if (!transcriptFile?.download_url) {
+        console.log(`[zoom-poll] Attempt ${attempt}/${MAX_ATTEMPTS}: no transcript file yet`);
+        continue;
+      }
+
+      // Check if transcript status is completed
+      if (transcriptFile.status && transcriptFile.status !== 'completed') {
+        console.log(`[zoom-poll] Attempt ${attempt}/${MAX_ATTEMPTS}: transcript status="${transcriptFile.status}", waiting...`);
+        continue;
+      }
+
+      // Transcript is ready — download it
+      console.log(`[zoom-poll] Transcript ready after ${attempt * 30}s! Downloading...`);
+      const separator = transcriptFile.download_url.includes('?') ? '&' : '?';
+      const downloadUrl = transcriptFile.download_url + separator + 'access_token=' + accessToken;
+      const dlResponse = await fetch(downloadUrl, { redirect: 'follow' });
+      const transcriptText = await dlResponse.text();
+
+      if (!dlResponse.ok || (transcriptText.startsWith('{') && transcriptText.includes('errorCode'))) {
+        console.log(`[zoom-poll] Transcript download failed, retrying...`);
+        continue;
+      }
+
+      console.log(`[zoom-poll] Got transcript (${transcriptText.length} chars), running full pipeline`);
+
+      // Build a synthetic recording.completed payload and process it through the normal pipeline
+      const syntheticPayload = {
+        event: 'recording.completed',
+        download_token: undefined,
+        payload: {
+          object: {
+            ...data,
+            uuid: meetingUuid,
+            id: meetingPayload.id,
+            topic: meetingTopic,
+            host_id: meetingPayload.host_id,
+            host_email: meetingPayload.host_email,
+            start_time: data.start_time || meetingPayload.start_time,
+            duration: data.duration || meetingPayload.duration,
+            recording_files: data.recording_files,
+          },
+        },
+      };
+
+      // Process through the main handler (it will dedup via processedMeetings)
+      await handleZoomWebhook(syntheticPayload, slackClient);
+      console.log(`[zoom-poll] Full pipeline complete for: ${meetingTopic}`);
+      return;
+
+    } catch (err) {
+      console.error(`[zoom-poll] Attempt ${attempt}/${MAX_ATTEMPTS} error:`, err);
+    }
+  }
+
+  console.log(`[zoom-poll] Gave up after ${MAX_ATTEMPTS} attempts for: ${meetingTopic}`);
 }
 
 // Handle team meetings: post to channel + create tasks
