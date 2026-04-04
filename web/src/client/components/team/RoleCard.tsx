@@ -17,7 +17,10 @@ export function RoleCard({ role, isHired, onHire }: RoleCardProps) {
   const gradient = DEPARTMENT_GRADIENT[role.department] ?? 'from-gray-100 to-gray-200';
 
   return (
-    <div className="group flex flex-col rounded-xl border border-gray-200 bg-white p-5 transition-all hover:border-[#A78BFA] hover:shadow-md">
+    <div
+      className="group flex cursor-pointer flex-col rounded-xl border border-gray-200 bg-white p-5 transition-all hover:border-[#A78BFA] hover:shadow-md"
+      onClick={() => onHire(role)}
+    >
       {/* Header */}
       <div className="mb-3 flex items-start gap-3">
         <div
@@ -64,7 +67,7 @@ export function RoleCard({ role, isHired, onHire }: RoleCardProps) {
           </span>
         ) : (
           <button
-            onClick={() => onHire(role)}
+            onClick={(e) => { e.stopPropagation(); onHire(role); }}
             className="rounded-lg bg-[#4F3588] px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E]"
           >
             Hire

@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { db } from '../db';
-import { aiEmployees, aiActivity, aiRoutines, aiJournals } from '../schema-team';
-import { eq, and, desc } from 'drizzle-orm';
+import { aiEmployees, aiActivity, aiRoutines, aiJournals, aiTasks, aiMetricsSnapshots } from '../schema-team';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import * as paperclip from '../services/paperclip-bridge';
+import { getSoulTemplate } from '../services/soul-templates';
+import { executeTask, isExecutionAvailable, calculateHoursConsumed } from '../services/agent-executor';
+import * as slackNotify from '../services/slack-notifier';
 
 const router = Router();
 
@@ -52,6 +55,7 @@ function toEmployeeDTO(row: any) {
     hireDate: row.hireDate,
     isChiefOfStaff: row.isChiefOfStaff === 1 || row.isChiefOfStaff === true,
     soul: typeof row.soul === 'string' ? JSON.parse(row.soul) : row.soul ?? undefined,
+    model: row.model ?? 'sonnet',
   };
 }
 
@@ -104,25 +108,26 @@ function toRoutineDTO(row: any) {
 // ---------------------------------------------------------------------------
 
 const ROLES = [
-  { id: 'role-smm', name: 'Social Media Manager', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '📱', description: 'Creates and schedules social media posts, monitors engagement, and grows your online audience across platforms.', skills: ['Content Creation', 'Scheduling', 'Analytics'], estimatedHours: 20 },
-  { id: 'role-em', name: 'Email Marketer', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '✉️', description: 'Writes and sends email campaigns, manages subscriber lists, and runs A/B tests to improve open rates and conversions.', skills: ['Copywriting', 'Campaigns', 'A/B Testing'], estimatedHours: 15 },
-  { id: 'role-lq', name: 'Lead Qualifier', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '🎯', description: 'Scores inbound leads against your ideal customer profile, researches prospects, and routes qualified opportunities to sales.', skills: ['Lead Scoring', 'Research', 'Routing'], estimatedHours: 25 },
-  { id: 'role-cw', name: 'Content Writer', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '✍️', description: 'Produces blog posts, landing page copy, and marketing collateral aligned with your brand voice and SEO strategy.', skills: ['SEO Writing', 'Blog Posts', 'Brand Voice'], estimatedHours: 20 },
-  { id: 'role-fus', name: 'Follow-Up Specialist', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '🔄', description: 'Sends timely follow-up messages to prospects and customers, ensuring no opportunity falls through the cracks.', skills: ['Follow-Ups', 'CRM Updates', 'Sequences'], estimatedHours: 15 },
-  { id: 'role-bk', name: 'Bookkeeper', department: 'operations', departmentLabel: 'Operations', icon: '📒', description: 'Reconciles bank transactions, categorizes expenses, and generates weekly financial summaries to keep your books clean.', skills: ['Bookkeeping', 'Reports', 'Reconciliation'], estimatedHours: 10 },
-  { id: 'role-as', name: 'Appointment Scheduler', department: 'operations', departmentLabel: 'Operations', icon: '📅', description: 'Manages your calendar, books appointments with clients, and sends automated reminders to reduce no-shows.', skills: ['Scheduling', 'Reminders', 'Calendar'], estimatedHours: 15 },
-  { id: 'role-it', name: 'Inventory Tracker', department: 'operations', departmentLabel: 'Operations', icon: '📦', description: 'Monitors stock levels, flags low-inventory items, and generates reorder recommendations so you never run out.', skills: ['Inventory Counts', 'Reorder Alerts', 'Reporting'], estimatedHours: 10 },
-  { id: 'role-csr', name: 'Customer Service Rep', department: 'customer_service', departmentLabel: 'Customer Service', icon: '💬', description: 'Responds to customer inquiries, resolves common issues, and escalates complex cases to the appropriate team member.', skills: ['Ticket Resolution', 'FAQ Handling', 'Escalation'], estimatedHours: 25 },
-  { id: 'role-rm', name: 'Review Manager', department: 'customer_service', departmentLabel: 'Customer Service', icon: '⭐', description: 'Monitors online reviews, drafts professional responses, and identifies trends in customer feedback.', skills: ['Review Responses', 'Sentiment Analysis', 'Reputation'], estimatedHours: 10 },
-  { id: 'role-cfu', name: 'Client Follow-Up', department: 'customer_service', departmentLabel: 'Customer Service', icon: '🤝', description: 'Reaches out to past clients for feedback, upsell opportunities, and relationship nurturing to boost retention.', skills: ['Check-Ins', 'Satisfaction Surveys', 'Upselling'], estimatedHours: 15 },
+  { id: 'role-smm', name: 'Social Media Manager', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '📱', description: 'Creates and schedules social media posts, monitors engagement, and grows your online audience across platforms.', skills: ['Content Creation', 'Scheduling', 'Analytics'], estimatedHours: 20, responsibilities: ['Draft and schedule posts across Instagram, Facebook, LinkedIn, and X', 'Monitor comments, DMs, and mentions and respond on your behalf', 'Track follower growth, engagement rates, and top-performing content', 'Maintain a content calendar aligned with your marketing goals', 'Report weekly analytics with insights and recommendations'], sampleTasks: ['Create a week of Instagram posts promoting our new product launch', 'Write a LinkedIn thought-leadership post about industry trends', 'Compile this month\'s social media performance report', 'Draft responses to the 12 unanswered comments from this week'] },
+  { id: 'role-em', name: 'Email Marketer', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '✉️', description: 'Writes and sends email campaigns, manages subscriber lists, and runs A/B tests to improve open rates and conversions.', skills: ['Copywriting', 'Campaigns', 'A/B Testing'], estimatedHours: 15, responsibilities: ['Write and send email campaigns to your subscriber list', 'Run A/B tests on subject lines and content', 'Manage subscriber segments and list hygiene', 'Track open rates, click rates, and conversions', 'Create automated welcome and nurture sequences'], sampleTasks: ['Write a welcome email sequence for new customers', 'Draft a promotional email for our spring sale', 'Create a re-engagement campaign for inactive subscribers', 'A/B test subject lines for this month\'s newsletter'] },
+  { id: 'role-lq', name: 'Lead Qualifier', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '🎯', description: 'Scores inbound leads against your ideal customer profile, researches prospects, and routes qualified opportunities to sales.', skills: ['Lead Scoring', 'Research', 'Routing'], estimatedHours: 25, responsibilities: ['Score all new inbound leads against your ideal customer profile', 'Research top prospects and add enrichment data to the CRM', 'Route qualified leads to the appropriate sales pipeline stage', 'Flag high-priority opportunities for immediate follow-up', 'Generate weekly pipeline reports with conversion metrics'], sampleTasks: ['Score and prioritize the 20 leads that came in overnight', 'Research Greenfield Corp and prepare a prospect brief', 'Update CRM records with enrichment data for this week\'s hot leads', 'Generate a pipeline health report for the Monday sales meeting'] },
+  { id: 'role-cw', name: 'Content Writer', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '✍️', description: 'Produces blog posts, landing page copy, and marketing collateral aligned with your brand voice and SEO strategy.', skills: ['SEO Writing', 'Blog Posts', 'Brand Voice'], estimatedHours: 20, responsibilities: ['Write SEO-optimized blog posts on topics relevant to your audience', 'Create landing page copy for campaigns and product launches', 'Develop marketing collateral like case studies and one-pagers', 'Maintain a consistent brand voice across all written content', 'Research keywords and trending topics in your industry'], sampleTasks: ['Write a 1,200-word blog post on "5 Ways to Reduce Customer Churn"', 'Draft landing page copy for our new service tier', 'Create a customer success case study for Acme Corp', 'Research and outline 4 blog post ideas for next month'] },
+  { id: 'role-fus', name: 'Follow-Up Specialist', department: 'sales_marketing', departmentLabel: 'Sales & Marketing', icon: '🔄', description: 'Sends timely follow-up messages to prospects and customers, ensuring no opportunity falls through the cracks.', skills: ['Follow-Ups', 'CRM Updates', 'Sequences'], estimatedHours: 15, responsibilities: ['Send follow-up emails to prospects who haven\'t responded', 'Create and manage multi-step follow-up sequences', 'Update CRM deal stages and next-action dates after each touchpoint', 'Flag stale deals that need attention or a different approach', 'Track follow-up response rates and optimize messaging'], sampleTasks: ['Send a follow-up to all prospects who received a proposal last week', 'Create a 3-step sequence for post-demo follow-ups', 'Update CRM records for the 15 deals with no activity in 7 days', 'Draft a "checking in" email for warm leads that went cold'] },
+  { id: 'role-bk', name: 'Bookkeeper', department: 'operations', departmentLabel: 'Operations', icon: '📒', description: 'Reconciles bank transactions, categorizes expenses, and generates weekly financial summaries to keep your books clean.', skills: ['Bookkeeping', 'Reports', 'Reconciliation'], estimatedHours: 10, responsibilities: ['Reconcile bank transactions against invoices and receipts', 'Categorize expenses into the correct chart-of-accounts categories', 'Flag discrepancies or unusual charges for your review', 'Generate weekly revenue, expense, and cash-flow summaries', 'Prepare month-end financial reports'], sampleTasks: ['Reconcile all transactions from the past week', 'Categorize the 30 uncategorized expenses in the ledger', 'Generate a profit-and-loss summary for March', 'Flag any transactions over $500 that don\'t match an invoice'] },
+  { id: 'role-as', name: 'Appointment Scheduler', department: 'operations', departmentLabel: 'Operations', icon: '📅', description: 'Manages your calendar, books appointments with clients, and sends automated reminders to reduce no-shows.', skills: ['Scheduling', 'Reminders', 'Calendar'], estimatedHours: 15, responsibilities: ['Confirm and schedule new appointment requests within business hours', 'Send 24-hour reminder messages to reduce no-shows', 'Reschedule cancellations and fill open calendar slots', 'Coordinate availability across team members for group meetings', 'Track appointment volume and no-show rates weekly'], sampleTasks: ['Confirm the 8 appointment requests that came in today', 'Send reminders for all appointments scheduled tomorrow', 'Reschedule the 3 cancelled appointments from this week', 'Find an open 30-minute slot for a client meeting next Tuesday'] },
+  { id: 'role-it', name: 'Inventory Tracker', department: 'operations', departmentLabel: 'Operations', icon: '📦', description: 'Monitors stock levels, flags low-inventory items, and generates reorder recommendations so you never run out.', skills: ['Inventory Counts', 'Reorder Alerts', 'Reporting'], estimatedHours: 10, responsibilities: ['Monitor current stock levels and flag items below reorder thresholds', 'Generate reorder recommendations with suggested quantities', 'Track inventory turnover rates and identify slow-moving items', 'Reconcile physical counts against system records', 'Produce weekly inventory status reports'], sampleTasks: ['Check which items are below their reorder point and create a reorder list', 'Generate an inventory turnover report for the past 30 days', 'Identify the top 5 slow-moving SKUs and recommend action', 'Reconcile this week\'s shipment receipts against purchase orders'] },
+  { id: 'role-csr', name: 'Customer Service Rep', department: 'customer_service', departmentLabel: 'Customer Service', icon: '💬', description: 'Responds to customer inquiries, resolves common issues, and escalates complex cases to the appropriate team member.', skills: ['Ticket Resolution', 'FAQ Handling', 'Escalation'], estimatedHours: 25, responsibilities: ['Respond to incoming support tickets and customer messages', 'Resolve common issues using your knowledge base and FAQ', 'Escalate complex or sensitive cases to the right team member', 'Track ticket volume, resolution time, and satisfaction scores', 'Update the FAQ and knowledge base with new solutions'], sampleTasks: ['Respond to the 15 open support tickets in the queue', 'Draft a reply for the billing dispute from customer #4821', 'Update the FAQ with answers for the 3 most common questions this week', 'Compile a customer support summary for this week\'s team meeting'] },
+  { id: 'role-rm', name: 'Review Manager', department: 'customer_service', departmentLabel: 'Customer Service', icon: '⭐', description: 'Monitors online reviews, drafts professional responses, and identifies trends in customer feedback.', skills: ['Review Responses', 'Sentiment Analysis', 'Reputation'], estimatedHours: 10, responsibilities: ['Monitor new reviews across Google, Yelp, and industry platforms', 'Draft professional, on-brand responses to both positive and negative reviews', 'Identify recurring themes and sentiment trends in customer feedback', 'Flag urgent negative reviews that need immediate attention', 'Report weekly on review volume, average rating, and sentiment shifts'], sampleTasks: ['Respond to the 6 new Google reviews from this week', 'Draft a thoughtful reply to the 1-star review about shipping delays', 'Compile a sentiment analysis of all reviews from the past month', 'Identify the top 3 complaints mentioned in recent negative reviews'] },
+  { id: 'role-cfu', name: 'Client Follow-Up', department: 'customer_service', departmentLabel: 'Customer Service', icon: '🤝', description: 'Reaches out to past clients for feedback, upsell opportunities, and relationship nurturing to boost retention.', skills: ['Check-Ins', 'Satisfaction Surveys', 'Upselling'], estimatedHours: 15, responsibilities: ['Send check-in messages to clients after service delivery', 'Distribute satisfaction surveys and compile the results', 'Identify upsell and cross-sell opportunities based on client history', 'Nurture relationships with personalized touchpoints on milestones', 'Track client retention metrics and flag at-risk accounts'], sampleTasks: ['Send a 30-day check-in email to clients who completed onboarding last month', 'Distribute a satisfaction survey to all Q1 clients', 'Identify 5 existing clients who might benefit from our new premium tier', 'Draft a personalized anniversary message for our top 10 clients'] },
 ];
 
 const BLUEPRINTS = [
   { id: 'bp-dental', name: 'Dental Office', icon: '🦷', industry: 'Healthcare / Dental', teamSize: 5, roles: ['Appointment Scheduler', 'Customer Service Rep', 'Review Manager', 'Follow-Up Specialist', 'Bookkeeper'], description: 'A ready-made team for dental practices. Handles appointment booking, patient follow-ups, online review management, and bookkeeping so you can focus on patient care.' },
+  { id: 'bp-agency', name: 'Marketing Agency', icon: '📣', industry: 'Marketing & Advertising', teamSize: 5, roles: ['Content Writer', 'Social Media Manager', 'Email Marketer', 'Lead Qualifier', 'Bookkeeper'], description: 'An AI team for marketing agencies. Produces client content, manages social accounts, runs email campaigns, qualifies new business leads, and keeps finances organized.' },
   { id: 'bp-realestate', name: 'Real Estate Agency', icon: '🏠', industry: 'Real Estate', teamSize: 4, roles: ['Lead Qualifier', 'Follow-Up Specialist', 'Social Media Manager', 'Appointment Scheduler'], description: 'Built for real estate agents and brokerages. Qualifies inbound leads, nurtures prospects with timely follow-ups, and keeps your social presence active between showings.' },
   { id: 'bp-roofing', name: 'Roofing Company', icon: '🏗️', industry: 'Home Services / Roofing', teamSize: 3, roles: ['Lead Qualifier', 'Appointment Scheduler', 'Client Follow-Up'], description: 'Designed for roofing and home service contractors. Scores storm-damage leads, books estimates, and follows up after jobs to earn reviews and referrals.' },
-  { id: 'bp-restaurant', name: 'Restaurant', icon: '🍽️', industry: 'Food & Beverage', teamSize: 4, roles: ['Social Media Manager', 'Review Manager', 'Inventory Tracker', 'Customer Service Rep'], description: 'Tailored for restaurants and cafes. Keeps your social feeds fresh with daily specials, responds to reviews, tracks inventory, and handles customer inquiries.' },
-  { id: 'bp-agency', name: 'Marketing Agency', icon: '📣', industry: 'Marketing & Advertising', teamSize: 5, roles: ['Content Writer', 'Social Media Manager', 'Email Marketer', 'Lead Qualifier', 'Bookkeeper'], description: 'An AI team for marketing agencies. Produces client content, manages social accounts, runs email campaigns, qualifies new business leads, and keeps finances organized.' },
+  { id: 'bp-landscaping', name: 'Landscaping Company', icon: '🌿', industry: 'Home Services / Landscaping', teamSize: 4, roles: ['Lead Qualifier', 'Appointment Scheduler', 'Client Follow-Up', 'Social Media Manager'], description: 'Built for landscaping and lawn care businesses. Qualifies new property leads, schedules estimates and seasonal services, follows up for repeat business, and showcases your work on social media.' },
+  { id: 'bp-lawoffice', name: 'Law Office', icon: '⚖️', industry: 'Legal Services', teamSize: 5, roles: ['Lead Qualifier', 'Appointment Scheduler', 'Follow-Up Specialist', 'Content Writer', 'Bookkeeper'], description: 'Designed for law firms and solo practitioners. Qualifies potential clients, manages consultation scheduling, follows up on cases, creates educational content, and keeps billing organized.' },
 ];
 
 function findRole(name: string) {
@@ -155,7 +160,10 @@ router.get('/team/employees', async (req: any, res) => {
 // POST /team/employees
 router.post('/team/employees', async (req: any, res) => {
   try {
-    const { name, role, department, departmentLabel, icon, skills, estimatedHours, standingInstructions } = req.body;
+    const { name, role, department, departmentLabel, icon, skills, estimatedHours, standingInstructions, trustLevel, model } = req.body;
+
+    // Auto-populate personality profile from role templates
+    const soul = getSoulTemplate(role);
 
     // Always write to local SQLite (our rich data store)
     const id = `emp-${Date.now()}`;
@@ -177,15 +185,25 @@ router.post('/team/employees', async (req: any, res) => {
         hoursUsed: 0,
         approvalsCount: 0,
         deliverablesCount: 0,
-        trustLevel: 'supervised',
+        trustLevel: trustLevel ?? 'supervised',
         status: 'idle',
         reportsTo: 'cos',
         hireDate: now,
         isChiefOfStaff: 0,
+        soul,
+        model: model ?? 'sonnet',
         createdAt: ts,
         updatedAt: ts,
       })
       .run();
+
+    // Notify owner via Slack (fire-and-forget)
+    slackNotify.notifyNewHire({
+      ownerSlackId: req.userId,
+      employeeName: name,
+      employeeIcon: icon || '🤖',
+      role,
+    }).catch(() => {});
 
     // Also push to Paperclip if connected (dual-write)
     if (req.paperclipCompanyId) {
@@ -228,6 +246,28 @@ router.patch('/team/employees/:id', async (req: any, res) => {
     if (body.approvalsCount !== undefined) updates.approvalsCount = body.approvalsCount;
     if (body.deliverablesCount !== undefined) updates.deliverablesCount = body.deliverablesCount;
     if (body.soul !== undefined) updates.soul = body.soul;
+    if (body.model !== undefined) updates.model = body.model;
+
+    // Handle add/remove training material as array operations
+    if (body.addTrainingMaterial) {
+      const existing = db.select().from(aiEmployees).where(eq(aiEmployees.id, id)).get() as any;
+      if (existing) {
+        const current = typeof existing.trainingMaterials === 'string'
+          ? JSON.parse(existing.trainingMaterials) : existing.trainingMaterials ?? [];
+        if (!current.includes(body.addTrainingMaterial)) {
+          updates.trainingMaterials = [...current, body.addTrainingMaterial];
+        }
+      }
+    }
+    if (body.removeTrainingMaterial) {
+      const existing = db.select().from(aiEmployees).where(eq(aiEmployees.id, id)).get() as any;
+      if (existing) {
+        const current = typeof existing.trainingMaterials === 'string'
+          ? JSON.parse(existing.trainingMaterials) : existing.trainingMaterials ?? [];
+        updates.trainingMaterials = current.filter((f: string) => f !== body.removeTrainingMaterial);
+      }
+    }
+
     updates.updatedAt = Math.floor(Date.now() / 1000);
 
     // Update local SQLite
@@ -262,6 +302,7 @@ router.patch('/team/employees/:id', async (req: any, res) => {
 router.delete('/team/employees/:id', (req: any, res) => {
   try {
     const { id } = req.params;
+    db.delete(aiTasks).where(eq(aiTasks.employeeId, id)).run();
     db.delete(aiRoutines).where(eq(aiRoutines.employeeId, id)).run();
     db.delete(aiActivity).where(eq(aiActivity.employeeId, id)).run();
     db.delete(aiEmployees).where(eq(aiEmployees.id, id)).run();
@@ -551,6 +592,7 @@ router.post('/team/blueprints/:id/deploy', (req: any, res) => {
       const roleDef = findRole(roleName);
       if (!roleDef) continue;
       const empId = `emp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const empSoul = getSoulTemplate(roleDef.name);
       db.insert(aiEmployees)
         .values({
           id: empId,
@@ -572,6 +614,7 @@ router.post('/team/blueprints/:id/deploy', (req: any, res) => {
           reportsTo: 'cos',
           hireDate: now,
           isChiefOfStaff: 0,
+          soul: empSoul,
           createdAt: ts,
           updatedAt: ts,
         })
@@ -729,29 +772,35 @@ router.post('/team/seed', (req: any, res) => {
 // TASKS — assign work to employees
 // ---------------------------------------------------------------------------
 
+function toTaskDTO(row: any) {
+  return {
+    id: row.id,
+    employeeId: row.employeeId,
+    title: row.title,
+    description: row.description ?? '',
+    priority: row.priority ?? 'medium',
+    status: row.status ?? 'todo',
+    output: row.output ?? undefined,
+    tokensUsed: row.tokensUsed ?? 0,
+    durationMs: row.durationMs ?? 0,
+    failureReason: row.failureReason ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 // GET /team/employees/:id/tasks
 router.get('/team/employees/:id/tasks', async (req: any, res) => {
   try {
     const { id } = req.params;
-    // Try Paperclip first
-    if (req.paperclipCompanyId) {
-      const tasks = await paperclip.listTasks(req.paperclipCompanyId, id);
-      if (tasks) {
-        res.json(tasks.map((t: any) => ({
-          id: t.id,
-          employeeId: t.assigneeAgentId || id,
-          title: t.title,
-          description: t.description || '',
-          priority: t.priority || 'medium',
-          status: t.status || 'todo',
-          createdAt: t.createdAt || new Date().toISOString(),
-          updatedAt: t.updatedAt || undefined,
-        })));
-        return;
-      }
-    }
-    // Fall back to local — tasks stored in-memory for now (no SQLite table yet)
-    res.json([]);
+    // Always use local SQLite as source of truth
+    const rows = db
+      .select()
+      .from(aiTasks)
+      .where(and(eq(aiTasks.ownerSlackId, req.userId), eq(aiTasks.employeeId, id)))
+      .orderBy(desc(aiTasks.createdAt))
+      .all();
+    res.json(rows.map(toTaskDTO));
   } catch (err) {
     console.error('[team] GET /team/employees/:id/tasks error:', err);
     res.status(500).json({ error: 'Failed to fetch tasks' });
@@ -765,39 +814,35 @@ router.post('/team/employees/:id/tasks', async (req: any, res) => {
     const { title, description, priority } = req.body;
     if (!title) { res.status(400).json({ error: 'Title is required' }); return; }
 
-    // Try Paperclip first
+    const taskId = `task-${Date.now()}`;
+    const ts = Math.floor(Date.now() / 1000);
+
+    // Always write to local SQLite
+    db.insert(aiTasks)
+      .values({
+        id: taskId,
+        ownerSlackId: req.userId,
+        employeeId: id,
+        title,
+        description: description || '',
+        priority: priority || 'medium',
+        status: 'todo',
+        createdAt: ts,
+        updatedAt: ts,
+      })
+      .run();
+
+    // Also push to Paperclip if connected
     if (req.paperclipCompanyId) {
-      const task = await paperclip.createTask(req.paperclipCompanyId, {
+      paperclip.createTask(req.paperclipCompanyId, {
         title,
         assigneeAgentId: id,
         priority: priority || 'medium',
-      });
-      if (task) {
-        res.json({
-          id: task.id,
-          employeeId: task.assigneeAgentId || id,
-          title: task.title,
-          description: task.description || description || '',
-          priority: task.priority || priority || 'medium',
-          status: task.status || 'todo',
-          createdAt: task.createdAt || new Date().toISOString(),
-          updatedAt: task.updatedAt || undefined,
-        });
-        return;
-      }
+      }).catch(() => { /* best-effort sync */ });
     }
 
-    // Fall back to local mock
-    const task = {
-      id: `task-${Date.now()}`,
-      employeeId: id,
-      title,
-      description: description || '',
-      priority: priority || 'medium',
-      status: 'todo',
-      createdAt: new Date().toISOString(),
-    };
-    res.json(task);
+    const row = db.select().from(aiTasks).where(eq(aiTasks.id, taskId)).get();
+    res.json(toTaskDTO(row));
   } catch (err) {
     console.error('[team] POST /team/employees/:id/tasks error:', err);
     res.status(500).json({ error: 'Failed to create task' });
@@ -863,21 +908,374 @@ router.post('/team/employees/:id/journal', (req: any, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// PAPERCLIP STATUS — lets the frontend know if Paperclip is connected
+// TASK MANAGEMENT — update status, run tasks
+// ---------------------------------------------------------------------------
+
+// PATCH /team/tasks/:id — update task status, priority, etc.
+router.patch('/team/tasks/:id', (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const body = req.body;
+    const updates: Record<string, any> = {};
+    if (body.status !== undefined) updates.status = body.status;
+    if (body.priority !== undefined) updates.priority = body.priority;
+    if (body.title !== undefined) updates.title = body.title;
+    if (body.description !== undefined) updates.description = body.description;
+    if (body.output !== undefined) updates.output = body.output;
+    updates.updatedAt = Math.floor(Date.now() / 1000);
+
+    db.update(aiTasks).set(updates).where(eq(aiTasks.id, id)).run();
+    const row = db.select().from(aiTasks).where(eq(aiTasks.id, id)).get();
+    if (!row) { res.status(404).json({ error: 'Task not found' }); return; }
+    res.json(toTaskDTO(row));
+  } catch (err) {
+    console.error('[team] PATCH /team/tasks/:id error:', err);
+    res.status(500).json({ error: 'Failed to update task' });
+  }
+});
+
+// DELETE /team/tasks/:id
+router.delete('/team/tasks/:id', (req: any, res) => {
+  try {
+    db.delete(aiTasks).where(eq(aiTasks.id, req.params.id)).run();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[team] DELETE /team/tasks/:id error:', err);
+    res.status(500).json({ error: 'Failed to delete task' });
+  }
+});
+
+// POST /team/tasks/:id/run — execute a task using the AI agent
+router.post('/team/tasks/:id/run', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const task = db.select().from(aiTasks).where(eq(aiTasks.id, id)).get() as any;
+    if (!task) { res.status(404).json({ error: 'Task not found' }); return; }
+
+    const employee = db.select().from(aiEmployees).where(eq(aiEmployees.id, task.employeeId)).get() as any;
+    if (!employee) { res.status(404).json({ error: 'Employee not found' }); return; }
+
+    // Check if execution is available (API key configured)
+    const available = await isExecutionAvailable();
+    if (!available) {
+      res.status(503).json({ error: 'AI execution not available. Please configure your Anthropic API key.' });
+      return;
+    }
+
+    // Mark task as in_progress
+    const ts = Math.floor(Date.now() / 1000);
+    db.update(aiTasks).set({ status: 'in_progress', updatedAt: ts }).where(eq(aiTasks.id, id)).run();
+
+    // Mark employee as working
+    db.update(aiEmployees).set({ status: 'working', updatedAt: ts }).where(eq(aiEmployees.id, employee.id)).run();
+
+    // Execute the task
+    const soul = typeof employee.soul === 'string' ? JSON.parse(employee.soul) : employee.soul;
+    const skills = typeof employee.skills === 'string' ? JSON.parse(employee.skills) : employee.skills ?? [];
+
+    const result = await executeTask({
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        role: employee.role,
+        department: employee.departmentLabel || employee.department,
+        skills,
+        standingInstructions: employee.standingInstructions || '',
+        model: employee.model || 'sonnet',
+        soul: soul || undefined,
+      },
+      task: {
+        title: task.title,
+        description: task.description || '',
+        priority: task.priority,
+      },
+      ownerContext: req.body.context,
+    });
+
+    // Update task with result
+    db.update(aiTasks).set({
+      status: result.success ? 'done' : 'failed',
+      output: result.output,
+      tokensUsed: result.tokensUsed,
+      durationMs: result.durationMs,
+      failureReason: result.error || null,
+      updatedAt: Math.floor(Date.now() / 1000),
+    }).where(eq(aiTasks.id, id)).run();
+
+    // Set employee back to idle
+    db.update(aiEmployees).set({ status: 'idle', updatedAt: Math.floor(Date.now() / 1000) }).where(eq(aiEmployees.id, employee.id)).run();
+
+    // Determine if this needs approval based on trust level
+    const needsApproval = employee.trustLevel === 'supervised' ||
+      (employee.trustLevel === 'trusted' && (task.priority === 'high' || task.priority === 'urgent'));
+
+    // Auto-create activity entry
+    const actId = `act-${Date.now()}`;
+    db.insert(aiActivity).values({
+      id: actId,
+      ownerSlackId: req.userId,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      employeeIcon: employee.icon,
+      action: result.success ? `Completed: ${task.title}` : `Failed: ${task.title}`,
+      detail: result.success
+        ? `Task completed in ${(result.durationMs / 1000).toFixed(1)}s using ${result.tokensUsed} tokens.`
+        : `Task failed: ${result.error}`,
+      timestamp: new Date().toISOString(),
+      needsApproval: needsApproval && result.success ? 1 : 0,
+      approved: null,
+      deliverablePreview: result.success ? result.output.slice(0, 500) : null,
+      status: result.success ? 'success' : 'failure',
+      failureReason: result.error || null,
+      createdAt: Math.floor(Date.now() / 1000),
+    }).run();
+
+    // Auto-create journal entry
+    const jrnId = `jrn-${Date.now()}`;
+    db.insert(aiJournals).values({
+      id: jrnId,
+      ownerSlackId: req.userId,
+      employeeId: employee.id,
+      date: new Date().toISOString().slice(0, 10),
+      type: result.success ? 'work_log' : 'failure',
+      title: task.title,
+      content: result.success
+        ? `Completed task "${task.title}" (${task.priority} priority). Output: ${result.output.slice(0, 1000)}`
+        : `Failed to complete "${task.title}": ${result.error}`,
+      tags: [task.priority, result.success ? 'completed' : 'failed'],
+      createdAt: Math.floor(Date.now() / 1000),
+    }).run();
+
+    // Send Slack notification (fire-and-forget)
+    if (result.success) {
+      slackNotify.notifyTaskCompleted({
+        ownerSlackId: req.userId,
+        employeeName: employee.name,
+        employeeIcon: employee.icon || '🤖',
+        taskTitle: task.title,
+        needsApproval,
+        outputPreview: result.output.slice(0, 300),
+      }).catch(() => {});
+    } else {
+      slackNotify.notifyTaskFailed({
+        ownerSlackId: req.userId,
+        employeeName: employee.name,
+        employeeIcon: employee.icon || '🤖',
+        taskTitle: task.title,
+        error: result.error || 'Unknown error',
+      }).catch(() => {});
+    }
+
+    // Update employee deliverables count
+    if (result.success) {
+      db.update(aiEmployees).set({
+        deliverablesCount: (employee.deliverablesCount ?? 0) + 1,
+        hoursUsed: (employee.hoursUsed ?? 0) + calculateHoursConsumed(task.priority, employee.model || 'sonnet'),
+      }).where(eq(aiEmployees.id, employee.id)).run();
+    }
+
+    // Return the completed task
+    const updatedTask = db.select().from(aiTasks).where(eq(aiTasks.id, id)).get();
+    res.json({
+      task: toTaskDTO(updatedTask),
+      activity: toActivityDTO(db.select().from(aiActivity).where(eq(aiActivity.id, actId)).get()),
+      needsApproval,
+    });
+  } catch (err) {
+    console.error('[team] POST /team/tasks/:id/run error:', err);
+    res.status(500).json({ error: 'Failed to run task' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// BULK OPERATIONS
+// ---------------------------------------------------------------------------
+
+// POST /team/bulk/pause-all — pause all AI employees
+router.post('/team/bulk/pause-all', (req: any, res) => {
+  try {
+    const ts = Math.floor(Date.now() / 1000);
+    db.update(aiEmployees)
+      .set({ status: 'paused', updatedAt: ts })
+      .where(and(
+        eq(aiEmployees.ownerSlackId, req.userId),
+        sql`${aiEmployees.id} != 'owner'`,
+        sql`${aiEmployees.isChiefOfStaff} != 1`,
+      ))
+      .run();
+    const rows = db.select().from(aiEmployees).where(eq(aiEmployees.ownerSlackId, req.userId)).all();
+    res.json(rows.map(toEmployeeDTO));
+  } catch (err) {
+    console.error('[team] POST /team/bulk/pause-all error:', err);
+    res.status(500).json({ error: 'Failed to pause all employees' });
+  }
+});
+
+// POST /team/bulk/resume-all — resume all paused AI employees
+router.post('/team/bulk/resume-all', (req: any, res) => {
+  try {
+    const ts = Math.floor(Date.now() / 1000);
+    db.update(aiEmployees)
+      .set({ status: 'idle', updatedAt: ts })
+      .where(and(
+        eq(aiEmployees.ownerSlackId, req.userId),
+        eq(aiEmployees.status, 'paused'),
+      ))
+      .run();
+    const rows = db.select().from(aiEmployees).where(eq(aiEmployees.ownerSlackId, req.userId)).all();
+    res.json(rows.map(toEmployeeDTO));
+  } catch (err) {
+    console.error('[team] POST /team/bulk/resume-all error:', err);
+    res.status(500).json({ error: 'Failed to resume all employees' });
+  }
+});
+
+// DELETE /team/bulk/reset — clear all AI team data for this user
+router.delete('/team/bulk/reset', (req: any, res) => {
+  try {
+    db.delete(aiTasks).where(eq(aiTasks.ownerSlackId, req.userId)).run();
+    db.delete(aiJournals).where(eq(aiJournals.ownerSlackId, req.userId)).run();
+    db.delete(aiActivity).where(eq(aiActivity.ownerSlackId, req.userId)).run();
+    db.delete(aiRoutines).where(eq(aiRoutines.ownerSlackId, req.userId)).run();
+    db.delete(aiMetricsSnapshots).where(eq(aiMetricsSnapshots.ownerSlackId, req.userId)).run();
+    db.delete(aiEmployees).where(eq(aiEmployees.ownerSlackId, req.userId)).run();
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[team] DELETE /team/bulk/reset error:', err);
+    res.status(500).json({ error: 'Failed to reset team data' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PERFORMANCE METRICS
+// ---------------------------------------------------------------------------
+
+// POST /team/metrics/snapshot — capture today's metrics for all employees
+router.post('/team/metrics/snapshot', (req: any, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const ts = Math.floor(Date.now() / 1000);
+    const employees = db.select().from(aiEmployees)
+      .where(and(
+        eq(aiEmployees.ownerSlackId, req.userId),
+        sql`${aiEmployees.id} != 'owner'`,
+      ))
+      .all();
+
+    const snapshots: any[] = [];
+    for (const emp of employees) {
+      // Count today's metrics from related tables
+      const tasksCompleted = db.select().from(aiTasks)
+        .where(and(eq(aiTasks.employeeId, emp.id), eq(aiTasks.status, 'done')))
+        .all().length;
+      const tasksCreated = db.select().from(aiTasks)
+        .where(eq(aiTasks.employeeId, emp.id))
+        .all().length;
+      const journalCount = db.select().from(aiJournals)
+        .where(eq(aiJournals.employeeId, emp.id))
+        .all().length;
+      const failureCount = db.select().from(aiActivity)
+        .where(and(eq(aiActivity.employeeId, emp.id), eq(aiActivity.status, 'failure')))
+        .all().length;
+
+      const snapId = `snap-${emp.id}-${today}`;
+      // Upsert: delete any existing snapshot for this employee+date, then insert
+      db.delete(aiMetricsSnapshots)
+        .where(and(eq(aiMetricsSnapshots.employeeId, emp.id), eq(aiMetricsSnapshots.date, today)))
+        .run();
+      db.insert(aiMetricsSnapshots).values({
+        id: snapId,
+        employeeId: emp.id,
+        date: today,
+        tasksCompleted,
+        tasksCreated,
+        approvalsReceived: (emp as any).approvalsCount ?? 0,
+        rejectionsReceived: 0,
+        hoursUsed: (emp as any).hoursUsed ?? 0,
+        journalEntries: journalCount,
+        failureCount,
+        ownerSlackId: req.userId,
+        createdAt: ts,
+      }).run();
+      snapshots.push({ employeeId: emp.id, date: today, tasksCompleted, tasksCreated, journalCount, failureCount });
+    }
+    res.json({ date: today, snapshots });
+  } catch (err) {
+    console.error('[team] POST /team/metrics/snapshot error:', err);
+    res.status(500).json({ error: 'Failed to capture metrics snapshot' });
+  }
+});
+
+// GET /team/metrics — get metrics history for all employees
+router.get('/team/metrics', (req: any, res) => {
+  try {
+    const rows = db.select().from(aiMetricsSnapshots)
+      .where(eq(aiMetricsSnapshots.ownerSlackId, req.userId))
+      .orderBy(desc(aiMetricsSnapshots.date))
+      .all();
+    res.json(rows.map((r: any) => ({
+      id: r.id,
+      employeeId: r.employeeId,
+      date: r.date,
+      tasksCompleted: r.tasksCompleted ?? 0,
+      tasksCreated: r.tasksCreated ?? 0,
+      approvalsReceived: r.approvalsReceived ?? 0,
+      rejectionsReceived: r.rejectionsReceived ?? 0,
+      hoursUsed: r.hoursUsed ?? 0,
+      journalEntries: r.journalEntries ?? 0,
+      failureCount: r.failureCount ?? 0,
+    })));
+  } catch (err) {
+    console.error('[team] GET /team/metrics error:', err);
+    res.status(500).json({ error: 'Failed to fetch metrics' });
+  }
+});
+
+// GET /team/metrics/:employeeId — get metrics history for one employee
+router.get('/team/metrics/:employeeId', (req: any, res) => {
+  try {
+    const rows = db.select().from(aiMetricsSnapshots)
+      .where(and(
+        eq(aiMetricsSnapshots.ownerSlackId, req.userId),
+        eq(aiMetricsSnapshots.employeeId, req.params.employeeId),
+      ))
+      .orderBy(desc(aiMetricsSnapshots.date))
+      .all();
+    res.json(rows.map((r: any) => ({
+      id: r.id,
+      employeeId: r.employeeId,
+      date: r.date,
+      tasksCompleted: r.tasksCompleted ?? 0,
+      tasksCreated: r.tasksCreated ?? 0,
+      approvalsReceived: r.approvalsReceived ?? 0,
+      rejectionsReceived: r.rejectionsReceived ?? 0,
+      hoursUsed: r.hoursUsed ?? 0,
+      journalEntries: r.journalEntries ?? 0,
+      failureCount: r.failureCount ?? 0,
+    })));
+  } catch (err) {
+    console.error('[team] GET /team/metrics/:employeeId error:', err);
+    res.status(500).json({ error: 'Failed to fetch employee metrics' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// ORCHESTRATION STATUS
 // ---------------------------------------------------------------------------
 
 router.get('/team/status', async (req: any, res) => {
   const alive = await paperclip.isPaperclipAlive();
+  const executionReady = await isExecutionAvailable();
 
-  // Get Paperclip health details if available
-  let paperclipVersion: string | null = null;
+  // Get orchestration health details if available
+  let orchestrationVersion: string | null = null;
   let agentCount = 0;
   if (alive) {
     try {
       const health = await fetch('http://127.0.0.1:3100/api/health', { signal: AbortSignal.timeout(2000) })
         .then((r) => r.json())
         .catch(() => null);
-      if (health) paperclipVersion = health.version || null;
+      if (health) orchestrationVersion = health.version || null;
 
       if (req.paperclipCompanyId) {
         const agents = await paperclip.listEmployees(req.paperclipCompanyId);
@@ -890,8 +1288,9 @@ router.get('/team/status', async (req: any, res) => {
     paperclipConnected: alive,
     companyId: req.paperclipCompanyId || null,
     mode: alive ? 'live' : 'local',
-    paperclipVersion,
+    paperclipVersion: orchestrationVersion,
     paperclipAgents: agentCount,
+    executionReady,
   });
 });
 

@@ -21,6 +21,7 @@ export const aiEmployees = sqliteTable('ai_employees', {
   hireDate: text('hire_date'),
   isChiefOfStaff: integer('is_chief_of_staff').default(0),
   soul: text('soul', { mode: 'json' }),
+  model: text('model').default('sonnet'), // sonnet | opus
   ownerSlackId: text('owner_slack_id'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
@@ -59,6 +60,22 @@ export const aiRoutines = sqliteTable('ai_routines', {
   updatedAt: integer('updated_at').notNull(),
 });
 
+export const aiTasks = sqliteTable('ai_tasks', {
+  id: text('id').primaryKey(),
+  employeeId: text('employee_id').notNull(),
+  title: text('title').notNull(),
+  description: text('description'),
+  priority: text('priority').notNull().default('medium'), // low | medium | high | urgent
+  status: text('status').notNull().default('todo'), // todo | in_progress | done | cancelled | failed
+  output: text('output'), // AI-generated result text
+  tokensUsed: integer('tokens_used').default(0),
+  durationMs: integer('duration_ms').default(0),
+  failureReason: text('failure_reason'),
+  ownerSlackId: text('owner_slack_id'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
 export const aiJournals = sqliteTable('ai_journals', {
   id: text('id').primaryKey(),
   employeeId: text('employee_id').notNull(),
@@ -67,6 +84,21 @@ export const aiJournals = sqliteTable('ai_journals', {
   title: text('title').notNull(),
   content: text('content'),
   tags: text('tags', { mode: 'json' }),
+  ownerSlackId: text('owner_slack_id'),
+  createdAt: integer('created_at').notNull(),
+});
+
+export const aiMetricsSnapshots = sqliteTable('ai_metrics_snapshots', {
+  id: text('id').primaryKey(),
+  employeeId: text('employee_id').notNull(),
+  date: text('date').notNull(), // ISO date YYYY-MM-DD
+  tasksCompleted: integer('tasks_completed').default(0),
+  tasksCreated: integer('tasks_created').default(0),
+  approvalsReceived: integer('approvals_received').default(0),
+  rejectionsReceived: integer('rejections_received').default(0),
+  hoursUsed: integer('hours_used').default(0),
+  journalEntries: integer('journal_entries').default(0),
+  failureCount: integer('failure_count').default(0),
   ownerSlackId: text('owner_slack_id'),
   createdAt: integer('created_at').notNull(),
 });

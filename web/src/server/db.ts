@@ -52,10 +52,49 @@ export const db = drizzle(sqlite, { schema: { ...schema, ...analyticsSchema, ...
 // Re-export analytics tables for use by routes without bot imports
 export { callAnalyses, productSignals, coachingSnapshots } from './schema-analytics';
 export { emailDrafts } from './schema-email-drafts';
-export { aiEmployees, aiActivity, aiRoutines, aiJournals } from './schema-team';
+export { aiEmployees, aiActivity, aiRoutines, aiJournals, aiTasks, aiMetricsSnapshots } from './schema-team';
+
+// Ensure ai_metrics_snapshots table exists
+sqlite.exec(`CREATE TABLE IF NOT EXISTS ai_metrics_snapshots (
+  id TEXT PRIMARY KEY,
+  employee_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  tasks_completed INTEGER DEFAULT 0,
+  tasks_created INTEGER DEFAULT 0,
+  approvals_received INTEGER DEFAULT 0,
+  rejections_received INTEGER DEFAULT 0,
+  hours_used INTEGER DEFAULT 0,
+  journal_entries INTEGER DEFAULT 0,
+  failure_count INTEGER DEFAULT 0,
+  owner_slack_id TEXT,
+  created_at INTEGER NOT NULL
+)`);
+
+// Ensure ai_tasks table exists
+sqlite.exec(`CREATE TABLE IF NOT EXISTS ai_tasks (
+  id TEXT PRIMARY KEY,
+  employee_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  priority TEXT NOT NULL DEFAULT 'medium',
+  status TEXT NOT NULL DEFAULT 'todo',
+  output TEXT,
+  tokens_used INTEGER DEFAULT 0,
+  duration_ms INTEGER DEFAULT 0,
+  failure_reason TEXT,
+  owner_slack_id TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+)`);
+// Migration: add new ai_tasks columns if table existed before
+try { sqlite.exec('ALTER TABLE ai_tasks ADD COLUMN output TEXT'); } catch (_e) { /* already exists */ }
+try { sqlite.exec('ALTER TABLE ai_tasks ADD COLUMN tokens_used INTEGER DEFAULT 0'); } catch (_e) { /* already exists */ }
+try { sqlite.exec('ALTER TABLE ai_tasks ADD COLUMN duration_ms INTEGER DEFAULT 0'); } catch (_e) { /* already exists */ }
+try { sqlite.exec('ALTER TABLE ai_tasks ADD COLUMN failure_reason TEXT'); } catch (_e) { /* already exists */ }
 
 // Ensure new columns exist on existing tables (migration-safe)
 try { sqlite.exec('ALTER TABLE ai_employees ADD COLUMN soul TEXT'); } catch (_e) { /* already exists */ }
+try { sqlite.exec("ALTER TABLE ai_employees ADD COLUMN model TEXT DEFAULT 'sonnet'"); } catch (_e) { /* already exists */ }
 try { sqlite.exec('ALTER TABLE ai_activity ADD COLUMN status TEXT DEFAULT \'success\''); } catch (_e) { /* already exists */ }
 try { sqlite.exec('ALTER TABLE ai_activity ADD COLUMN failure_reason TEXT'); } catch (_e) { /* already exists */ }
 try { sqlite.exec('ALTER TABLE ai_activity ADD COLUMN failure_step TEXT'); } catch (_e) { /* already exists */ }

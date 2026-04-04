@@ -48,7 +48,7 @@ const PORT = Number(process.env.WEB_PORT) || 3001;
 app.use(cors({
   origin: process.env.NODE_ENV === 'production'
     ? true  // Allow same-origin in production (served from same server)
-    : ['http://localhost:5173', 'http://localhost:3001'],
+    : ['http://localhost:5173', 'http://localhost:5175', 'http://localhost:3001'],
   credentials: true,
 }));
 app.use(express.json());

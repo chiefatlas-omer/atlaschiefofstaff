@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type {
   Employee,
   ActivityEntry,
@@ -6,6 +6,7 @@ import type {
   Role,
   Blueprint,
   TrustLevel,
+  HireCustomization,
 } from '../lib/team-types';
 import { teamApi } from '../lib/team-api';
 
@@ -16,6 +17,9 @@ import { HireTab } from '../components/team/HireTab';
 import { ActivityTab } from '../components/team/ActivityTab';
 import { ScheduleTab } from '../components/team/ScheduleTab';
 import { PayrollTab } from '../components/team/PayrollTab';
+import { DeliverablesTab } from '../components/team/DeliverablesTab';
+import OutputViewer from '../components/team/OutputViewer';
+import type { OutputViewerData } from '../components/team/OutputViewer';
 
 // ---------------------------------------------------------------------------
 // Tab definitions
@@ -24,6 +28,7 @@ const TABS = [
   { id: 'org-chart', label: 'Org Chart' },
   { id: 'hire', label: 'Hire' },
   { id: 'activity', label: 'Activity' },
+  { id: 'deliverables', label: 'Deliverables' },
   { id: 'schedule', label: 'Schedule' },
   { id: 'payroll', label: 'Payroll' },
 ] as const;
@@ -45,6 +50,22 @@ export default function Team() {
   const [blueprints, setBlueprints] = useState<Blueprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [executionReady, setExecutionReady] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const [outputViewerData, setOutputViewerData] = useState<OutputViewerData | null>(null);
+
+  // Close more menu on outside click
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMoreMenu]);
 
   // Orchestration engine connection status
   const [pcStatus, setPcStatus] = useState<{
@@ -77,6 +98,7 @@ export default function Team() {
           version: status.paperclipVersion ?? null,
           agents: status.paperclipAgents ?? 0,
         });
+        setExecutionReady(status.executionReady ?? false);
       }
     } catch (err) {
       console.error('[Team] Failed to load data:', err);
@@ -111,16 +133,20 @@ export default function Team() {
 
   // ── Handlers — all call the API then update local state ────────────
 
-  const handleHire = useCallback(async (role: Role) => {
+  const handleHire = useCallback(async (data: HireCustomization) => {
     try {
+      const { role, customName, standingInstructions, hoursAllocated, trustLevel, model } = data;
       const newEmp = await teamApi.hireEmployee({
-        name: role.name,
+        name: customName || role.name,
         role: role.name,
         department: role.department,
         departmentLabel: role.departmentLabel,
         icon: role.icon,
         skills: role.skills,
-        estimatedHours: role.estimatedHours,
+        estimatedHours: hoursAllocated,
+        standingInstructions: standingInstructions || undefined,
+        trustLevel,
+        model,
       });
       setEmployees((prev) => [...prev, newEmp]);
       // Auto-open the new employee's profile so the user can configure them immediately
@@ -247,6 +273,36 @@ export default function Team() {
     }
   }, []);
 
+  // ── Bulk operations ────────────────────────────────────────────────
+
+  const handlePauseAll = useCallback(async () => {
+    try {
+      const updated = await teamApi.pauseAll();
+      setEmployees(updated);
+    } catch (err) { console.error('[Team] Pause all failed:', err); }
+  }, []);
+
+  const handleResumeAll = useCallback(async () => {
+    try {
+      const updated = await teamApi.resumeAll();
+      setEmployees(updated);
+    } catch (err) { console.error('[Team] Resume all failed:', err); }
+  }, []);
+
+  const handleResetTeam = useCallback(async () => {
+    if (!confirm('This will delete all AI team data. Are you sure?')) return;
+    try {
+      await teamApi.resetTeam();
+      setEmployees([]);
+      setActivity([]);
+      setRoutines([]);
+    } catch (err) { console.error('[Team] Reset failed:', err); }
+  }, []);
+
+  // ── Derived state for bulk buttons ────────────────────────────────
+  const hasNonPausedEmployees = employees.some((e) => e.status !== 'paused');
+  const hasPausedEmployees = employees.some((e) => e.status === 'paused');
+
   // ── Loading state ──────────────────────────────────────────────────
   if (loading) {
     return (
@@ -338,6 +394,13 @@ export default function Team() {
             onSelectEmployee={setSelectedEmployeeId}
           />
         );
+      case 'deliverables':
+        return (
+          <DeliverablesTab
+            employees={employees}
+            onViewOutput={setOutputViewerData}
+          />
+        );
       case 'schedule':
         return (
           <ScheduleTab
@@ -370,23 +433,78 @@ export default function Team() {
           <p className="text-sm text-gray-500 mt-1">Manage your AI Team</p>
         </div>
 
-        {/* Orchestration status */}
-        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: pcStatus.connected ? '#22C55E' : '#9CA3AF' }}
-          />
-          <span className="text-xs font-medium text-gray-700">
-            {pcStatus.connected ? 'Orchestration Active' : 'Local Mode'}
-          </span>
-          {pcStatus.connected && pcStatus.version && (
-            <span className="text-[10px] text-gray-400">v{pcStatus.version}</span>
-          )}
-          {pcStatus.connected && pcStatus.agents > 0 && (
-            <span className="rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-medium text-[#22C55E]">
-              {pcStatus.agents} agent{pcStatus.agents !== 1 ? 's' : ''}
+        <div className="flex flex-col items-end gap-2">
+          {/* Action buttons */}
+          <div className="flex items-center gap-1">
+            {hasNonPausedEmployees && (
+              <button
+                onClick={handlePauseAll}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Pause All
+              </button>
+            )}
+            {hasPausedEmployees && (
+              <button
+                onClick={handleResumeAll}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Resume All
+              </button>
+            )}
+            {/* More menu */}
+            <div className="relative" ref={moreMenuRef}>
+              <button
+                onClick={() => setShowMoreMenu((v) => !v)}
+                className="flex items-center justify-center w-7 h-7 text-gray-400 rounded-md hover:bg-gray-50 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4zm0 6a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+              </button>
+              {showMoreMenu && (
+                <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                  <button
+                    onClick={() => { setShowMoreMenu(false); handleResetTeam(); }}
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Reset Team...
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Orchestration status */}
+          <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: pcStatus.connected ? '#22C55E' : '#9CA3AF' }}
+            />
+            <span className="text-xs font-medium text-gray-700">
+              {pcStatus.connected ? 'Orchestration Active' : 'Local Mode'}
             </span>
-          )}
+            {pcStatus.connected && pcStatus.version && (
+              <span className="text-[10px] text-gray-400">v{pcStatus.version}</span>
+            )}
+            {pcStatus.connected && pcStatus.agents > 0 && (
+              <span className="rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-medium text-[#22C55E]">
+                {pcStatus.agents} agent{pcStatus.agents !== 1 ? 's' : ''}
+              </span>
+            )}
+            {executionReady && (
+              <span className="rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-medium text-[#22C55E]">
+                AI Ready
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -426,8 +544,16 @@ export default function Team() {
           onUpdateTrust={handleUpdateTrust}
           onTogglePause={handleTogglePause}
           onRemove={handleRemoveEmployee}
+          onTaskRun={() => teamApi.activity().then(setActivity).catch(() => {})}
+          onViewOutput={setOutputViewerData}
         />
       )}
+
+      {/* Full output viewer panel */}
+      <OutputViewer
+        data={outputViewerData}
+        onClose={() => setOutputViewerData(null)}
+      />
     </div>
   );
 }

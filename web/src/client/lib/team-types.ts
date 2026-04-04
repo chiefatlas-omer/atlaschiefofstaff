@@ -1,6 +1,14 @@
 // Trust levels - progressive autonomy
 export type TrustLevel = 'supervised' | 'trusted' | 'autonomous';
 
+// AI model selection — per-employee quality/speed tradeoff
+export type AgentModel = 'sonnet' | 'opus';
+
+export const AGENT_MODEL_INFO: Record<AgentModel, { label: string; description: string; color: string; bgColor: string }> = {
+  sonnet: { label: 'Sonnet', description: 'Fast and efficient — great for routine tasks', color: '#3B82F6', bgColor: '#DBEAFE' },
+  opus: { label: 'Opus', description: 'Maximum quality — best for complex, high-stakes work', color: '#4F3588', bgColor: '#F3F1FC' },
+};
+
 // Employee status
 export type EmployeeStatus = 'working' | 'idle' | 'paused';
 
@@ -36,6 +44,7 @@ export interface Employee {
   hireDate: string; // ISO date string
   isChiefOfStaff: boolean;
   soul?: Soul;
+  model?: AgentModel;
 }
 
 export interface Role {
@@ -47,6 +56,18 @@ export interface Role {
   description: string;
   skills: string[];
   estimatedHours: number;
+  responsibilities: string[];
+  sampleTasks: string[];
+}
+
+// Data passed from the RoleDetailPanel when hiring with customizations
+export interface HireCustomization {
+  role: Role;
+  customName: string;
+  standingInstructions: string;
+  hoursAllocated: number;
+  trustLevel: TrustLevel;
+  model: AgentModel;
 }
 
 export interface Blueprint {
@@ -94,7 +115,7 @@ export interface Routine {
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 // Task status
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'cancelled';
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'cancelled' | 'failed';
 
 export interface Task {
   id: string;
@@ -103,8 +124,33 @@ export interface Task {
   description?: string;
   priority: TaskPriority;
   status: TaskStatus;
+  output?: string; // AI-generated result
+  tokensUsed?: number;
+  durationMs?: number;
+  failureReason?: string;
   createdAt: string; // ISO
   updatedAt?: string; // ISO
+}
+
+// Performance metrics snapshot
+export interface MetricsSnapshot {
+  id: string;
+  employeeId: string;
+  date: string;
+  tasksCompleted: number;
+  tasksCreated: number;
+  approvalsReceived: number;
+  rejectionsReceived: number;
+  hoursUsed: number;
+  journalEntries: number;
+  failureCount: number;
+}
+
+// Task run result from the backend
+export interface TaskRunResult {
+  task: Task;
+  activity: ActivityEntry;
+  needsApproval: boolean;
 }
 
 // Journal entry types
@@ -143,8 +189,9 @@ export const TASK_PRIORITY_INFO: Record<TaskPriority, { label: string; color: st
 
 export const TASK_STATUS_INFO: Record<TaskStatus, { label: string; color: string; bgColor: string }> = {
   todo: { label: 'To Do', color: '#6B7280', bgColor: '#F3F4F6' },
-  in_progress: { label: 'In Progress', color: '#3B82F6', bgColor: '#DBEAFE' },
+  in_progress: { label: 'Running', color: '#3B82F6', bgColor: '#DBEAFE' },
   done: { label: 'Done', color: '#22C55E', bgColor: '#DCFCE7' },
+  failed: { label: 'Failed', color: '#EF4444', bgColor: '#FEE2E2' },
   cancelled: { label: 'Cancelled', color: '#9CA3AF', bgColor: '#F3F4F6' },
 };
 

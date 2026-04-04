@@ -13,8 +13,10 @@ import {
   TASK_PRIORITY_INFO,
   TASK_STATUS_INFO,
   JOURNAL_TYPE_INFO,
+  AGENT_MODEL_INFO,
 } from '../../lib/team-types';
 import { teamApi } from '../../lib/team-api';
+import type { OutputViewerData } from './OutputViewer';
 
 interface EmployeeProfileProps {
   employee: Employee;
@@ -22,6 +24,8 @@ interface EmployeeProfileProps {
   onUpdateTrust: (employeeId: string, level: TrustLevel) => void;
   onTogglePause: (employeeId: string) => void;
   onRemove: (employeeId: string) => void;
+  onTaskRun?: () => void;
+  onViewOutput?: (data: OutputViewerData) => void;
 }
 
 const TRUST_PROGRESSION: TrustLevel[] = [
@@ -50,6 +54,8 @@ export default function EmployeeProfile({
   onUpdateTrust,
   onTogglePause,
   onRemove,
+  onTaskRun,
+  onViewOutput,
 }: EmployeeProfileProps) {
   const [visible, setVisible] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -64,6 +70,9 @@ export default function EmployeeProfile({
   const [journalContent, setJournalContent] = useState('');
   const [journalType, setJournalType] = useState<JournalEntryType>('work_log');
   const [submittingJournal, setSubmittingJournal] = useState(false);
+  const [taskDescription, setTaskDescription] = useState('');
+  const [runningTaskId, setRunningTaskId] = useState<string | null>(null);
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [editingSoul, setEditingSoul] = useState(false);
   const [soulDraft, setSoulDraft] = useState<Soul | null>(null);
   const [savingSoul, setSavingSoul] = useState(false);
@@ -99,6 +108,9 @@ export default function EmployeeProfile({
     const frame = requestAnimationFrame(() => setVisible(true));
     setShowTaskForm(false);
     setTaskTitle('');
+    setTaskDescription('');
+    setRunningTaskId(null);
+    setExpandedTaskId(null);
     setShowJournalForm(false);
     setEditingSoul(false);
     loadTasks();
@@ -113,16 +125,33 @@ export default function EmployeeProfile({
     try {
       const task = await teamApi.createTask(employee.id, {
         title: taskTitle.trim(),
+        description: taskDescription.trim() || undefined,
         priority: taskPriority,
       });
       setTasks((prev) => [task, ...prev]);
       setTaskTitle('');
+      setTaskDescription('');
       setTaskPriority('medium');
       setShowTaskForm(false);
     } catch {
       // keep form open on error
     } finally {
       setSubmittingTask(false);
+    }
+  }
+
+  async function handleRunTask(taskId: string) {
+    if (runningTaskId) return;
+    setRunningTaskId(taskId);
+    try {
+      await teamApi.runTask(taskId);
+      await loadTasks();
+      onTaskRun?.();
+    } catch {
+      // silently fail — task list will refresh anyway
+      await loadTasks();
+    } finally {
+      setRunningTaskId(null);
     }
   }
 
@@ -309,6 +338,50 @@ export default function EmployeeProfile({
             )}
           </div>
 
+          {/* AI Model */}
+          {!employee.isChiefOfStaff && employee.id !== 'owner' && (
+            <div className="border-b border-gray-100 px-6 py-5">
+              <SectionLabel>AI Model</SectionLabel>
+              <div className="flex gap-2">
+                {(['sonnet', 'opus'] as const).map((m) => {
+                  const info = AGENT_MODEL_INFO[m];
+                  const isActive = (employee.model || 'sonnet') === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        if (!isActive) {
+                          teamApi.updateEmployee(employee.id, { model: m } as any).catch(() => {});
+                        }
+                      }}
+                      className={`flex-1 rounded-lg border-2 px-3 py-2.5 text-left transition-all ${
+                        isActive
+                          ? 'border-[#4F3588] bg-[#FAF9FE]'
+                          : 'border-gray-100 bg-white hover:border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                          style={{ color: info.color, backgroundColor: info.bgColor }}
+                        >
+                          {info.label}
+                        </span>
+                        {isActive && (
+                          <svg className="h-3.5 w-3.5 text-[#4F3588]" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[11px] leading-snug text-gray-500">{info.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Performance */}
           <div className="border-b border-gray-100 px-6 py-5">
             <SectionLabel>Performance</SectionLabel>
@@ -337,29 +410,52 @@ export default function EmployeeProfile({
             </div>
           </div>
 
-          {/* Assignments */}
+          {/* Tasks */}
           {!employee.isChiefOfStaff && employee.id !== 'owner' && (
             <div className="border-b border-gray-100 px-6 py-5">
               <div className="mb-2 flex items-center justify-between">
-                <SectionLabel>Assignments</SectionLabel>
+                <div className="flex items-center gap-2">
+                  <SectionLabel>Tasks</SectionLabel>
+                  {tasks.length > 0 && (
+                    <span className="mb-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#F3F1FC] px-1.5 text-[10px] font-semibold text-[#4F3588]">
+                      {tasks.length}
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowTaskForm(!showTaskForm)}
-                  className="rounded-md bg-[#4F3588] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E]"
+                  className="flex items-center gap-1 rounded-md bg-[#4F3588] px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E]"
                 >
-                  {showTaskForm ? 'Cancel' : '+ Assign Task'}
+                  {showTaskForm ? (
+                    'Cancel'
+                  ) : (
+                    <>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                        <path d="M6 2v8M2 6h8" />
+                      </svg>
+                      Add Task
+                    </>
+                  )}
                 </button>
               </div>
 
               {showTaskForm && (
-                <form onSubmit={handleAssignTask} className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <form onSubmit={handleAssignTask} className="mb-3 space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <input
                     type="text"
-                    placeholder="What needs to be done?"
+                    placeholder="Task title"
                     value={taskTitle}
                     onChange={(e) => setTaskTitle(e.target.value)}
-                    className="mb-2 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
+                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
                     autoFocus
+                  />
+                  <textarea
+                    placeholder="Description (optional)"
+                    value={taskDescription}
+                    onChange={(e) => setTaskDescription(e.target.value)}
+                    rows={2}
+                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#4F3588] focus:ring-1 focus:ring-[#4F3588]"
                   />
                   <div className="flex items-center gap-2">
                     <select
@@ -372,13 +468,22 @@ export default function EmployeeProfile({
                       <option value="high">High</option>
                       <option value="urgent">Urgent</option>
                     </select>
-                    <button
-                      type="submit"
-                      disabled={!taskTitle.trim() || submittingTask}
-                      className="ml-auto rounded-md bg-[#4F3588] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E] disabled:opacity-50"
-                    >
-                      {submittingTask ? 'Assigning…' : 'Assign'}
-                    </button>
+                    <div className="ml-auto flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowTaskForm(false); setTaskTitle(''); setTaskDescription(''); }}
+                        className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!taskTitle.trim() || submittingTask}
+                        className="rounded-md bg-[#4F3588] px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[#5A3C9E] disabled:opacity-50"
+                      >
+                        {submittingTask ? 'Creating...' : 'Create'}
+                      </button>
+                    </div>
                   </div>
                 </form>
               )}
@@ -387,41 +492,140 @@ export default function EmployeeProfile({
                 <div className="space-y-2">
                   {tasks.map((task) => {
                     const priority = TASK_PRIORITY_INFO[task.priority];
-                    const status = TASK_STATUS_INFO[task.status];
+                    const taskStatus = TASK_STATUS_INFO[task.status];
+                    const isRunning = runningTaskId === task.id || task.status === 'in_progress';
+                    const isExpanded = expandedTaskId === task.id;
+                    const canRun = task.status === 'todo' || task.status === 'failed';
+
                     return (
                       <div
                         key={task.id}
-                        className="flex items-start gap-2.5 rounded-lg border border-gray-100 bg-white px-3 py-2.5"
+                        className="rounded-lg border border-gray-100 bg-white px-3 py-2.5"
                       >
-                        <span
-                          className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
-                          style={{ backgroundColor: status.color }}
-                          title={status.label}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900 leading-snug">
-                            {task.title}
-                          </p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span
-                              className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-                              style={{ color: priority.color, backgroundColor: priority.bgColor }}
+                        <div className="flex items-start gap-2.5">
+                          <span
+                            className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
+                            style={{ backgroundColor: taskStatus.color }}
+                            title={taskStatus.label}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium leading-snug text-gray-900">
+                              {task.title}
+                            </p>
+                            <div className="mt-1 flex items-center gap-2">
+                              <span
+                                className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                style={{ color: priority.color, backgroundColor: priority.bgColor }}
+                              >
+                                {priority.label}
+                              </span>
+                              <span
+                                className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                                style={{ color: taskStatus.color, backgroundColor: taskStatus.bgColor }}
+                              >
+                                {taskStatus.label}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Run button / spinner */}
+                          {isRunning ? (
+                            <svg className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-[#3B82F6]" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                              <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                            </svg>
+                          ) : canRun ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRunTask(task.id)}
+                              disabled={!!runningTaskId}
+                              className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#4F3588] transition-colors hover:bg-[#F3F1FC] disabled:opacity-40"
+                              title="Run task"
                             >
-                              {priority.label}
-                            </span>
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                                <path d="M3 1.5v9l7.5-4.5L3 1.5Z" />
+                              </svg>
+                            </button>
+                          ) : null}
+                        </div>
+
+                        {/* Failure reason */}
+                        {task.status === 'failed' && task.failureReason && (
+                          <p className="mt-1.5 rounded bg-[#FEE2E2] px-2 py-1 text-xs text-[#EF4444]">
+                            {task.failureReason}
+                          </p>
+                        )}
+
+                        {/* Done — output actions */}
+                        {task.status === 'done' && task.output && (
+                          <div className="mt-2 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (onViewOutput) {
+                                  onViewOutput({
+                                    title: task.title,
+                                    output: task.output!,
+                                    employeeName: employee.name,
+                                    employeeIcon: employee.icon,
+                                    employeeRole: employee.role,
+                                    priority: task.priority,
+                                    tokensUsed: task.tokensUsed,
+                                    durationMs: task.durationMs,
+                                    completedAt: task.updatedAt || task.createdAt,
+                                    taskId: task.id,
+                                  });
+                                } else {
+                                  setExpandedTaskId(isExpanded ? null : task.id);
+                                }
+                              }}
+                              className="flex items-center gap-1 rounded-md bg-[#4F3588] px-2 py-1 text-[11px] font-medium text-white transition-colors hover:bg-[#5A3C9E]"
+                            >
+                              <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M1 7s2.5-4.5 6-4.5S13 7 13 7s-2.5 4.5-6 4.5S1 7 1 7z" />
+                                <circle cx="7" cy="7" r="2" />
+                              </svg>
+                              View output
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(task.output!);
+                                  setExpandedTaskId('copied-' + task.id);
+                                  setTimeout(() => setExpandedTaskId(null), 1500);
+                                } catch {}
+                              }}
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-gray-100"
+                            >
+                              {expandedTaskId === 'copied-' + task.id ? (
+                                <>
+                                  <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M2.5 7.5l3 3 6-6" />
+                                  </svg>
+                                  <span className="text-[#22C55E]">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="4.5" y="4.5" width="7" height="7" rx="1.5" />
+                                    <path d="M9.5 4.5V3a1.5 1.5 0 00-1.5-1.5H3A1.5 1.5 0 001.5 3v5A1.5 1.5 0 003 9.5h1.5" />
+                                  </svg>
+                                  Copy
+                                </>
+                              )}
+                            </button>
                             <span className="text-[10px] text-gray-400">
-                              {status.label}
+                              {task.output!.split(/\s+/).filter(Boolean).length} words
                             </span>
                           </div>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               ) : !showTaskForm ? (
-                <p className="text-sm text-gray-400">
-                  No tasks assigned yet
-                </p>
+                <p className="text-sm text-gray-400">No tasks yet</p>
               ) : null}
             </div>
           )}
@@ -672,11 +876,28 @@ export default function EmployeeProfile({
 
           {/* Training Materials */}
           <div className="border-b border-gray-100 px-6 py-5">
-            <SectionLabel>Training Materials</SectionLabel>
+            <div className="mb-2 flex items-center justify-between">
+              <SectionLabel>Training Materials</SectionLabel>
+              <button
+                type="button"
+                onClick={() => {
+                  const name = prompt('Enter a file name or document reference:');
+                  if (name?.trim()) {
+                    teamApi.addTrainingMaterial(employee.id, name.trim()).catch(() => {});
+                  }
+                }}
+                className="flex items-center gap-1 text-[11px] font-medium text-[#4F3588] hover:text-[#5A3C9E]"
+              >
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M5 1.5v7M1.5 5h7" />
+                </svg>
+                Add
+              </button>
+            </div>
             {employee.trainingMaterials.length > 0 ? (
               <ul className="space-y-1.5">
                 {employee.trainingMaterials.map((file) => (
-                  <li key={file} className="flex items-center gap-2 text-sm">
+                  <li key={file} className="group flex items-center gap-2 text-sm">
                     <svg
                       width="14"
                       height="14"
@@ -696,7 +917,19 @@ export default function EmployeeProfile({
                         strokeLinecap="round"
                       />
                     </svg>
-                    <span className="text-gray-600">{file}</span>
+                    <span className="flex-1 text-gray-600">{file}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        teamApi.removeTrainingMaterial(employee.id, file).catch(() => {});
+                      }}
+                      className="hidden shrink-0 text-gray-300 transition-colors hover:text-red-400 group-hover:block"
+                      title="Remove"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                        <path d="M3 3l6 6M9 3l-6 6" />
+                      </svg>
+                    </button>
                   </li>
                 ))}
               </ul>
