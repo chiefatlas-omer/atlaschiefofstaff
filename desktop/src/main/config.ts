@@ -39,6 +39,12 @@ export const config = {
   anthropic: {
     apiKey: requireEnv('ANTHROPIC_API_KEY'),
   },
+  groq: {
+    apiKey: optionalEnv('GROQ_API_KEY'),
+  },
+  deepgram: {
+    apiKey: optionalEnv('DEEPGRAM_API_KEY'),
+  },
   slackUserId: requireEnv('SLACK_USER_ID'),
   db: {
     path: optionalEnv('CHIEF_DB_PATH', path.resolve(userHome, '.atlas-chief', 'chiefofstaff.db')),

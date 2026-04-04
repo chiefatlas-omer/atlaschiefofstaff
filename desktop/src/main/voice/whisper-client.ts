@@ -16,6 +16,22 @@ export interface TranscribeOptions {
   highQualityRetry?: boolean;
 }
 
+// Determine which backend to use: Groq (fast) or OpenAI (fallback)
+function getWhisperBackend(): { hostname: string; apiKey: string; model: string } {
+  if (config.groq?.apiKey) {
+    return {
+      hostname: 'api.groq.com',
+      apiKey: config.groq.apiKey,
+      model: 'whisper-large-v3-turbo',
+    };
+  }
+  return {
+    hostname: 'api.openai.com',
+    apiKey: config.openai.apiKey,
+    model: 'whisper-1',
+  };
+}
+
 // Use raw https instead of OpenAI SDK to avoid node-fetch ECONNRESET on Electron + Windows ARM64
 export async function transcribeAudio(
   audioBuffer: Buffer,
@@ -63,11 +79,14 @@ async function _callWhisper(
   parts.push(fileData);
   parts.push(Buffer.from('\r\n'));
 
+  const backend = getWhisperBackend();
+  console.log('[WHISPER] Using backend:', backend.hostname, 'model:', backend.model);
+
   // Model field
   parts.push(Buffer.from(
     `--${boundary}\r\n` +
     `Content-Disposition: form-data; name="model"\r\n\r\n` +
-    `whisper-1\r\n`
+    `${backend.model}\r\n`
   ));
 
   // Language field — explicit 'en' prevents Whisper auto-detect overhead
@@ -97,12 +116,16 @@ async function _callWhisper(
   const body = Buffer.concat(parts);
 
   const text = await new Promise<string>((resolve, reject) => {
+    const apiPath = backend.hostname === 'api.groq.com'
+      ? '/openai/v1/audio/transcriptions'
+      : '/v1/audio/transcriptions';
+
     const req = https.request({
-      hostname: 'api.openai.com',
-      path: '/v1/audio/transcriptions',
+      hostname: backend.hostname,
+      path: apiPath,
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.openai.apiKey}`,
+        'Authorization': `Bearer ${backend.apiKey}`,
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
         'Content-Length': body.length,
       },

@@ -64,6 +64,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@types/ws": "^8.18.1",
     "better-sqlite3": "^12.8.0",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
@@ -71,7 +72,8 @@
     "electron-updater": "^6.8.3",
     "googleapis": "^171.4.0",
     "openai": "^4.85.0",
-    "uiohook-napi": "^1.5.4"
+    "uiohook-napi": "^1.5.4",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",

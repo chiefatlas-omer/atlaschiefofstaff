@@ -3,6 +3,7 @@ import { execSync } from 'child_process';
 import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
 import { postProcess, smartProcess, formatDictation } from './voice/post-processor';
+import { DeepgramStream, isDeepgramAvailable } from './voice/deepgram-stream';
 import { getMyTasks } from './db/task-bridge';
 import { logVoiceInteraction } from './db/voice-logger';
 import { sqlite } from './db/connection';
@@ -13,40 +14,38 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
   // Rolling context window for continuity across consecutive transcription chunks.
   let transcriptionContext = '';
 
-  // ── Live transcription session state ──
+  // ── Deepgram streaming session ──
+  let activeStream: DeepgramStream | null = null;
+  let streamingActive = false;
+
+  // ── Legacy live transcription session state (fallback when no Deepgram key) ──
   let liveTranscriptParts: string[] = [];
   let liveSessionActive = false;
 
   // ── Inline dictation paste state ──
-  // Tracks what we last pasted into the focused app so we can delete it before pasting updated text.
   let lastPastedText = '';
 
   /**
    * Delete previously pasted text from the focused app and paste new text in its place.
    * Uses PowerShell SendKeys to send Backspace keystrokes, then Ctrl+V to paste.
    */
-  async function pastePartialDictation(newText: string) {
+  async function pasteIntoApp(newText: string) {
     const oldLen = lastPastedText.length;
 
     if (oldLen > 0) {
-      // Delete previously pasted text by sending Backspace keystrokes
-      // SendKeys {BACKSPACE N} sends N backspaces efficiently
       try {
         const bsKeys = '{BACKSPACE ' + oldLen + '}';
         execSync(
           `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${bsKeys}')"`,
           { timeout: 3000 },
         );
-        console.log('[DICTATION] Sent', oldLen, 'backspaces to delete old partial text');
       } catch (bsErr) {
         console.warn('[DICTATION] Failed to send backspaces:', bsErr);
       }
     }
 
-    // Paste new text via clipboard
     const savedClipboard = clipboard.readText();
     clipboard.writeText(newText);
-
     await new Promise(r => setTimeout(r, 50));
 
     try {
@@ -54,26 +53,78 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')"`,
         { timeout: 3000 },
       );
-      console.log('[DICTATION] Pasted partial text:', newText.substring(0, 80));
     } catch (psErr) {
       console.error('[DICTATION] Paste failed:', psErr);
     }
 
-    // Restore original clipboard after a brief delay
-    setTimeout(() => {
-      clipboard.writeText(savedClipboard);
-    }, 300);
-
+    setTimeout(() => { clipboard.writeText(savedClipboard); }, 300);
     lastPastedText = newText;
+  }
+
+  // ── Deepgram streaming: start session when first audio chunk arrives ──
+  async function startDeepgramStream(): Promise<boolean> {
+    if (!isDeepgramAvailable()) return false;
+
+    lastPastedText = '';
+    streamingActive = true;
+
+    activeStream = new DeepgramStream({
+      onInterim: (text) => {
+        // Word-by-word: paste interim text as user speaks
+        const processed = postProcess(text, { stripFillers: false });
+        if (processed.trim()) {
+          pasteIntoApp(processed);
+          mainWindow.webContents.send(IPC.PARTIAL_TRANSCRIPT, processed);
+        }
+      },
+      onFinal: (text) => {
+        // Sentence finalized — paste the updated full text
+        const processed = postProcess(text, { stripFillers: false });
+        if (processed.trim()) {
+          pasteIntoApp(processed);
+          mainWindow.webContents.send(IPC.PARTIAL_TRANSCRIPT, processed);
+        }
+      },
+      onError: (err) => {
+        console.error('[DEEPGRAM] Stream error:', err);
+      },
+      onClose: () => {
+        console.log('[DEEPGRAM] Stream closed');
+        streamingActive = false;
+      },
+    });
+
+    const connected = await activeStream.start();
+    if (!connected) {
+      console.warn('[DEEPGRAM] Failed to connect, falling back to chunk-based transcription');
+      activeStream = null;
+      streamingActive = false;
+    }
+    return connected;
   }
 
   // Handler for partial audio chunks during live dictation transcription
   ipcMain.handle(IPC.PARTIAL_AUDIO, async (_event, audioBuffer: ArrayBuffer) => {
     try {
       const buffer = Buffer.from(audioBuffer);
-      if (buffer.length < 1000) return; // too small to transcribe
+      if (buffer.length < 500) return;
 
-      // Reset lastPastedText at the start of a new dictation session
+      // ── Deepgram streaming path: forward raw audio to WebSocket ──
+      if (activeStream && streamingActive) {
+        activeStream.sendAudio(buffer);
+        return;
+      }
+
+      // ── Attempt to start Deepgram stream on first chunk ──
+      if (!streamingActive && !liveSessionActive && isDeepgramAvailable()) {
+        const started = await startDeepgramStream();
+        if (started) {
+          activeStream!.sendAudio(buffer);
+          return;
+        }
+      }
+
+      // ── Legacy fallback: chunk-based Whisper transcription ──
       if (!liveSessionActive) {
         lastPastedText = '';
       }
@@ -81,7 +132,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
       const rawTranscript = await transcribeAudio(buffer, {
         previousTranscript: liveTranscriptParts.join(' '),
-        highQualityRetry: false, // speed over quality for partial chunks
+        highQualityRetry: false,
       });
 
       if (rawTranscript && rawTranscript.trim().length > 0) {
@@ -89,11 +140,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
         if (cleaned && cleaned.trim().length > 0) {
           liveTranscriptParts.push(cleaned);
           const accumulated = liveTranscriptParts.join(' ');
-
-          // Paste accumulated text directly into the focused app
-          await pastePartialDictation(accumulated);
-
-          // Notify renderer (for any lightweight UI indicator)
+          await pasteIntoApp(accumulated);
           mainWindow.webContents.send(IPC.PARTIAL_TRANSCRIPT, accumulated);
         }
       }
@@ -149,30 +196,41 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
       if (mode === 'dictation') {
         // ── Dictation flow: format and paste text into active app ──
-        // If a live transcription session was active, combine partial results with the final pass
         let combinedTranscript = transcript;
-        if (liveSessionActive && liveTranscriptParts.length > 0) {
-          // Use accumulated partials as the base — they covered most of the audio already
-          // The final Whisper pass on the full audio is often more accurate, so prefer it
-          // but fall back to partials if the final pass is shorter (indicating it missed content)
+
+        // If Deepgram streaming was active, prefer its accumulated results
+        if (streamingActive && activeStream) {
+          const streamText = activeStream.getFinalTranscript() || activeStream.getFullTranscript();
+          activeStream.stop();
+          activeStream = null;
+          streamingActive = false;
+
+          if (streamText.trim().length > 0) {
+            // Deepgram already pasted progressive text — now do a final polish
+            // Use Whisper (Groq) result if it's higher quality, otherwise keep Deepgram's
+            if (transcript.length > streamText.length * 0.8) {
+              combinedTranscript = transcript; // Whisper/Groq captured more
+            } else {
+              combinedTranscript = streamText; // Deepgram was more complete
+            }
+          }
+        } else if (liveSessionActive && liveTranscriptParts.length > 0) {
+          // Legacy fallback: combine partial results
           const partialText = liveTranscriptParts.join(' ');
           if (partialText.length > transcript.length * 1.2) {
-            // Partials captured more content, use them
             combinedTranscript = partialText;
           }
         }
 
-        const finalText = formatDictation(combinedTranscript);
-        console.log('[DICTATION] Formatted output:', finalText.substring(0, 100));
+        const finalText = formatDictation(postProcess(combinedTranscript, { stripFillers: false }));
+        console.log('[DICTATION] Final output:', finalText.substring(0, 100));
 
-        // Delete previously pasted partial text and paste the final version
-        // The eatBackslash() in hotkey.ts handles the '\' from the stop keypress;
-        // wait a moment to let it run before we manipulate the text field.
+        // Wait for hotkey backslash cleanup
         await new Promise(r => setTimeout(r, 200));
 
-        await pastePartialDictation(finalText);
+        await pasteIntoApp(finalText);
 
-        // Reset all live session and paste state
+        // Reset all session state
         liveTranscriptParts = [];
         liveSessionActive = false;
         lastPastedText = '';
