@@ -32,7 +32,7 @@ export class DeepgramStream {
   }
 
   /** Open the streaming connection. Returns true if connected. */
-  async start(): Promise<boolean> {
+  async start(sampleRate: number = 48000): Promise<boolean> {
     if (!config.deepgram.apiKey) {
       return false;
     }
@@ -48,7 +48,7 @@ export class DeepgramStream {
         punctuate: 'true',
         filler_words: 'false',
         encoding: 'linear16',
-        sample_rate: '16000',
+        sample_rate: String(sampleRate),
         channels: '1',
       });
 

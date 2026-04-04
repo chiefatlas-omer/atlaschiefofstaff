@@ -11,6 +11,7 @@ const IPC = {
   VOICE_MODE: 'voice:mode',
   PARTIAL_TRANSCRIPT: 'voice:partial-transcript',
   PARTIAL_AUDIO: 'voice:partial-audio',
+  STREAM_START: 'voice:stream-start',
   // Knowledge Query
   KNOWLEDGE_RESPONSE: 'knowledge:response',
   // Meeting Briefing
@@ -65,6 +66,9 @@ contextBridge.exposeInMainWorld('chiefOfStaff', {
   },
   sendPartialAudio: (buffer: ArrayBuffer) => {
     ipcRenderer.invoke(IPC.PARTIAL_AUDIO, buffer);
+  },
+  startStream: (sampleRate: number) => {
+    ipcRenderer.invoke(IPC.STREAM_START, sampleRate);
   },
   getTasks: () => ipcRenderer.invoke(IPC.TASKS_GET),
 

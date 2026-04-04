@@ -1,5 +1,13 @@
 import { globalShortcut, BrowserWindow } from 'electron';
+import fs from 'fs';
+import path from 'path';
 import { IPC } from '../shared/types';
+
+const logPath = path.join(process.env.USERPROFILE || '', '.atlas-chief', 'voice-debug.log');
+function debugLog(msg: string) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(logPath, line); } catch {}
+}
 
 let isListening = false;
 let currentMode: 'dictation' | 'command' | null = null;
@@ -78,12 +86,14 @@ export function toggleRecording(mode: 'dictation' | 'command') {
   if (!isListening) {
     isListening = true;
     currentMode = mode;
-    console.log(`[HOTKEY] → startListening (${mode} mode)`);
+    debugLog('[HOTKEY] → startListening (' + mode + ' mode)');
     mainWindow?.webContents.send(IPC.VOICE_MODE, mode);
-    mainWindow?.webContents.send(IPC.STATUS_CHANGE, 'listening');
+    setTimeout(() => {
+      mainWindow?.webContents.send(IPC.STATUS_CHANGE, 'listening');
+    }, 50);
   } else {
     isListening = false;
-    console.log(`[HOTKEY] → stopListening (was ${currentMode} mode)`);
+    debugLog('[HOTKEY] → stopListening (was ' + currentMode + ' mode)');
     mainWindow?.webContents.send(IPC.STATUS_CHANGE, 'processing');
   }
 }

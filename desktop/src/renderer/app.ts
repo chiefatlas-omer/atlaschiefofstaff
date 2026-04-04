@@ -13,6 +13,7 @@ declare global {
       onPartialTranscript: (cb: (text: string) => void) => void;
       sendAudioData: (buffer: ArrayBuffer) => void;
       sendPartialAudio: (buffer: ArrayBuffer) => void;
+      startStream: (sampleRate: number) => void;
       getTasks: () => Promise<any[]>;
       // Knowledge
       onKnowledgeResponse: (cb: (answer: string) => void) => void;
@@ -124,6 +125,49 @@ let vadAudioContext: AudioContext | null = null;
 let vadAnimFrame: number | null = null;
 let silentFrameCount = 0;
 let recordingStartTime = 0;
+
+// ── PCM streaming for Deepgram ──
+// ScriptProcessor captures raw PCM at 16kHz for real-time streaming
+let pcmProcessor: ScriptProcessorNode | null = null;
+let pcmStreamActive = false;
+
+function startPcmStream(stream: MediaStream) {
+  if (!vadAudioContext) return;
+  try {
+    // Create a separate source for PCM capture
+    const source = vadAudioContext.createMediaStreamSource(stream);
+    // ScriptProcessor with 4096 buffer size, 1 input channel, 1 output channel
+    pcmProcessor = vadAudioContext.createScriptProcessor(4096, 1, 1);
+    pcmStreamActive = true;
+
+    pcmProcessor.onaudioprocess = (event) => {
+      if (!pcmStreamActive) return;
+      const inputData = event.inputBuffer.getChannelData(0);
+      // Convert float32 [-1,1] to int16 PCM
+      const pcmData = new Int16Array(inputData.length);
+      for (let i = 0; i < inputData.length; i++) {
+        const s = Math.max(-1, Math.min(1, inputData[i]));
+        pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+      }
+      // Send raw PCM bytes to main process for Deepgram
+      window.chiefOfStaff.sendPartialAudio(pcmData.buffer);
+    };
+
+    source.connect(pcmProcessor);
+    pcmProcessor.connect(vadAudioContext.destination); // Required for processing to work
+    console.log('[PCM] Streaming started at', vadAudioContext.sampleRate, 'Hz');
+  } catch (err) {
+    console.warn('[PCM] Failed to start PCM stream:', err);
+  }
+}
+
+function stopPcmStream() {
+  pcmStreamActive = false;
+  if (pcmProcessor) {
+    pcmProcessor.disconnect();
+    pcmProcessor = null;
+  }
+}
 
 function stopVad() {
   if (vadAnimFrame !== null) {
@@ -293,19 +337,24 @@ window.chiefOfStaff.onStatusChange(async (state: string) => {
       mediaRecorder.start();
       console.log('[RECORDER] Started recording');
 
-      // If in dictation mode, start sending partial audio chunks for live transcription
+      // If in dictation mode, start sending audio for live transcription
       if (currentVoiceMode === 'dictation') {
         lastDisplayedText = '';
-        // Show the small "Dictating..." indicator (no text content)
         liveTranscript.classList.remove('hidden');
         liveTranscript.classList.remove('fade-out');
-        startPartialChunks();
+        // Start real-time PCM streaming for Deepgram (word-by-word)
+        const sampleRate = vadAudioContext?.sampleRate || 48000;
+        window.chiefOfStaff.startStream(sampleRate);
+        startPcmStream(stream);
+        // Legacy chunk-based fallback after delay in case Deepgram doesn't connect
+        setTimeout(() => { startPartialChunks(); }, 3000);
       }
     } catch (err) {
       console.error('[RECORDER] Failed to start audio capture:', err);
     }
   } else if (state === 'processing') {
     console.log('[RECORDER] Processing state — stopping recorder');
+    stopPcmStream();
     stopPartialChunks();
     stopVad();
     waveform.stop();

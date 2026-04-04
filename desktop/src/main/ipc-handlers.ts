@@ -1,5 +1,7 @@
 import { ipcMain, BrowserWindow, clipboard } from 'electron';
 import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 import { IPC } from '../shared/types';
 import { transcribeAudio } from './voice/whisper-client';
 import { postProcess, smartProcess, formatDictation } from './voice/post-processor';
@@ -10,7 +12,17 @@ import { sqlite } from './db/connection';
 import { getVoiceMode } from './hotkey';
 import { fetchTasks, askKnowledgeBot } from './bot-api';
 
+// Debug log file for voice pipeline
+const logPath = path.join(process.env.USERPROFILE || '', '.atlas-chief', 'voice-debug.log');
+function debugLog(msg: string) {
+  const line = `[${new Date().toISOString()}] ${msg}\n`;
+  try { fs.appendFileSync(logPath, line); } catch {}
+  console.log(msg);
+}
+
 export function registerIpcHandlers(mainWindow: BrowserWindow) {
+  debugLog('[IPC] Handlers registered. Deepgram available: ' + isDeepgramAvailable());
+
   // Rolling context window for continuity across consecutive transcription chunks.
   let transcriptionContext = '';
 
@@ -103,26 +115,63 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
     return connected;
   }
 
+  // Handler to start Deepgram streaming with the correct sample rate
+  ipcMain.handle(IPC.STREAM_START, async (_event, sampleRate: number) => {
+    debugLog('[STREAM] Start requested, sampleRate: ' + sampleRate + ' deepgramAvailable: ' + isDeepgramAvailable() + ' streamingActive: ' + streamingActive);
+    if (isDeepgramAvailable() && !streamingActive) {
+      lastPastedText = '';
+      streamingActive = true;
+
+      activeStream = new DeepgramStream({
+        onInterim: (text) => {
+          debugLog('[DEEPGRAM] Interim: ' + text.substring(0, 80));
+          const processed = postProcess(text, { stripFillers: false });
+          if (processed.trim()) {
+            pasteIntoApp(processed);
+            mainWindow.webContents.send(IPC.PARTIAL_TRANSCRIPT, processed);
+          }
+        },
+        onFinal: (text) => {
+          debugLog('[DEEPGRAM] Final: ' + text.substring(0, 80));
+          const processed = postProcess(text, { stripFillers: false });
+          if (processed.trim()) {
+            pasteIntoApp(processed);
+            mainWindow.webContents.send(IPC.PARTIAL_TRANSCRIPT, processed);
+          }
+        },
+        onError: (err) => {
+          debugLog('[DEEPGRAM] Stream error: ' + err.message);
+        },
+        onClose: () => {
+          debugLog('[DEEPGRAM] Stream closed');
+          streamingActive = false;
+        },
+      });
+
+      debugLog('[DEEPGRAM] Attempting connection...');
+      const connected = await activeStream.start(sampleRate);
+      debugLog('[DEEPGRAM] Connection result: ' + connected);
+      if (!connected) {
+        debugLog('[DEEPGRAM] Failed to connect, will use chunk-based fallback');
+        activeStream = null;
+        streamingActive = false;
+      }
+    }
+  });
+
   // Handler for partial audio chunks during live dictation transcription
   ipcMain.handle(IPC.PARTIAL_AUDIO, async (_event, audioBuffer: ArrayBuffer) => {
     try {
       const buffer = Buffer.from(audioBuffer);
       if (buffer.length < 500) return;
 
-      // ── Deepgram streaming path: forward raw audio to WebSocket ──
+      // ── Deepgram streaming path: forward raw PCM to WebSocket ──
       if (activeStream && streamingActive) {
         activeStream.sendAudio(buffer);
-        return;
+        return; // Deepgram handles transcription — skip Whisper
       }
+      debugLog('[PARTIAL_AUDIO] Using legacy Whisper path, streamingActive: ' + streamingActive);
 
-      // ── Attempt to start Deepgram stream on first chunk ──
-      if (!streamingActive && !liveSessionActive && isDeepgramAvailable()) {
-        const started = await startDeepgramStream();
-        if (started) {
-          activeStream!.sendAudio(buffer);
-          return;
-        }
-      }
 
       // ── Legacy fallback: chunk-based Whisper transcription ──
       if (!liveSessionActive) {
@@ -151,7 +200,7 @@ export function registerIpcHandlers(mainWindow: BrowserWindow) {
 
   // Unified audio handler — single flow for both command and dictation
   ipcMain.handle(IPC.AUDIO_DATA, async (_event, audioBuffer: ArrayBuffer) => {
-    console.log('[AUDIO] Received audio data, size:', audioBuffer?.byteLength || 0, 'bytes');
+    debugLog('[AUDIO] Received audio data, size: ' + (audioBuffer?.byteLength || 0) + ' bytes');
     try {
       const buffer = Buffer.from(audioBuffer);
       console.log('[AUDIO] Buffer size:', buffer.length, 'bytes');

@@ -40,6 +40,7 @@ export const IPC = {
   // Live transcription
   PARTIAL_TRANSCRIPT: 'voice:partial-transcript',
   PARTIAL_AUDIO: 'voice:partial-audio',
+  STREAM_START: 'voice:stream-start',
   // Dictation completed — skip text preview, just flash confirmation
   DICTATION_DONE: 'voice:dictation-done',
   // Bot API — command results from live bot
