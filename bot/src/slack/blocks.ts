@@ -360,7 +360,13 @@ export function taskListBlocks(
     },
   ];
 
-  for (const t of userTasks) {
+  // Slack has a 50 block limit. Each task with buttons = 2 blocks + 1 header = max ~24 tasks with buttons.
+  // For large lists, show compact view with numbered tasks and a link to the web portal.
+  const MAX_TASKS_WITH_BUTTONS = 10;
+  const showButtons = userTasks.length <= MAX_TASKS_WITH_BUTTONS;
+
+  for (let i = 0; i < userTasks.length; i++) {
+    const t = userTasks[i];
     const statusIcon =
       t.status === 'OVERDUE' || t.status === 'ESCALATED' ? ':rotating_light:' :
       t.status === 'CONFIRMED' ? ':pushpin:' : ':question:';
@@ -369,48 +375,50 @@ export function taskListBlocks(
       ? dl.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : 'no deadline';
 
-    // Build thread link — link to the original message where the task was detected
-    let threadLink = '';
-    if (t.sourceChannelId && t.sourceMessageTs) {
-      const msgTs = t.sourceMessageTs.replace('.', '');
-      // If the message was in a thread, link with thread context; otherwise link to the message directly
-      if (t.sourceThreadTs) {
-        const threadTs = t.sourceThreadTs.replace('.', '');
-        threadLink = '  <https://youratlas.slack.com/archives/' + t.sourceChannelId + '/p' + threadTs + '?thread_ts=' + t.sourceThreadTs + '&cid=' + t.sourceChannelId + '|:link: view thread>';
-      } else {
-        threadLink = '  <https://youratlas.slack.com/archives/' + t.sourceChannelId + '/p' + msgTs + '|:link: view thread>';
-      }
-    }
-
-    blocks.push({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `${statusIcon} *${t.description}* — due ${deadlineStr}${threadLink}`,
-      },
-    });
-
-    blocks.push({
-      type: 'actions',
-      elements: [
-        {
+    if (showButtons) {
+      // Compact: section with accessory button (1 block per task instead of 2)
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${statusIcon} *${t.description}* — due ${deadlineStr}`,
+        },
+        accessory: {
           type: 'button',
-          text: { type: 'plain_text', text: 'Mark Complete' },
+          text: { type: 'plain_text', text: 'Complete' },
           style: 'primary',
           action_id: 'task_complete',
           value: t.id,
         },
-        {
-          type: 'button',
-          text: { type: 'plain_text', text: 'Need More Time' },
-          action_id: 'task_snooze',
-          value: t.id,
+      });
+    } else {
+      // No buttons — numbered list, user can reply "done 1" or "done tsk_xxx"
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${statusIcon} ${i + 1}. *${t.description}* — due ${deadlineStr}`,
         },
+      });
+    }
+  }
+
+  if (!showButtons) {
+    blocks.push({ type: 'divider' });
+    blocks.push({
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '_Reply *"done 1"* or *"done 3, 5"* to mark tasks complete, or manage them at <https://app.youratlas.com/tasks|app.youratlas.com/tasks>_',
+      },
+    });
+  } else {
+    blocks.push({
+      type: 'context',
+      elements: [
         {
-          type: 'button',
-          text: { type: 'plain_text', text: 'Not a Task' },
-          action_id: 'task_dismiss',
-          value: t.id,
+          type: 'mrkdwn',
+          text: 'Reply *"done tsk_xxx"* to complete | *"not a task"* to dismiss | Or manage at <https://app.youratlas.com/tasks|app.youratlas.com/tasks>',
         },
       ],
     });

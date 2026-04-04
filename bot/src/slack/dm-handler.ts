@@ -439,7 +439,7 @@ export async function handleDirectMessage(
     return true;
   }
 
-  // --- Done / complete <task-id> ---
+  // --- Done / complete by task ID ---
   const doneMatch = text.match(/^(?:done|complete|finished?)\s+(tsk_\w+)/);
   if (doneMatch) {
     const taskId = doneMatch[1];
@@ -462,6 +462,49 @@ export async function handleDirectMessage(
       }
     }
     return true;
+  }
+
+  // --- Done / complete by number (e.g. "done 1", "done 3, 5", "done 1 and 4") ---
+  const doneNumberMatch = text.match(/^(?:done|complete|finished?)\s+([\d\s,and]+)$/);
+  if (doneNumberMatch) {
+    const nums = (doneNumberMatch[1].match(/\d+/g) || []).map((n: string) => parseInt(n, 10));
+    if (nums.length > 0) {
+      const userTasks = getTasksByUser(userId);
+      const completed: string[] = [];
+      const errors: string[] = [];
+      for (const num of nums) {
+        const idx = num - 1; // 1-based to 0-based
+        if (idx < 0 || idx >= userTasks.length) {
+          errors.push('#' + num + ' (out of range)');
+          continue;
+        }
+        const task = userTasks[idx] as any;
+        if (task.status === 'COMPLETED') {
+          errors.push('#' + num + ' (already done)');
+          continue;
+        }
+        completeTask(task.id);
+        completed.push(task.description);
+        if (task.botReplyTs && task.sourceChannelId) {
+          try {
+            await client.chat.update({
+              channel: task.sourceChannelId, ts: task.botReplyTs,
+              blocks: [{ type: 'section', text: { type: 'mrkdwn', text: ':white_check_mark: *Done!* ' + task.description + ' \u2014 marked complete.' } }],
+              text: 'Task completed: ' + task.description,
+            });
+          } catch { }
+        }
+      }
+      const parts: string[] = [];
+      if (completed.length > 0) {
+        parts.push(':white_check_mark: Completed ' + completed.length + ' task' + (completed.length > 1 ? 's' : '') + ':\n' + completed.map(d => '• ' + d).join('\n'));
+      }
+      if (errors.length > 0) {
+        parts.push(':warning: Skipped: ' + errors.join(', '));
+      }
+      await client.chat.postMessage({ channel, text: parts.join('\n\n') });
+      return true;
+    }
   }
 
   // --- Push <task-id> <new deadline> ---
