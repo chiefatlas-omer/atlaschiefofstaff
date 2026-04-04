@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
-import type { ActivityEntry, Employee } from '../../lib/team-types';
+import type { ActivityEntry, ActivityStatus, Employee } from '../../lib/team-types';
+import { ACTIVITY_STATUS_INFO } from '../../lib/team-types';
 import { ActivityEntryComponent } from './ActivityEntry';
+
+type StatusFilter = 'all' | 'success' | 'failures' | 'attention';
 
 interface ActivityTabProps {
   activity: ActivityEntry[];
@@ -8,10 +11,12 @@ interface ActivityTabProps {
   onApprove: (activityId: string) => void;
   onReject: (activityId: string) => void;
   onPromote: (employeeId: string) => void;
+  onSelectEmployee?: (employeeId: string) => void;
 }
 
-export function ActivityTab({ activity, employees, onApprove, onReject, onPromote }: ActivityTabProps) {
+export function ActivityTab({ activity, employees, onApprove, onReject, onPromote, onSelectEmployee }: ActivityTabProps) {
   const [filterEmployee, setFilterEmployee] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
 
   const pendingApprovals = useMemo(
     () => activity.filter((a) => a.needsApproval && a.approved === null),
@@ -19,13 +24,29 @@ export function ActivityTab({ activity, employees, onApprove, onReject, onPromot
   );
 
   const sortedActivity = useMemo(() => {
-    const filtered = filterEmployee
+    let filtered = filterEmployee
       ? activity.filter((a) => a.employeeId === filterEmployee)
       : activity;
+
+    // Apply status filter
+    if (filterStatus === 'success') {
+      filtered = filtered.filter((a) => a.status === 'success');
+    } else if (filterStatus === 'failures') {
+      filtered = filtered.filter((a) => a.status === 'failure' || a.status === 'partial');
+    } else if (filterStatus === 'attention') {
+      filtered = filtered.filter((a) => a.status === 'failure' || a.status === 'partial' || (a.needsApproval && a.approved === null));
+    }
+
     return [...filtered].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
-  }, [activity, filterEmployee]);
+  }, [activity, filterEmployee, filterStatus]);
+
+  // Count failures for the badge
+  const failureCount = useMemo(
+    () => activity.filter((a) => a.status === 'failure' || a.status === 'partial').length,
+    [activity],
+  );
 
   // Employees eligible for promotion: supervised with >= 12 approvals
   const promotionCandidates = useMemo(() => {
@@ -74,6 +95,7 @@ export function ActivityTab({ activity, employees, onApprove, onReject, onPromot
                   showApprovalActions
                   onApprove={() => onApprove(entry.id)}
                   onReject={() => onReject(entry.id)}
+                  onClickEmployee={onSelectEmployee ? () => onSelectEmployee(entry.employeeId) : undefined}
                 />
               </div>
             ))}
@@ -107,7 +129,33 @@ export function ActivityTab({ activity, employees, onApprove, onReject, onPromot
       <section>
         <h3 className="mb-3 text-sm font-semibold text-gray-900">Activity Feed</h3>
 
-        {/* Filter bar */}
+        {/* Status filter pills */}
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {([
+            { key: 'all' as StatusFilter, label: 'All', color: '#4F3588' },
+            { key: 'success' as StatusFilter, label: 'Successes', color: '#22C55E' },
+            { key: 'failures' as StatusFilter, label: 'Failures', color: '#EF4444' },
+            { key: 'attention' as StatusFilter, label: 'Needs Attention', color: '#EAB308' },
+          ]).map(({ key, label, color }) => (
+            <button
+              key={key}
+              onClick={() => setFilterStatus(key)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                filterStatus === key
+                  ? 'text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+              style={filterStatus === key ? { backgroundColor: color } : undefined}
+            >
+              {label}
+              {key === 'failures' && failureCount > 0 && (
+                <span className="ml-1 rounded-full bg-white/30 px-1.5 py-0.5 text-[10px]">{failureCount}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Employee filter bar */}
         <div className="mb-4 flex flex-wrap gap-1.5">
           <button
             onClick={() => setFilterEmployee(null)}
@@ -141,7 +189,11 @@ export function ActivityTab({ activity, employees, onApprove, onReject, onPromot
             <p className="py-8 text-center text-sm text-gray-400">No activity yet</p>
           ) : (
             sortedActivity.map((entry) => (
-              <ActivityEntryComponent key={entry.id} entry={entry} />
+              <ActivityEntryComponent
+                key={entry.id}
+                entry={entry}
+                onClickEmployee={onSelectEmployee ? () => onSelectEmployee(entry.employeeId) : undefined}
+              />
             ))
           )}
         </div>

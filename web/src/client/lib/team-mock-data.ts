@@ -168,6 +168,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Creates and schedules social media posts, monitors engagement, and grows your online audience across platforms.',
     skills: ['Content Creation', 'Scheduling', 'Analytics'],
     estimatedHours: 20,
+    responsibilities: [
+      'Draft and schedule posts across Instagram, Facebook, LinkedIn, and X',
+      'Monitor comments, DMs, and mentions and respond on your behalf',
+      'Track follower growth, engagement rates, and top-performing content',
+      'Maintain a content calendar aligned with your marketing goals',
+      'Report weekly analytics with insights and recommendations',
+    ],
+    sampleTasks: [
+      'Create a week of Instagram posts promoting our new product launch',
+      'Write a LinkedIn thought-leadership post about industry trends',
+      'Compile this month\'s social media performance report',
+      'Draft responses to the 12 unanswered comments from this week',
+    ],
   },
   {
     id: 'role-em',
@@ -178,6 +191,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Writes and sends email campaigns, manages subscriber lists, and runs A/B tests to improve open rates and conversions.',
     skills: ['Copywriting', 'Campaigns', 'A/B Testing'],
     estimatedHours: 15,
+    responsibilities: [
+      'Write and send email campaigns to your subscriber list',
+      'Run A/B tests on subject lines and content',
+      'Manage subscriber segments and list hygiene',
+      'Track open rates, click rates, and conversions',
+      'Create automated welcome and nurture sequences',
+    ],
+    sampleTasks: [
+      'Write a welcome email sequence for new customers',
+      'Draft a promotional email for our spring sale',
+      'Create a re-engagement campaign for inactive subscribers',
+      'A/B test subject lines for this month\'s newsletter',
+    ],
   },
   {
     id: 'role-lq',
@@ -188,6 +214,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Scores inbound leads against your ideal customer profile, researches prospects, and routes qualified opportunities to sales.',
     skills: ['Lead Scoring', 'Research', 'Routing'],
     estimatedHours: 25,
+    responsibilities: [
+      'Score all new inbound leads against your ideal customer profile',
+      'Research top prospects and add enrichment data to the CRM',
+      'Route qualified leads to the appropriate sales pipeline stage',
+      'Flag high-priority opportunities for immediate follow-up',
+      'Generate weekly pipeline reports with conversion metrics',
+    ],
+    sampleTasks: [
+      'Score and prioritize the 20 leads that came in overnight',
+      'Research Greenfield Corp and prepare a prospect brief',
+      'Update CRM records with enrichment data for this week\'s hot leads',
+      'Generate a pipeline health report for the Monday sales meeting',
+    ],
   },
   {
     id: 'role-cw',
@@ -198,6 +237,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Produces blog posts, landing page copy, and marketing collateral aligned with your brand voice and SEO strategy.',
     skills: ['SEO Writing', 'Blog Posts', 'Brand Voice'],
     estimatedHours: 20,
+    responsibilities: [
+      'Write SEO-optimized blog posts on topics relevant to your audience',
+      'Create landing page copy for campaigns and product launches',
+      'Develop marketing collateral like case studies and one-pagers',
+      'Maintain a consistent brand voice across all written content',
+      'Research keywords and trending topics in your industry',
+    ],
+    sampleTasks: [
+      'Write a 1,200-word blog post on "5 Ways to Reduce Customer Churn"',
+      'Draft landing page copy for our new service tier',
+      'Create a customer success case study for Acme Corp',
+      'Research and outline 4 blog post ideas for next month',
+    ],
   },
   {
     id: 'role-fus',
@@ -208,6 +260,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Sends timely follow-up messages to prospects and customers, ensuring no opportunity falls through the cracks.',
     skills: ['Follow-Ups', 'CRM Updates', 'Sequences'],
     estimatedHours: 15,
+    responsibilities: [
+      'Send follow-up emails to prospects who haven\'t responded',
+      'Create and manage multi-step follow-up sequences',
+      'Update CRM deal stages and next-action dates after each touchpoint',
+      'Flag stale deals that need attention or a different approach',
+      'Track follow-up response rates and optimize messaging',
+    ],
+    sampleTasks: [
+      'Send a follow-up to all prospects who received a proposal last week',
+      'Create a 3-step sequence for post-demo follow-ups',
+      'Update CRM records for the 15 deals with no activity in 7 days',
+      'Draft a "checking in" email for warm leads that went cold',
+    ],
   },
   // Operations
   {
@@ -219,6 +284,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Reconciles bank transactions, categorizes expenses, and generates weekly financial summaries to keep your books clean.',
     skills: ['Bookkeeping', 'Reports', 'Reconciliation'],
     estimatedHours: 10,
+    responsibilities: [
+      'Reconcile bank transactions against invoices and receipts',
+      'Categorize expenses into the correct chart-of-accounts categories',
+      'Flag discrepancies or unusual charges for your review',
+      'Generate weekly revenue, expense, and cash-flow summaries',
+      'Prepare month-end financial reports',
+    ],
+    sampleTasks: [
+      'Reconcile all transactions from the past week',
+      'Categorize the 30 uncategorized expenses in the ledger',
+      'Generate a profit-and-loss summary for March',
+      'Flag any transactions over $500 that don\'t match an invoice',
+    ],
   },
   {
     id: 'role-as',
@@ -229,6 +307,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Manages your calendar, books appointments with clients, and sends automated reminders to reduce no-shows.',
     skills: ['Scheduling', 'Reminders', 'Calendar'],
     estimatedHours: 15,
+    responsibilities: [
+      'Confirm and schedule new appointment requests within business hours',
+      'Send 24-hour reminder messages to reduce no-shows',
+      'Reschedule cancellations and fill open calendar slots',
+      'Coordinate availability across team members for group meetings',
+      'Track appointment volume and no-show rates weekly',
+    ],
+    sampleTasks: [
+      'Confirm the 8 appointment requests that came in today',
+      'Send reminders for all appointments scheduled tomorrow',
+      'Reschedule the 3 cancelled appointments from this week',
+      'Find an open 30-minute slot for a client meeting next Tuesday',
+    ],
   },
   {
     id: 'role-it',
@@ -239,6 +330,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Monitors stock levels, flags low-inventory items, and generates reorder recommendations so you never run out.',
     skills: ['Inventory Counts', 'Reorder Alerts', 'Reporting'],
     estimatedHours: 10,
+    responsibilities: [
+      'Monitor current stock levels and flag items below reorder thresholds',
+      'Generate reorder recommendations with suggested quantities',
+      'Track inventory turnover rates and identify slow-moving items',
+      'Reconcile physical counts against system records',
+      'Produce weekly inventory status reports',
+    ],
+    sampleTasks: [
+      'Check which items are below their reorder point and create a reorder list',
+      'Generate an inventory turnover report for the past 30 days',
+      'Identify the top 5 slow-moving SKUs and recommend action',
+      'Reconcile this week\'s shipment receipts against purchase orders',
+    ],
   },
   // Customer Service
   {
@@ -250,6 +354,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Responds to customer inquiries, resolves common issues, and escalates complex cases to the appropriate team member.',
     skills: ['Ticket Resolution', 'FAQ Handling', 'Escalation'],
     estimatedHours: 25,
+    responsibilities: [
+      'Respond to incoming support tickets and customer messages',
+      'Resolve common issues using your knowledge base and FAQ',
+      'Escalate complex or sensitive cases to the right team member',
+      'Track ticket volume, resolution time, and satisfaction scores',
+      'Update the FAQ and knowledge base with new solutions',
+    ],
+    sampleTasks: [
+      'Respond to the 15 open support tickets in the queue',
+      'Draft a reply for the billing dispute from customer #4821',
+      'Update the FAQ with answers for the 3 most common questions this week',
+      'Compile a customer support summary for this week\'s team meeting',
+    ],
   },
   {
     id: 'role-rm',
@@ -260,6 +377,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Monitors online reviews, drafts professional responses, and identifies trends in customer feedback.',
     skills: ['Review Responses', 'Sentiment Analysis', 'Reputation'],
     estimatedHours: 10,
+    responsibilities: [
+      'Monitor new reviews across Google, Yelp, and industry platforms',
+      'Draft professional, on-brand responses to both positive and negative reviews',
+      'Identify recurring themes and sentiment trends in customer feedback',
+      'Flag urgent negative reviews that need immediate attention',
+      'Report weekly on review volume, average rating, and sentiment shifts',
+    ],
+    sampleTasks: [
+      'Respond to the 6 new Google reviews from this week',
+      'Draft a thoughtful reply to the 1-star review about shipping delays',
+      'Compile a sentiment analysis of all reviews from the past month',
+      'Identify the top 3 complaints mentioned in recent negative reviews',
+    ],
   },
   {
     id: 'role-cfu',
@@ -270,6 +400,19 @@ export const MOCK_ROLES: Role[] = [
     description: 'Reaches out to past clients for feedback, upsell opportunities, and relationship nurturing to boost retention.',
     skills: ['Check-Ins', 'Satisfaction Surveys', 'Upselling'],
     estimatedHours: 15,
+    responsibilities: [
+      'Send check-in messages to clients after service delivery',
+      'Distribute satisfaction surveys and compile the results',
+      'Identify upsell and cross-sell opportunities based on client history',
+      'Nurture relationships with personalized touchpoints on milestones',
+      'Track client retention metrics and flag at-risk accounts',
+    ],
+    sampleTasks: [
+      'Send a 30-day check-in email to clients who completed onboarding last month',
+      'Distribute a satisfaction survey to all Q1 clients',
+      'Identify 5 existing clients who might benefit from our new premium tier',
+      'Draft a personalized anniversary message for our top 10 clients',
+    ],
   },
 ];
 
@@ -345,6 +488,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-31T09:15:00Z',
     needsApproval: true,
     approved: null,
+    status: 'success',
     deliverablePreview:
       '🌸 Spring is here and so are our biggest deals! Swipe through to see what\'s new this season. Slide 1: "Fresh Starts, Fresh Savings" — 20% off all services…',
   },
@@ -358,6 +502,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-28T16:30:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-3',
@@ -369,6 +514,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-30T10:00:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-4',
@@ -380,6 +526,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-29T14:20:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-5',
@@ -391,6 +538,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-31T08:05:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-6',
@@ -402,6 +550,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-31T13:45:00Z',
     needsApproval: true,
     approved: null,
+    status: 'success',
     deliverablePreview:
       'Greenfield Corp Overview: Founded 2019, HQ Austin TX. Revenue ~$2M ARR, 45 FTE. Currently expanding into Southeast region. Key contact: Dana Reeves, VP Growth. ICP score: 92/100…',
   },
@@ -415,6 +564,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-28T10:30:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-8',
@@ -426,6 +576,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-28T15:00:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-9',
@@ -437,6 +588,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-30T09:00:00Z',
     needsApproval: false,
     approved: null,
+    status: 'success',
   },
   {
     id: 'act-10',
@@ -448,6 +600,7 @@ export const MOCK_ACTIVITY: ActivityEntry[] = [
     timestamp: '2026-03-31T11:30:00Z',
     needsApproval: true,
     approved: null,
+    status: 'success',
     deliverablePreview:
       '🧵 1/5 The landscape is shifting fast — here are 3 trends every small business owner should watch this quarter. Thread 👇\n\n2/5 Trend #1: AI-powered customer service is no longer optional…',
   },

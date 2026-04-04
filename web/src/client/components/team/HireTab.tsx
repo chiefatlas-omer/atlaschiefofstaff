@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { DEPARTMENT_INFO, type Blueprint, type Department, type Employee, type Role } from '../../lib/team-types';
+import { DEPARTMENT_INFO, type Blueprint, type Department, type Employee, type HireCustomization, type Role } from '../../lib/team-types';
 import { BlueprintCard } from './BlueprintCard';
-import { HireConfirmModal } from './HireConfirmModal';
 import { RoleCard } from './RoleCard';
+import { RoleDetailPanel } from './RoleDetailPanel';
 
 interface HireTabProps {
   roles: Role[];
   blueprints: Blueprint[];
   employees: Employee[];
-  onHire: (role: Role) => void;
+  onHire: (data: HireCustomization) => void;
   onImportBlueprint: (blueprint: Blueprint) => void;
 }
 
@@ -21,7 +21,7 @@ const DEPARTMENT_FILTERS: { key: Department | null; label: string }[] = [
 
 export function HireTab({ roles, blueprints, employees, onHire, onImportBlueprint }: HireTabProps) {
   const [activeDepartment, setActiveDepartment] = useState<Department | null>(null);
-  const [confirmRole, setConfirmRole] = useState<Role | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
 
   const hiredRoleNames = new Set(employees.map((e) => e.role));
 
@@ -30,14 +30,12 @@ export function HireTab({ roles, blueprints, employees, onHire, onImportBlueprin
     : roles;
 
   const handleHireClick = (role: Role) => {
-    setConfirmRole(role);
+    setSelectedRole(role);
   };
 
-  const handleConfirm = () => {
-    if (confirmRole) {
-      onHire(confirmRole);
-      setConfirmRole(null);
-    }
+  const handleHireFromPanel = (data: HireCustomization) => {
+    onHire(data);
+    setSelectedRole(null);
   };
 
   return (
@@ -115,12 +113,12 @@ export function HireTab({ roles, blueprints, employees, onHire, onImportBlueprin
         </button>
       </div>
 
-      {/* Confirmation modal */}
-      {confirmRole && (
-        <HireConfirmModal
-          role={confirmRole}
-          onConfirm={handleConfirm}
-          onCancel={() => setConfirmRole(null)}
+      {/* Role detail slide-out panel */}
+      {selectedRole && (
+        <RoleDetailPanel
+          role={selectedRole}
+          onClose={() => setSelectedRole(null)}
+          onHire={handleHireFromPanel}
         />
       )}
     </div>
