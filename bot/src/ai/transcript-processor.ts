@@ -19,9 +19,14 @@ export async function processTranscript(
   transcriptText: string,
   participantMapping?: Record<string, string>,
   hostContext?: { hostName: string },
+  externalNames?: string[],
 ): Promise<TranscriptResult> {
-  const mappingInfo = participantMapping && Object.keys(participantMapping).length > 0
-    ? '\n\nMeeting participants (Zoom name → Slack user ID):\n' + JSON.stringify(participantMapping)
+  const internalNames = participantMapping ? Object.keys(participantMapping) : [];
+  const mappingInfo = internalNames.length > 0
+    ? '\n\nINTERNAL team members (only assign tasks to these people):\n' + internalNames.join(', ')
+    + (externalNames && externalNames.length > 0
+      ? '\n\nEXTERNAL participants (do NOT assign tasks to these people):\n' + externalNames.join(', ')
+      : '')
     : '';
 
   const hostInfo = hostContext

@@ -125,22 +125,18 @@ Rules:
 
 export const TRANSCRIPT_PROCESSING_PROMPT = `You are analyzing a Zoom meeting transcript to extract action items, decisions, and open questions.
 
-An action item is ANY task, to-do, request, or commitment made during the meeting. Be AGGRESSIVE about finding tasks — it is better to catch too many than to miss them. Examples of action items:
-- "I'll send that over by Friday" → action item for the speaker
-- "Can you remind me to book a reservation?" → action item for the person being asked
-- "Olivia, can you handle the follow-up?" → action item for Olivia
-- "Let me take care of that" → action item for the speaker
-- "We need to get X done by next week" → action item for whoever volunteered or was discussed
-- "I'll follow up with the client" → action item for the speaker
-- "Hey [person], can you [do something]?" → action item for [person]
-- "[Person], please [do something]" → action item for [person]
+An action item is ANY task, to-do, request, or commitment made during the meeting by an INTERNAL team member. Examples:
+- "I'll send that over by Friday" → action item for the speaker (if internal)
+- "Olivia, can you handle the follow-up?" → action item for Olivia (if internal)
+- "Let me take care of that" → action item for the speaker (if internal)
+- "I'll follow up with the client" → action item for the speaker (if internal)
 
 When someone ASKS another person to do something (e.g., "Can you...", "Would you...", "Please..."), the owner is the person being ASKED, not the person asking.
 
-Even if the meeting is short or casual, extract ANY tasks or requests mentioned. Do NOT return empty action_items if there are clear requests or commitments in the transcript.
+CRITICAL: Only extract action items for INTERNAL team members (people listed in the participant mapping below). Do NOT extract tasks for external contacts, clients, prospects, or anyone not in your team. If an external person says "I'll send you the contract", that is NOT an action item — it's their responsibility, not your team's. If an internal person says "I need to follow up with them about the contract", that IS an action item for the internal person.
 
 For each action item, extract:
-- owner_name: The person responsible (the person being ASKED or who VOLUNTEERED, not the person giving the instruction)
+- owner_name: The INTERNAL person responsible (must be someone from the participant mapping). Do NOT assign tasks to external people.
 - action: What they need to do
 - deadline_text: Any mentioned deadline, or null
 - context: One sentence of surrounding context from the discussion

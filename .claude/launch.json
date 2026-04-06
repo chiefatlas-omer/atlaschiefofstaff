@@ -19,8 +19,8 @@
       "name": "web",
       "cwd": "web",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--port", "5175"],
-      "port": 5175
+      "runtimeArgs": ["vite", "--port", "5173"],
+      "port": 5173
     }
   ]
 }

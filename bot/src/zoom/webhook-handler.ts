@@ -588,14 +588,9 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
         participantMapping[host.name] = host.slackId;
         console.log('Direct-mapped host name:', host.name, '->', host.slackId);
       }
-      // If there are unmapped participants, map the first one to host
-      for (const pName of participantNames) {
-        if (!participantMapping[pName]) {
-          participantMapping[pName] = host.slackId;
-          console.log('Fallback-mapped participant to host:', pName, '->', host.slackId);
-          break;
-        }
-      }
+      // NOTE: We intentionally do NOT fallback-map unknown participants to the host.
+      // Unknown participants are likely external contacts and mapping them to the host
+      // would cause their tasks to be auto-assigned to the host incorrectly.
     }
 
     console.log('Resolved participant mapping:', participantMapping);
@@ -619,8 +614,9 @@ export async function handleZoomWebhook(payload: any, slackClient: any) {
 
     // Process transcript with Claude
     // If we know the host, tell Claude so it can attribute "I will..." statements
+    // Pass external names so Claude knows NOT to assign tasks to them
     const hostContext = host ? { hostName: host.name } : undefined;
-    const result = await processTranscript(transcriptText, participantMapping, hostContext);
+    const result = await processTranscript(transcriptText, participantMapping, hostContext, meetingInfo.externalNames);
 
     if (meetingInfo.type === 'team') {
       // TEAM MEETING: Post to #founderhubhq (public)
@@ -920,10 +916,11 @@ async function handleTeamMeeting(
     ],
   });
 
-  // Create tasks for each action item with a known owner
+  // Create tasks for each action item with a known INTERNAL owner
+  // Skip any tasks assigned to external participants
   for (const item of result.action_items) {
     const slackUserId = participantMapping[item.owner_name];
-    if (slackUserId) {
+    if (slackUserId && meetingInfo.internalSlackIds.includes(slackUserId)) {
       createTask({
         slackUserId,
         slackUserName: item.owner_name,
@@ -935,6 +932,8 @@ async function handleTeamMeeting(
         source: 'zoom',
         zoomMeetingId: recording.id?.toString(),
       });
+    } else if (slackUserId) {
+      console.log(`[TASK SKIP] Skipping task for "${item.owner_name}" — not an internal participant for this meeting`);
     }
   }
 }
@@ -989,10 +988,11 @@ async function handlePrivateMeeting(
     }
   }
 
-  // Auto-create tasks for action items where the owner is a known internal user
+  // Auto-create tasks for action items where the owner is a known INTERNAL user
+  // Skip any tasks assigned to external participants
   for (const item of result.action_items) {
     const slackUserId = participantMapping[item.owner_name];
-    if (slackUserId) {
+    if (slackUserId && meetingInfo.internalSlackIds.includes(slackUserId)) {
       createTask({
         slackUserId,
         slackUserName: item.owner_name,
@@ -1004,6 +1004,8 @@ async function handlePrivateMeeting(
         source: 'zoom',
         zoomMeetingId: meetingId,
       });
+    } else if (slackUserId) {
+      console.log(`[TASK SKIP] Skipping task for "${item.owner_name}" — not an internal participant for this meeting`);
     }
   }
 }
